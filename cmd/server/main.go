@@ -24,7 +24,7 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(mw.RateLimiter(config.Cfg.RateLimit, config.Cfg.RateWindow))
 
-	e.POST("/v1/address", handler.HandleAddressRequest)
+	e.POST("/v1/validate", handler.HandleAddressRequest)
 
 	addr := fmt.Sprintf(":%d", config.Cfg.Port)
 	log.Printf("server starting on %s", addr)

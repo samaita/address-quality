@@ -82,7 +82,7 @@ make run
 ```
 
 ```bash
-curl -X POST http://localhost:8080/v1/address \
+curl -X POST http://localhost:8080/v1/validate \
   -H "Content-Type: application/json" \
   -d '{"address":"Jl. Merdeka No.1, Jakarta Pusat 10110"}'
 ```
@@ -119,7 +119,7 @@ All configuration is via `.env` file (not committed — see `.env.example`). Res
 
 ## 5. API Reference
 
-### `POST /v1/address`
+### `POST /v1/validate`
 
 #### Request
 
@@ -178,7 +178,7 @@ X-RateLimit-Reset: 1718000000
 ## 6. Data Flow
 
 ```
-Client → POST /v1/address
+Client → POST /v1/validate
           │
           ▼
     Echo Router
