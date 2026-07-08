@@ -9,6 +9,64 @@ A lightweight Go HTTP server that accepts free-text Indonesian address input, sa
 
 ---
 
+### 1.1 Problem: Bad Addresses in Indonesian E-Commerce
+
+Indonesian e-commerce end users routinely submit addresses that are structurally undeliverable: landmark-based inputs (*"dekat masjid Al-Ikhlas, gang Mawar, Bekasi Timur"*), missing kelurahan / kecamatan, abbreviated informal names, or references to non-standard geographic features. Developers at 3PL-integrating startups (JNE, SiCepat, AnterAja) forward these strings directly to routing APIs — the failure surfaces days later as a failed delivery, a CS ticket, or a re-delivery charge.
+
+**How bad addresses contribute to failed delivery.** Bad address data is a top-two structural cause of failed first-attempt deliveries globally, ranking second only to recipient unavailability. Across global research:
+
+- First-attempt delivery failure rates run **5–20%** domestically.
+- In a 10,000-delivery study, incorrect address data alone caused **28% of failed deliveries** — second only to recipient unavailability.
+- Industry surveys attribute **60–71%** of all failed deliveries to inaccurate or incomplete address data when counting every address-related failure mode.
+- Incorrect / incomplete addresses consistently account for **25–45%** of first-attempt failures in large-scale datasets.
+
+Indonesia's context amplifies the problem: 17,000+ islands, informal addressing (`gang`, RT/RW, landmark references), continuous pemekaran (new administrative subdivisions), and a World Bank LPI 2023 rank of **63/139** (down from 46 in 2018) with pronounced weaknesses in Timeliness and Tracking — both address-sensitive dimensions.
+
+**Common bad-address patterns:**
+
+1. **Typo / informal spelling of a location name**
+   Input: `"4 Koto, Kabupaten Agam, Sumatera Barat"`
+   — The official name is "IV Koto" (Roman numeral), but users commonly type
+     "4 Koto" or "Empat Koto". Courier systems may not resolve "4" → "IV",
+     causing failed geocoding or misrouting to a different sorting zone.
+
+2. **Postal code / location mismatch**
+   Input: `"Jl. Siliwangi No.1, Bogor 16119"`
+   — Address is in Kota Bogor (postal code range specific to kelurahan), but
+     16119 is a Kabupaten Bogor code. The mismatch can trigger wrong regional
+     pricing (ongkir) or route the package to a sorting center in the wrong
+     administrative area.
+
+3. **Incomplete administrative hierarchy**
+   Input: `"Kapuas Tengah, Kalimantan"`
+   — Kapuas Tengah is a district (kecamatan) in Kabupaten Kapuas, Kalimantan
+     Tengah. Omitting "Tengah" from the province name introduces ambiguity —
+     there are four other Kapuas-named districts across Kalimantan Barat and
+     Kalimantan Timur, any of which could be inferred by the courier's system.
+
+**Rank among failure causes (Indonesia, qualitative).** Local studies (2024 Bandung e-commerce logistics study; distribution irregularity analyses in Indonesian 3PLs) identify data-entry errors, wrong address / route, and order-accuracy failures as primary drivers of customer dissatisfaction and operational loss — pairing with global benchmarks to place address quality as the #1 or #2 failure cause depending on the dataset.
+
+**Cost spent, monthly (IDR).** Per-failure cost in developed markets is **>USD 15** (~Rp 225.000 at Rp 15.000 / USD) when re-delivery, reverse logistics, CS handling, and refund processing are summed. Indonesian 3PLs operate under higher baseline logistics costs (25–30% of GDP) and thin-margin routes, so the marginal cost of each failed attempt is comparable or higher. A representative developer-team exposure:
+
+| Scenario | Monthly bad-address loss (IDR) |
+|---|---|
+| 1.000 orders / mo × 10% failed × 30% address-attributable × Rp 225.000 | **~Rp 6.750.000 / mo** (~USD 450) |
+| 10.000 orders / mo (same ratios) | **~Rp 67.500.000 / mo** (~USD 4.500) |
+| 100.000 orders / mo (same ratios) | **~Rp 675.000.000 / mo** (~USD 45.000) |
+
+**Proof that validation moves the metric.** Tokopedia's internal address validation platform reported a **~10% uplift in successfully completed addresses** after deployment; Paxel reports **up to 99% reduction in pickup/delivery time**. Both are enterprise-scale builds unavailable to small developer teams.
+
+**Market gap.** No lightweight, API-first, self-serve Indonesian address validation tool is publicly available at the developer layer. Existing options fail:
+- **Google Maps Geocoding:** priced and designed for lat/lng, not deliverability validation; developers pay USD 0.005 / call for a side-effect check.
+- **Raja Ongkir / Biteship:** logistics-layer APIs that assume the address is already clean.
+- **In-house builds:** require a curated corpus + parsing logic + ongoing maintenance — out of scope for 2–10 person teams.
+
+### 1.2 Solution
+
+The API is a **classification signal, not a gate**. Given a free-text string, it returns a structured response with quality metadata — confidence score, parsed location fields, and normalized output. Integrators decide the action: accept with warnings, request correction, or enrich before forwarding to the courier.
+
+---
+
 ## 2. Quick Start
 
 ```bash
@@ -179,7 +237,32 @@ CREATE TABLE IF NOT EXISTS address_requests (
 
 ---
 
-## 8. Rate Limiting
+## 8. Geocoding Strategy (v1 → v3 Evolution)
+
+The algorithm evolves across major versions to balance accuracy, cost, and coverage for Indonesian addresses.
+
+### v1: Administrative Tree Parser
+Parse the free-text input and discard all non-administrative tokens (landmarks, gang, RT/RW, building names). Extract only the administrative hierarchy (province → city/kabupaten → kecamatan → kelurahan → postal code) and validate it against a known reference tree. Fast, zero-cost, works fully offline — but cannot resolve ambiguous or novel locations.
+
+### v2: OpenStreetMap Geocoding
+Supply the full address string to a self-hosted or API-based OSM Nominatim instance. OSM's Indonesia coverage is strong for major roads and administrative boundaries. No API key required — only infrastructure cost. Coverage gaps exist in rural/peri-urban areas and newly pemekaran regions.
+
+### v3: Google Maps Geocoding Fallback
+If OSM returns low confidence or no result, fall back to the Google Maps Geocoding API for the same query. Higher cost (~USD 0.005 / call) but better coverage for informal addresses, landmarks, and newly created subdivisions. Reserved for the subset of queries that OSM cannot resolve.
+
+### Summary
+
+| Version | Method              | Cost     | Coverage | Offline |
+|---------|---------------------|----------|----------|---------|
+| v1      | Admin tree parser   | Free     | Moderate | ✅      |
+| v2      | OSM Nominatim       | Free*    | Good     | ❌      |
+| v3      | Google Maps fallback| Paid     | Best     | ❌      |
+
+\* Self-hosted infrastructure cost only
+
+---
+
+## 9. Rate Limiting
 
 - **Library**: `github.com/samaita/go-http-ratelimit`
 - **Strategy**: Token bucket (in-memory, per IP)
@@ -192,7 +275,7 @@ Future: Redis-backed distributed rate limiting for multi-instance deployments.
 
 ---
 
-## 9. Architecture Decisions
+## 10. Architecture Decisions
 
 | Decision | Rationale |
 |----------|-----------|
@@ -206,7 +289,7 @@ Future: Redis-backed distributed rate limiting for multi-instance deployments.
 
 ---
 
-## 10. Future Features (Open for Contribution)
+## 11. Future Features (Open for Contribution)
 
 - [ ] **API authentication** (API key via `API_KEY` env var, header validation)
 - [ ] **Health check endpoint** (`GET /health`)
