@@ -21,7 +21,7 @@ air:
 test-api: test-api-smoke test-api-load
 
 test-api-smoke:
-	k6 run tests/api/smoke-test.js
+	./tests/api/run-k6.sh smoke-test tests/api/smoke-test.js
 
 test-api-load:
-	k6 run tests/api/load-test.js
+	./tests/api/run-k6.sh load-test tests/api/load-test.js
