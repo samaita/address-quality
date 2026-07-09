@@ -15,12 +15,13 @@ import (
 )
 
 type Handler struct {
-	repo *database.Repository
-	s    *sanitizer.Sanitizer
+	repo             *database.Repository
+	s                *sanitizer.Sanitizer
+	maxAddressLength int
 }
 
-func New(repo *database.Repository, s *sanitizer.Sanitizer) *Handler {
-	return &Handler{repo: repo, s: s}
+func New(repo *database.Repository, s *sanitizer.Sanitizer, maxAddressLength int) *Handler {
+	return &Handler{repo: repo, s: s, maxAddressLength: maxAddressLength}
 }
 
 func (h *Handler) HandleHealthCheck(c echo.Context) error {
@@ -50,6 +51,10 @@ func (h *Handler) HandleAddressRequest(c echo.Context) error {
 
 	if req.Address == "" {
 		return errorResponse(c, http.StatusBadRequest, "address is required")
+	}
+
+	if len(req.Address) > h.maxAddressLength {
+		return errorResponse(c, http.StatusBadRequest, "address exceeds maximum length of 1000 characters")
 	}
 
 	now := time.Now().UTC()
