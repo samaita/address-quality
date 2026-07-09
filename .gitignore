@@ -3,3 +3,4 @@ tmp/
 address.db
 tests/api/result/
 docs/ISSUES.md
+bin
