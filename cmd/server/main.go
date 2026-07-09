@@ -20,6 +20,8 @@ func main() {
 
 	e := echo.New()
 
+	e.GET("/health", handler.HandleHealthCheck)
+
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(mw.RateLimiter(config.Cfg.RateLimit, config.Cfg.RateWindow))

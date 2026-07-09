@@ -14,6 +14,24 @@ import (
 	"address-quality/internal/sanitizer"
 )
 
+func HandleHealthCheck(c echo.Context) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	if err := database.DB.Ping(); err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"status":    "error",
+			"timestamp": now,
+			"error":     err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"status":    "ok",
+		"timestamp": now,
+		"database":  "ok",
+	})
+}
+
 func errorResponse(c echo.Context, status int, msg string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	requestID := uuid.Must(uuid.NewV7()).String()
