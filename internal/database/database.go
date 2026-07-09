@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"time"
@@ -66,13 +67,13 @@ type AddressRecord struct {
 	CreatedAt       time.Time
 }
 
-func InsertRecord(r *AddressRecord) error {
+func InsertRecord(ctx context.Context, r *AddressRecord) error {
 	query := `INSERT INTO address_requests (
 		id, address_id, raw_input, normalized_address,
 		confidence, postal_code, sub_district, district, city, province,
 		location_version, output_json, created_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := DB.Exec(query,
+	_, err := DB.ExecContext(ctx, query,
 		r.ID, r.AddressID, r.RawInput, r.NormalizedAddr,
 		r.Confidence, r.PostalCode, r.SubDistrict, r.District, r.City, r.Province,
 		r.LocationVersion, r.OutputJSON, r.CreatedAt.Format(time.RFC3339),
