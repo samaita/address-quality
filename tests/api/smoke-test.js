@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import { check, group } from 'k6';
 
-const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:8080';
+const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:7300';
 
 export const options = {
   vus: 1,
