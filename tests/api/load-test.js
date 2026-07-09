@@ -3,7 +3,7 @@ import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Trend } from 'k6/metrics';
 
-const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:8080';
+const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:7300';
 const TARGET_VUS = parseInt(__ENV.K6_VUS) || 10;
 
 const addresses = new SharedArray('addresses', function () {
