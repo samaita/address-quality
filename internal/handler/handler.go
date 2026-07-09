@@ -32,9 +32,8 @@ func (h *Handler) HandleHealthCheck(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func errorResponse(c echo.Context, status int, msg string) error {
+func errorResponse(c echo.Context, status int, msg string, requestID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	requestID := uuid.Must(uuid.NewV7()).String()
 	resp := map[string]string{
 		"timestamp":  now,
 		"request_id": requestID,
@@ -44,21 +43,22 @@ func errorResponse(c echo.Context, status int, msg string) error {
 }
 
 func (h *Handler) HandleAddressRequest(c echo.Context) error {
+	requestID := uuid.Must(uuid.NewV7()).String()
+
 	var req model.AddressRequest
 	if err := c.Bind(&req); err != nil {
-		return errorResponse(c, http.StatusBadRequest, "invalid request body")
+		return errorResponse(c, http.StatusBadRequest, "invalid request body", requestID)
 	}
 
 	if req.Address == "" {
-		return errorResponse(c, http.StatusBadRequest, "address is required")
+		return errorResponse(c, http.StatusBadRequest, "address is required", requestID)
 	}
 
 	if len(req.Address) > h.maxAddressLength {
-		return errorResponse(c, http.StatusBadRequest, "address exceeds maximum length of 1000 characters")
+		return errorResponse(c, http.StatusBadRequest, "address exceeds maximum length of 1000 characters", requestID)
 	}
 
 	now := time.Now().UTC()
-	requestID := uuid.Must(uuid.NewV7()).String()
 	addressID := uuid.Must(uuid.NewV7()).String()
 
 	rawInput := req.Address
@@ -80,7 +80,7 @@ func (h *Handler) HandleAddressRequest(c echo.Context) error {
 		Quality:   quality,
 	}
 
-	outputJSON, _ := json.Marshal(sanitizedAddr)
+	outputJSON, _ := json.Marshal(quality)
 
 	record := &database.AddressRecord{
 		ID:               requestID,
@@ -100,7 +100,7 @@ func (h *Handler) HandleAddressRequest(c echo.Context) error {
 
 	ctx := c.Request().Context()
 	if err := h.repo.InsertRecord(ctx, record); err != nil {
-		return errorResponse(c, http.StatusInternalServerError, "failed to store record")
+		return errorResponse(c, http.StatusInternalServerError, "failed to store record", requestID)
 	}
 
 	return c.JSON(http.StatusOK, resp)
