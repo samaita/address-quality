@@ -23,6 +23,8 @@ func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
 	e.GET("/health", h.HandleHealthCheck)
 
 	api := e.Group("")
+	api.Use(middleware.BodyLimit(cfg.MaxBodySize))
+	api.Use(mw.APIKeyAuth(cfg.APIKey))
 	api.Use(mw.RateLimiter(cfg.RateLimit, cfg.RateWindow))
 	api.POST("/v1/validate", h.HandleAddressRequest)
 

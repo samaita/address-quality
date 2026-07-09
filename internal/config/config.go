@@ -7,12 +7,14 @@ import (
 )
 
 type Config struct {
-	Port         int
-	APIKey       string
-	RateLimit    int
-	RateWindow   int
-	ReadTimeout  int
-	WriteTimeout int
+	Port             int
+	APIKey           string
+	RateLimit        int
+	RateWindow       int
+	ReadTimeout      int
+	WriteTimeout     int
+	MaxBodySize      string
+	MaxAddressLength int
 }
 
 func Load() *Config {
@@ -27,18 +29,22 @@ func Load() *Config {
 	viper.SetDefault("RATE_WINDOW", 60)
 	viper.SetDefault("READ_TIMEOUT", 5)
 	viper.SetDefault("WRITE_TIMEOUT", 10)
+	viper.SetDefault("MAX_BODY_SIZE", "1M")
+	viper.SetDefault("MAX_ADDRESS_LENGTH", 1000)
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("warning: .env not found, using defaults: %v", err)
 	}
 
 	cfg := &Config{
-		Port:         viper.GetInt("PORT"),
-		APIKey:       viper.GetString("API_KEY"),
-		RateLimit:    viper.GetInt("RATE_LIMIT"),
-		RateWindow:   viper.GetInt("RATE_WINDOW"),
-		ReadTimeout:  viper.GetInt("READ_TIMEOUT"),
-		WriteTimeout: viper.GetInt("WRITE_TIMEOUT"),
+		Port:             viper.GetInt("PORT"),
+		APIKey:           viper.GetString("API_KEY"),
+		RateLimit:        viper.GetInt("RATE_LIMIT"),
+		RateWindow:       viper.GetInt("RATE_WINDOW"),
+		ReadTimeout:      viper.GetInt("READ_TIMEOUT"),
+		WriteTimeout:     viper.GetInt("WRITE_TIMEOUT"),
+		MaxBodySize:      viper.GetString("MAX_BODY_SIZE"),
+		MaxAddressLength: viper.GetInt("MAX_ADDRESS_LENGTH"),
 	}
 
 	log.Printf("config loaded: port=%d, rate_limit=%d, rate_window=%ds", cfg.Port, cfg.RateLimit, cfg.RateWindow)

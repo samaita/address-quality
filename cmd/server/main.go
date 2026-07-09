@@ -20,7 +20,7 @@ func main() {
 	}
 
 	s := sanitizer.New(sanitizer.DefaultPolicy())
-	h := handler.New(repo, s)
+	h := handler.New(repo, s, cfg.MaxAddressLength)
 
 	e := router.Setup(h, cfg)
 
