@@ -265,11 +265,12 @@ If OSM returns low confidence or no result, fall back to the Google Maps Geocodi
 ## 9. Rate Limiting
 
 - **Library**: `github.com/samaita/go-http-ratelimit`
-- **Strategy**: Token bucket (in-memory, per IP)
-- **Default**: 100 requests per 60-second window
+- **Strategy**: Token bucket (in-memory, per IP per endpoint via `Rules` pattern matching on `* /v1/*`)
+- **Default**: 100 requests per 60-second window per IP per `/v1/*` endpoint
 - **Configurable** via `RATE_LIMIT` and `RATE_WINDOW` in `.env`
-- **Headers**: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
-- **Error**: HTTP 429 with JSON body
+- **Scope**: Only `/v1/*` is rate-limited; `/health` is exempt
+- **Headers**: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
+- **Error**: HTTP 429 with JSON body (includes dynamic `retry_after` matching configured window)
 
 Future: Redis-backed distributed rate limiting for multi-instance deployments.
 

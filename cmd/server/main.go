@@ -20,13 +20,14 @@ func main() {
 
 	e := echo.New()
 
-	e.GET("/health", handler.HandleHealthCheck)
-
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Use(mw.RateLimiter(config.Cfg.RateLimit, config.Cfg.RateWindow))
 
-	e.POST("/v1/validate", handler.HandleAddressRequest)
+	e.GET("/health", handler.HandleHealthCheck)
+
+	api := e.Group("")
+	api.Use(mw.RateLimiter(config.Cfg.RateLimit, config.Cfg.RateWindow))
+	api.POST("/v1/validate", handler.HandleAddressRequest)
 
 	addr := fmt.Sprintf(":%d", config.Cfg.Port)
 	log.Printf("server starting on %s", addr)
