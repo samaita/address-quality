@@ -9,29 +9,31 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-var DB *sql.DB
+type Repository struct {
+	db *sql.DB
+}
 
-func Init(dbPath string) {
-	var err error
-	DB, err = sql.Open("sqlite", dbPath)
+func New(dbPath string) (*Repository, error) {
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		log.Fatalf("failed to open database: %v", err)
+		return nil, err
 	}
 
-	DB.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(1)
 
-	if err = DB.Ping(); err != nil {
-		log.Fatalf("failed to ping database: %v", err)
+	if err = db.Ping(); err != nil {
+		return nil, err
 	}
 
-	if err = migrate(); err != nil {
-		log.Fatalf("failed to run migrations: %v", err)
+	if err = migrate(db); err != nil {
+		return nil, err
 	}
 
 	log.Printf("database initialized: %s", dbPath)
+	return &Repository{db: db}, nil
 }
 
-func migrate() error {
+func migrate(db *sql.DB) error {
 	query := `CREATE TABLE IF NOT EXISTS address_requests (
 		id                TEXT PRIMARY KEY,
 		address_id        TEXT NOT NULL,
@@ -47,7 +49,7 @@ func migrate() error {
 		output_json       TEXT DEFAULT '',
 		created_at        TEXT NOT NULL
 	);`
-	_, err := DB.Exec(query)
+	_, err := db.Exec(query)
 	return err
 }
 
@@ -67,16 +69,20 @@ type AddressRecord struct {
 	CreatedAt       time.Time
 }
 
-func InsertRecord(ctx context.Context, r *AddressRecord) error {
+func (r *Repository) InsertRecord(ctx context.Context, rec *AddressRecord) error {
 	query := `INSERT INTO address_requests (
 		id, address_id, raw_input, normalized_address,
 		confidence, postal_code, sub_district, district, city, province,
 		location_version, output_json, created_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := DB.ExecContext(ctx, query,
-		r.ID, r.AddressID, r.RawInput, r.NormalizedAddr,
-		r.Confidence, r.PostalCode, r.SubDistrict, r.District, r.City, r.Province,
-		r.LocationVersion, r.OutputJSON, r.CreatedAt.Format(time.RFC3339),
+	_, err := r.db.ExecContext(ctx, query,
+		rec.ID, rec.AddressID, rec.RawInput, rec.NormalizedAddr,
+		rec.Confidence, rec.PostalCode, rec.SubDistrict, rec.District, rec.City, rec.Province,
+		rec.LocationVersion, rec.OutputJSON, rec.CreatedAt.Format(time.RFC3339),
 	)
 	return err
+}
+
+func (r *Repository) Ping(ctx context.Context) error {
+	return r.db.PingContext(ctx)
 }
