@@ -82,7 +82,7 @@ make run
 ```
 
 ```bash
-curl -X POST http://localhost:8080/v1/validate \
+curl -X POST http://localhost:7300/v1/validate \
   -H "Content-Type: application/json" \
   -d '{"address":"Jl. Merdeka No.1, Jakarta Pusat 10110"}'
 ```
@@ -110,7 +110,7 @@ All configuration is via `.env` file (not committed — see `.env.example`). Res
 
 | Key           | Default | Description                      |
 |---------------|---------|----------------------------------|
-| `PORT`        | `8080`  | HTTP listen port                 |
+| `PORT`        | `7300`  | HTTP listen port                 |
 | `API_KEY`     | `""`    | Reserved for future auth         |
 | `RATE_LIMIT`  | `100`   | Max requests per window          |
 | `RATE_WINDOW` | `60`    | Rate limit window in seconds     |

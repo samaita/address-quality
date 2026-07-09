@@ -21,7 +21,7 @@ func Init() {
 
 	viper.AutomaticEnv()
 
-	viper.SetDefault("PORT", 8080)
+	viper.SetDefault("PORT", 7300)
 	viper.SetDefault("API_KEY", "")
 	viper.SetDefault("RATE_LIMIT", 100)
 	viper.SetDefault("RATE_WINDOW", 60)
