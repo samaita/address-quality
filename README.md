@@ -292,7 +292,7 @@ Future: Redis-backed distributed rate limiting for multi-instance deployments.
 ## 11. Future Features (Open for Contribution)
 
 - [ ] **API authentication** (API key via `API_KEY` env var, header validation)
-- [ ] **Health check endpoint** (`GET /health`)
+- [x] **Health check endpoint** (`GET /health`)
 - [ ] **Graceful shutdown** (signal handling)
 - [ ] **Dockerfile + docker-compose**
 - [ ] **CI/CD** (GitHub Actions: lint, test, build)
