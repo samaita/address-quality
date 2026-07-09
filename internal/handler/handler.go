@@ -14,9 +14,18 @@ import (
 	"address-quality/internal/sanitizer"
 )
 
-func HandleHealthCheck(c echo.Context) error {
+type Handler struct {
+	repo *database.Repository
+	s    *sanitizer.Sanitizer
+}
+
+func New(repo *database.Repository, s *sanitizer.Sanitizer) *Handler {
+	return &Handler{repo: repo, s: s}
+}
+
+func (h *Handler) HandleHealthCheck(c echo.Context) error {
 	ctx := c.Request().Context()
-	if err := database.DB.PingContext(ctx); err != nil {
+	if err := h.repo.Ping(ctx); err != nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "error"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
@@ -33,7 +42,7 @@ func errorResponse(c echo.Context, status int, msg string) error {
 	return c.JSON(status, resp)
 }
 
-func HandleAddressRequest(c echo.Context) error {
+func (h *Handler) HandleAddressRequest(c echo.Context) error {
 	var req model.AddressRequest
 	if err := c.Bind(&req); err != nil {
 		return errorResponse(c, http.StatusBadRequest, "invalid request body")
@@ -48,7 +57,7 @@ func HandleAddressRequest(c echo.Context) error {
 	addressID := uuid.Must(uuid.NewV7()).String()
 
 	rawInput := req.Address
-	sanitizedAddr := sanitizer.Sanitize(req.Address)
+	sanitizedAddr := h.s.Sanitize(req.Address)
 
 	quality := model.Quality{
 		AddressID:       addressID,
@@ -85,7 +94,7 @@ func HandleAddressRequest(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	if err := database.InsertRecord(ctx, record); err != nil {
+	if err := h.repo.InsertRecord(ctx, record); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, "failed to store record")
 	}
 

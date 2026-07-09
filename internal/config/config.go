@@ -15,9 +15,7 @@ type Config struct {
 	WriteTimeout int
 }
 
-var Cfg *Config
-
-func Init() {
+func Load() *Config {
 	viper.SetConfigFile(".env")
 	viper.SetConfigType("env")
 
@@ -34,7 +32,7 @@ func Init() {
 		log.Printf("warning: .env not found, using defaults: %v", err)
 	}
 
-	Cfg = &Config{
+	cfg := &Config{
 		Port:         viper.GetInt("PORT"),
 		APIKey:       viper.GetString("API_KEY"),
 		RateLimit:    viper.GetInt("RATE_LIMIT"),
@@ -43,5 +41,6 @@ func Init() {
 		WriteTimeout: viper.GetInt("WRITE_TIMEOUT"),
 	}
 
-	log.Printf("config loaded: port=%d, rate_limit=%d, rate_window=%ds", Cfg.Port, Cfg.RateLimit, Cfg.RateWindow)
+	log.Printf("config loaded: port=%d, rate_limit=%d, rate_window=%ds", cfg.Port, cfg.RateLimit, cfg.RateWindow)
+	return cfg
 }

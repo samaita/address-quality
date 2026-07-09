@@ -2,12 +2,18 @@ package sanitizer
 
 import "github.com/microcosm-cc/bluemonday"
 
-var policy *bluemonday.Policy
-
-func init() {
-	policy = bluemonday.UGCPolicy()
+type Sanitizer struct {
+	policy *bluemonday.Policy
 }
 
-func Sanitize(input string) string {
-	return policy.Sanitize(input)
+func DefaultPolicy() *bluemonday.Policy {
+	return bluemonday.UGCPolicy()
+}
+
+func New(policy *bluemonday.Policy) *Sanitizer {
+	return &Sanitizer{policy: policy}
+}
+
+func (s *Sanitizer) Sanitize(input string) string {
+	return s.policy.Sanitize(input)
 }

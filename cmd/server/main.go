@@ -3,37 +3,28 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
-
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 
 	"address-quality/internal/config"
 	"address-quality/internal/database"
 	"address-quality/internal/handler"
-	mw "address-quality/internal/middleware"
+	"address-quality/internal/router"
+	"address-quality/internal/sanitizer"
 )
 
 func main() {
-	config.Init()
+	cfg := config.Load()
 
-	database.Init("address.db")
+	repo, err := database.New("address.db")
+	if err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
+	}
 
-	e := echo.New()
+	s := sanitizer.New(sanitizer.DefaultPolicy())
+	h := handler.New(repo, s)
 
-	e.Server.ReadTimeout = time.Duration(config.Cfg.ReadTimeout) * time.Second
-	e.Server.WriteTimeout = time.Duration(config.Cfg.WriteTimeout) * time.Second
+	e := router.Setup(h, cfg)
 
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-
-	e.GET("/health", handler.HandleHealthCheck)
-
-	api := e.Group("")
-	api.Use(mw.RateLimiter(config.Cfg.RateLimit, config.Cfg.RateWindow))
-	api.POST("/v1/validate", handler.HandleAddressRequest)
-
-	addr := fmt.Sprintf(":%d", config.Cfg.Port)
+	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("server starting on %s", addr)
 	e.Logger.Fatal(e.Start(addr))
 }
