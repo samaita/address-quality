@@ -15,7 +15,8 @@ import (
 )
 
 func HandleHealthCheck(c echo.Context) error {
-	if err := database.DB.Ping(); err != nil {
+	ctx := c.Request().Context()
+	if err := database.DB.PingContext(ctx); err != nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "error"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
@@ -83,7 +84,8 @@ func HandleAddressRequest(c echo.Context) error {
 		CreatedAt:        now,
 	}
 
-	if err := database.InsertRecord(record); err != nil {
+	ctx := c.Request().Context()
+	if err := database.InsertRecord(ctx, record); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, "failed to store record")
 	}
 

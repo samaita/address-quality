@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -19,6 +20,9 @@ func main() {
 	database.Init("address.db")
 
 	e := echo.New()
+
+	e.Server.ReadTimeout = time.Duration(config.Cfg.ReadTimeout) * time.Second
+	e.Server.WriteTimeout = time.Duration(config.Cfg.WriteTimeout) * time.Second
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
