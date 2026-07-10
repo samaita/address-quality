@@ -1,0 +1,10 @@
+bin/
+tmp/
+address.db
+tests/
+docs/
+.git
+.air.toml
+.vscode/
+.idea/
+*.md
