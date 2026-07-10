@@ -69,6 +69,8 @@ The API is a **classification signal, not a gate**. Given a free-text string, it
 
 ## 2. Quick Start
 
+### 2.1 Local
+
 ```bash
 git clone <repo-url> address-quality
 cd address-quality
@@ -85,6 +87,29 @@ make run
 curl -X POST http://localhost:7300/v1/validate \
   -H "Content-Type: application/json" \
   -d '{"address":"Jl. Merdeka No.1, Jakarta Pusat 10110"}'
+```
+
+---
+
+### 2.2 Container (Podman)
+
+Multi-stage Dockerfile: Go 1.26 builder → Alpine 3.21 runtime. Non-root user, port 7300, SQLite persisted via volume.
+
+```bash
+podman build -t address-quality .
+podman run -p 7300:7300 -v address-data:/data address-quality
+```
+
+| Dependency | Purpose |
+|---|---|
+| `golang:1.26-alpine` | Build stage |
+| `alpine:3.21` | Runtime (~5 MB) |
+| `.env` | Embedded config template (override per environment in CI) |
+
+The `.env` file is embedded in the image at `/data/.env`. Replace before building:
+
+```bash
+cp .env.production .env && podman build -t address-quality .
 ```
 
 ---
@@ -295,7 +320,7 @@ Future: Redis-backed distributed rate limiting for multi-instance deployments.
 - [ ] **API authentication** (API key via `API_KEY` env var, header validation)
 - [x] **Health check endpoint** (`GET /health`)
 - [ ] **Graceful shutdown** (signal handling)
-- [ ] **Dockerfile + docker-compose**
+- [x] **Dockerfile + docker-compose**
 - [ ] **CI/CD** (GitHub Actions: lint, test, build)
 - [ ] **Testing suite** (unit + integration tests)
 - [ ] **Structured logging** (zerolog or zap)
