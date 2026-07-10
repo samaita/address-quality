@@ -1,0 +1,11 @@
+services:
+  address-quality:
+    build: .
+    ports:
+      - "7300:7300"
+    volumes:
+      - address-data:/data
+    restart: unless-stopped
+
+volumes:
+  address-data:
