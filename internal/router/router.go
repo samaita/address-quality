@@ -26,6 +26,7 @@ func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
 	api.Use(middleware.BodyLimit(cfg.MaxBodySize))
 	api.Use(mw.APIKeyAuth(cfg.APIKey))
 	api.Use(mw.RateLimiter(cfg.RateLimit, cfg.RateWindow))
+	api.Use(mw.RequestID())
 	api.POST("/v1/validate", h.HandleAddressRequest)
 
 	return e
