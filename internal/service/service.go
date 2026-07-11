@@ -17,7 +17,7 @@ import (
 var ErrValidation = errors.New("validation error")
 
 type AddressRepository interface {
-	InsertRecord(ctx context.Context, rec *database.AddressRecord) error
+	InsertAddressRequest(ctx context.Context, rec *database.AddressRecord) error
 	Ping(ctx context.Context) error
 }
 
@@ -35,7 +35,7 @@ func (svc *Service) Ping(ctx context.Context) error {
 	return svc.repo.Ping(ctx)
 }
 
-func (svc *Service) ProcessAddress(ctx context.Context, req *model.AddressRequest, requestID string) (*model.AddressResponse, error) {
+func (svc *Service) ValidateAddress(ctx context.Context, req *model.AddressRequest, requestID string) (*model.AddressResponse, error) {
 	if err := req.Validate(svc.maxAddressLength); err != nil {
 		return nil, errors.Join(ErrValidation, err)
 	}
@@ -57,22 +57,22 @@ func (svc *Service) ProcessAddress(ctx context.Context, req *model.AddressReques
 	outputJSON, _ := json.Marshal(quality)
 
 	record := &database.AddressRecord{
-		ID:               requestID,
-		AddressID:        addressID,
-		RawInput:         req.Address,
-		NormalizedAddr:   sanitized,
-		Confidence:       0.0,
-		PostalCode:       "",
-		SubDistrict:      "",
-		District:         "",
-		City:             "",
-		Province:         "",
-		LocationVersion:  "",
-		OutputJSON:       string(outputJSON),
-		CreatedAt:        now,
+		ID:              requestID,
+		AddressID:       addressID,
+		RawInput:        req.Address,
+		NormalizedAddr:  sanitized,
+		Confidence:      0.0,
+		PostalCode:      "",
+		SubDistrict:     "",
+		District:        "",
+		City:            "",
+		Province:        "",
+		LocationVersion: "",
+		OutputJSON:      string(outputJSON),
+		CreatedAt:       now,
 	}
 
-	if err := svc.repo.InsertRecord(ctx, record); err != nil {
+	if err := svc.repo.InsertAddressRequest(ctx, record); err != nil {
 		return nil, err
 	}
 

@@ -46,7 +46,7 @@ func (h *Handler) HandleAddressRequest(c echo.Context) error {
 		return errorResponse(c, http.StatusBadRequest, "invalid request body", requestID)
 	}
 
-	resp, err := h.svc.ProcessAddress(c.Request().Context(), &req, requestID)
+	resp, err := h.svc.ValidateAddress(c.Request().Context(), &req, requestID)
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
 			return errorResponse(c, http.StatusBadRequest, err.Error(), requestID)

@@ -4,6 +4,7 @@ import "github.com/microcosm-cc/bluemonday"
 
 // Sanitizer is a struct that holds a bluemonday.Policy for sanitizing input strings.
 // The principle is to clean user input to prevent XSS attacks and other malicious content from being processed or stored.
+// Do not put any business logic in this package.
 type Sanitizer struct {
 	policy *bluemonday.Policy
 }

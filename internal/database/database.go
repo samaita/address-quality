@@ -69,7 +69,7 @@ type AddressRecord struct {
 	CreatedAt       time.Time
 }
 
-func (r *Repository) InsertRecord(ctx context.Context, rec *AddressRecord) error {
+func (r *Repository) InsertAddressRequest(ctx context.Context, rec *AddressRecord) error {
 	query := `INSERT INTO address_requests (
 		id, address_id, raw_input, normalized_address,
 		confidence, postal_code, sub_district, district, city, province,
