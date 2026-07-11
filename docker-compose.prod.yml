@@ -1,6 +1,7 @@
 services:
   address-quality:
     image: ghcr.io/samaita/address-quality:latest
+    container_name: address-quality
     pull_policy: always
     ports:
       - "7300:7300"
