@@ -89,28 +89,75 @@ curl -X POST http://localhost:7300/v1/validate \
   -d '{"address":"Jl. Merdeka No.1, Jakarta Pusat 10110"}'
 ```
 
----
-
-### 2.2 Container (Podman)
+### 2.2 Local Container (Docker Compose)
 
 Multi-stage Dockerfile: Go 1.26 builder → Alpine 3.21 runtime. Non-root user, port 7300, SQLite persisted via volume.
 
 ```bash
-podman build -t address-quality .
-podman run -p 7300:7300 -v address-data:/data address-quality
+cp .env.example .env
+docker compose up -d --build
+```
+
+Config is read from real environment variables (via `viper.AutomaticEnv()`), so the image is environment-agnostic — no `.env` baked in. Local dev mounts `.env` through compose.
+
+---
+
+### 2.3 Production Deployment (VPS + Podman)
+
+**Flow:** GitHub Actions builds on push to `main` → pushes image to `ghcr.io/samaita/address-quality:latest` → VPS pulls and runs via Podman.
+
+#### One-time VPS setup
+
+```bash
+# 1. Install podman + podman-compose on the VPS
+# 2. Copy deploy files from your machine
+scp deploy.sh docker-compose.prod.yml vps:~/address-quality/
+scp .env.prod vps:~/address-quality/   # create .env.prod locally first
+
+# 3. Authenticate to GHCR (only needed if the package is private)
+ssh vps
+podman login ghcr.io
+```
+
+`.env.prod` contains production config (API_KEY, rate limits, etc.):
+
+```bash
+PORT=7300
+API_KEY=<your-secret-key>
+RATE_LIMIT=100
+RATE_WINDOW=60
+MAX_BODY_SIZE=1M
+MAX_ADDRESS_LENGTH=1000
+```
+
+#### Deploy / Update
+
+```bash
+ssh vps
+cd ~/address-quality
+./deploy.sh
+```
+
+`deploy.sh` pulls the latest image, recreates the container, runs a health check on `/health`, and prunes dangling images. SQLite data persists in the `address-data` volume across deploys.
+
+#### Rollback
+
+Every CI build is also tagged `sha-<short>`. To roll back:
+
+```bash
+# List available tags
+podman images ghcr.io/samaita/address-quality
+
+# Edit docker-compose.prod.yml: image: ghcr.io/samaita/address-quality:sha-<short>
+# Then:
+./deploy.sh
 ```
 
 | Dependency | Purpose |
 |---|---|
 | `golang:1.26-alpine` | Build stage |
-| `alpine:3.21` | Runtime (~5 MB) |
-| `.env` | Embedded config template (override per environment in CI) |
-
-The `.env` file is embedded in the image at `/data/.env`. Replace before building:
-
-```bash
-cp .env.production .env && podman build -t address-quality .
-```
+| `alpine:3.21` | Runtime (~5 MB) + wget for healthcheck |
+| `.env.prod` | Production config (gitignored, never committed) |
 
 ---
 
