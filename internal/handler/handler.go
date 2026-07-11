@@ -51,12 +51,8 @@ func (h *Handler) HandleAddressRequest(c echo.Context) error {
 		return errorResponse(c, http.StatusBadRequest, "invalid request body", requestID)
 	}
 
-	if req.Address == "" {
-		return errorResponse(c, http.StatusBadRequest, "address is required", requestID)
-	}
-
-	if len(req.Address) > h.maxAddressLength {
-		return errorResponse(c, http.StatusBadRequest, "address exceeds maximum length of 1000 characters", requestID)
+	if err := req.Validate(h.maxAddressLength); err != nil {
+		return errorResponse(c, http.StatusBadRequest, err.Error(), requestID)
 	}
 
 	now := time.Now().UTC()
