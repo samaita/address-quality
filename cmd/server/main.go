@@ -9,6 +9,7 @@ import (
 	"address-quality/internal/handler"
 	"address-quality/internal/router"
 	"address-quality/internal/sanitizer"
+	"address-quality/internal/service"
 )
 
 func main() {
@@ -20,7 +21,8 @@ func main() {
 	}
 
 	s := sanitizer.New(sanitizer.DefaultPolicy())
-	h := handler.New(repo, s, cfg.MaxAddressLength)
+	svc := service.New(repo, s, cfg.MaxAddressLength)
+	h := handler.New(svc)
 
 	e := router.Setup(h, cfg)
 

@@ -1,33 +1,28 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
-	"encoding/json"
-
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	"address-quality/internal/database"
 	mw "address-quality/internal/middleware"
 	"address-quality/internal/model"
-	"address-quality/internal/sanitizer"
+	"address-quality/internal/service"
 )
 
 type Handler struct {
-	repo             *database.Repository
-	s                *sanitizer.Sanitizer
-	maxAddressLength int
+	svc *service.Service
 }
 
-func New(repo *database.Repository, s *sanitizer.Sanitizer, maxAddressLength int) *Handler {
-	return &Handler{repo: repo, s: s, maxAddressLength: maxAddressLength}
+func New(svc *service.Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) HandleHealthCheck(c echo.Context) error {
 	ctx := c.Request().Context()
-	if err := h.repo.Ping(ctx); err != nil {
+	if err := h.svc.Ping(ctx); err != nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "error"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
@@ -51,52 +46,11 @@ func (h *Handler) HandleAddressRequest(c echo.Context) error {
 		return errorResponse(c, http.StatusBadRequest, "invalid request body", requestID)
 	}
 
-	if err := req.Validate(h.maxAddressLength); err != nil {
-		return errorResponse(c, http.StatusBadRequest, err.Error(), requestID)
-	}
-
-	now := time.Now().UTC()
-	addressID := uuid.Must(uuid.NewV7()).String()
-
-	rawInput := req.Address
-	sanitizedAddr := h.s.Sanitize(req.Address)
-
-	quality := model.Quality{
-		AddressID:       addressID,
-		Confidence:      0.0,
-		Location:        model.Location{},
-		NormalizedInput: sanitizedAddr,
-		Output:          sanitizedAddr,
-		LocationVersion: "",
-		RawInput:        rawInput,
-	}
-
-	resp := model.AddressResponse{
-		Timestamp: now.Format(time.RFC3339),
-		RequestID: requestID,
-		Quality:   quality,
-	}
-
-	outputJSON, _ := json.Marshal(quality)
-
-	record := &database.AddressRecord{
-		ID:               requestID,
-		AddressID:        addressID,
-		RawInput:         rawInput,
-		NormalizedAddr:   sanitizedAddr,
-		Confidence:       0.0,
-		PostalCode:       "",
-		SubDistrict:      "",
-		District:         "",
-		City:             "",
-		Province:         "",
-		LocationVersion:  "",
-		OutputJSON:       string(outputJSON),
-		CreatedAt:        now,
-	}
-
-	ctx := c.Request().Context()
-	if err := h.repo.InsertRecord(ctx, record); err != nil {
+	resp, err := h.svc.ProcessAddress(c.Request().Context(), &req, requestID)
+	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			return errorResponse(c, http.StatusBadRequest, err.Error(), requestID)
+		}
 		return errorResponse(c, http.StatusInternalServerError, "failed to store record", requestID)
 	}
 
