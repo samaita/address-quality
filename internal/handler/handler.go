@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"address-quality/internal/database"
+	mw "address-quality/internal/middleware"
 	"address-quality/internal/model"
 	"address-quality/internal/sanitizer"
 )
@@ -43,7 +44,7 @@ func errorResponse(c echo.Context, status int, msg string, requestID string) err
 }
 
 func (h *Handler) HandleAddressRequest(c echo.Context) error {
-	requestID := uuid.Must(uuid.NewV7()).String()
+	requestID := mw.GetRequestID(c.Request().Context())
 
 	var req model.AddressRequest
 	if err := c.Bind(&req); err != nil {
