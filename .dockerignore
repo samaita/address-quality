@@ -4,7 +4,14 @@ address.db
 tests/
 docs/
 .git
+.github/
 .air.toml
 .vscode/
 .idea/
 *.md
+.env
+.env.prod
+.env.*
+docker-compose*.yml
+deploy.sh
+Makefile

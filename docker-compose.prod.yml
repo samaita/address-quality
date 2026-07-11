@@ -1,12 +1,13 @@
 services:
   address-quality:
-    build: .
+    image: ghcr.io/samaita/address-quality:latest
+    pull_policy: always
     ports:
       - "7300:7300"
     volumes:
       - address-data:/data
     env_file:
-      - .env
+      - .env.prod
     restart: unless-stopped
 
 volumes:
