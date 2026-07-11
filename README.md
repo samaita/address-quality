@@ -161,6 +161,24 @@ podman images ghcr.io/samaita/address-quality
 
 ---
 
+### 2.4 Reverse Proxy (Nginx)
+
+When running behind an nginx reverse proxy under a path prefix, use the example config at `deploy/nginx.example.conf`. Place it inside your server's `http` block.
+
+This maps the external path `/address-quality/v1/validate` to the upstream application's `/v1/validate` endpoint on port 7300:
+
+```nginx
+location /address-quality/ {
+    proxy_pass http://127.0.0.1:7300/;
+    # The trailing / strips the /address-quality prefix,
+    # so /address-quality/v1/validate -> /v1/validate
+}
+```
+
+The `$connection_upgrade` variable (used in proxy headers) is defined by a `map` directive in the `http` block. See the example file for the complete setup.
+
+---
+
 ## 3. Tech Stack
 
 | Component       | Technology                          | Version |
