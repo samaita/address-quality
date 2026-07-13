@@ -1,4 +1,4 @@
-.PHONY: run build test lint clean air test-api test-api-smoke test-api-load
+.PHONY: run build test lint clean air test-api test-api-smoke test-api-load build-seed seed
 
 run:
 	go run ./cmd/server
@@ -25,3 +25,9 @@ test-api-smoke:
 
 test-api-load:
 	./tests/api/run-k6.sh load-test tests/api/load-test.js
+
+build-seed:
+	go build -o bin/seeder ./cmd/seeder
+
+seed:
+	go run ./cmd/seeder --drop

@@ -325,6 +325,47 @@ CREATE TABLE IF NOT EXISTS address_requests (
 - All location fields are empty in MVP — reserved for geocoding integration
 - `created_at` stored as ISO8601 UTC string
 
+### Location Database
+
+The `location.db` SQLite database powers the administrative tree parser (v1). It stores Indonesian administrative region codes (province → city → district → village), their names, normalized forms, and postal codes — sourced from Kepmendagri No 300.2.2-2138 Tahun 2025.
+
+**Schema** is defined in `db/location.sql`:
+- `location_levels` — hierarchy level lookup (province/city/district/village)
+- `location_sources` — upstream data source registry
+- `location_codes` — core table with 90k+ administrative region records
+- `location_alias` — alternative names/abbreviations for locations
+
+#### Seeding
+
+The `seeder` binary parses MySQL dumps (`db/source/wilayah.sql`, `db/source/wilayah_kodepos.sql`) and populates `location.db`:
+
+```bash
+# Full reset: drop tables, recreate schema, seed data
+make seed
+
+# Or directly:
+go run ./cmd/seeder --drop
+
+# Retry without dropping schema (truncate data only):
+go run ./cmd/seeder --truncate
+
+# Show all options:
+go run ./cmd/seeder --help
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--source-code` | `kemendagri` | Source code identifier |
+| `--source-version` | `2025` | Dataset version tag |
+| `--source-name` | `Kepmendagri No 300.2.2-2138` | Human-readable source name |
+| `--source-date` | `""` | Effective date of the codes |
+| `--source-desc` | `""` | Description of the source dataset |
+| `--drop` | `false` | Drop all tables and recreate from `db/location.sql` before seeding |
+| `--truncate` | `false` | Truncate data rows (keep schema) before seeding |
+| `--db` | from `.env` | Path to `location.db` |
+
+`--drop` and `--truncate` are mutually exclusive — if both set, `--drop` wins.
+
 ---
 
 ## 8. Geocoding Strategy (v1 → v3 Evolution)
