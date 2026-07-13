@@ -35,3 +35,13 @@ CREATE TABLE IF NOT EXISTS location_code (
     deleted_at         TEXT,
     UNIQUE(location_source_id, kode)
 );
+
+CREATE TABLE IF NOT EXISTS location_alias (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id INTEGER NOT NULL REFERENCES location_code(id),
+    alias       TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT,
+    deleted_at  TEXT,
+    UNIQUE(location_id, alias)
+);
