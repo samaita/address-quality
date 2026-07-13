@@ -13,7 +13,7 @@ lint:
 	go vet ./...
 
 clean:
-	rm -rf bin/ tmp/ address.db
+	rm -rf bin/ tmp/ db/*.db
 
 air:
 	air

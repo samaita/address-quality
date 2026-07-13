@@ -15,6 +15,8 @@ type Config struct {
 	WriteTimeout     int
 	MaxBodySize      string
 	MaxAddressLength int
+	AddressDBPath    string
+	LocationDBPath   string
 }
 
 func Load() *Config {
@@ -31,6 +33,8 @@ func Load() *Config {
 	viper.SetDefault("WRITE_TIMEOUT", 10)
 	viper.SetDefault("MAX_BODY_SIZE", "1M")
 	viper.SetDefault("MAX_ADDRESS_LENGTH", 1000)
+	viper.SetDefault("ADDRESS_DB_PATH", "db/address.db")
+	viper.SetDefault("LOCATION_DB_PATH", "db/location.db")
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("warning: .env not found, using defaults: %v", err)
@@ -45,6 +49,8 @@ func Load() *Config {
 		WriteTimeout:     viper.GetInt("WRITE_TIMEOUT"),
 		MaxBodySize:      viper.GetString("MAX_BODY_SIZE"),
 		MaxAddressLength: viper.GetInt("MAX_ADDRESS_LENGTH"),
+		AddressDBPath:    viper.GetString("ADDRESS_DB_PATH"),
+		LocationDBPath:   viper.GetString("LOCATION_DB_PATH"),
 	}
 
 	log.Printf("config loaded: port=%d, rate_limit=%d, rate_window=%ds", cfg.Port, cfg.RateLimit, cfg.RateWindow)

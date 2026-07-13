@@ -15,13 +15,18 @@ import (
 func main() {
 	cfg := config.Load()
 
-	repo, err := database.New("address.db")
+	repo, err := database.New(cfg.AddressDBPath)
 	if err != nil {
-		log.Fatalf("failed to initialize database: %v", err)
+		log.Fatalf("failed to initialize address database: %v", err)
+	}
+
+	locationRepo, err := database.NewLocationDB(cfg.LocationDBPath)
+	if err != nil {
+		log.Fatalf("failed to initialize location database: %v", err)
 	}
 
 	s := sanitizer.New(sanitizer.DefaultPolicy())
-	svc := service.New(repo, s, cfg.MaxAddressLength)
+	svc := service.New(repo, locationRepo, s, cfg.MaxAddressLength)
 	h := handler.New(svc)
 
 	e := router.Setup(h, cfg)

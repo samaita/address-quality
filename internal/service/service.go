@@ -21,14 +21,19 @@ type AddressRepository interface {
 	Ping(ctx context.Context) error
 }
 
+type LocationRepository interface {
+	Ping(ctx context.Context) error
+}
+
 type Service struct {
 	repo             AddressRepository
+	locationRepo     LocationRepository
 	s                *sanitizer.Sanitizer
 	maxAddressLength int
 }
 
-func New(repo AddressRepository, s *sanitizer.Sanitizer, maxAddressLength int) *Service {
-	return &Service{repo: repo, s: s, maxAddressLength: maxAddressLength}
+func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int) *Service {
+	return &Service{repo: repo, locationRepo: locationRepo, s: s, maxAddressLength: maxAddressLength}
 }
 
 func (svc *Service) Ping(ctx context.Context) error {

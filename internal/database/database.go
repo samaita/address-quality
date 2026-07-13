@@ -25,32 +25,8 @@ func New(dbPath string) (*Repository, error) {
 		return nil, err
 	}
 
-	if err = migrate(db); err != nil {
-		return nil, err
-	}
-
 	log.Printf("database initialized: %s", dbPath)
 	return &Repository{db: db}, nil
-}
-
-func migrate(db *sql.DB) error {
-	query := `CREATE TABLE IF NOT EXISTS address_requests (
-		id                TEXT PRIMARY KEY,
-		address_id        TEXT NOT NULL,
-		raw_input         TEXT NOT NULL,
-		normalized_address TEXT DEFAULT '',
-		confidence        REAL DEFAULT 0,
-		postal_code       TEXT DEFAULT '',
-		sub_district      TEXT DEFAULT '',
-		district          TEXT DEFAULT '',
-		city              TEXT DEFAULT '',
-		province          TEXT DEFAULT '',
-		location_version  TEXT DEFAULT '',
-		output_json       TEXT DEFAULT '',
-		created_at        TEXT NOT NULL
-	);`
-	_, err := db.Exec(query)
-	return err
 }
 
 type AddressRecord struct {
