@@ -24,12 +24,13 @@ CREATE TABLE IF NOT EXISTS location_sources (
     UNIQUE(code, version)
 );
 
-CREATE TABLE IF NOT EXISTS location_code (
+CREATE TABLE IF NOT EXISTS location_codes (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     location_source_id INTEGER NOT NULL REFERENCES location_sources(id),
     kode               TEXT NOT NULL,
     name               TEXT NOT NULL,
     level_id           INTEGER NOT NULL REFERENCES location_levels(id),
+    postal_code        TEXT,
     created_at         TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at         TEXT,
     deleted_at         TEXT,
@@ -38,7 +39,7 @@ CREATE TABLE IF NOT EXISTS location_code (
 
 CREATE TABLE IF NOT EXISTS location_alias (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    location_id INTEGER NOT NULL REFERENCES location_code(id),
+    location_id INTEGER NOT NULL REFERENCES location_codes(id),
     alias       TEXT NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT,
