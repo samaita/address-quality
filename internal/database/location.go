@@ -9,6 +9,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"address-quality/internal/model"
+	"address-quality/internal/normalizer"
 )
 
 type LocationRepository struct {
@@ -63,6 +64,16 @@ func (r *LocationRepository) FindByKode(ctx context.Context, kode string) (*mode
 	}
 
 	return loc, nil
+}
+
+func (r *LocationRepository) InsertLocationCode(ctx context.Context, sourceID int, kode, name string, levelID int, postalCode string) error {
+	normalized := normalizer.Normalize(name)
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO location_codes
+			(location_source_id, kode, name, lowercase_normalized, level_id, postal_code)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, sourceID, kode, name, normalized, levelID, postalCode)
+	return err
 }
 
 func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode string) (*model.Location, error) {
