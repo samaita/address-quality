@@ -1,12 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"log"
-
 	"address-quality/internal/config"
 	"address-quality/internal/database"
 	"address-quality/internal/handler"
+	"address-quality/internal/logger"
 	"address-quality/internal/router"
 	"address-quality/internal/sanitizer"
 	"address-quality/internal/service"
@@ -14,15 +12,16 @@ import (
 
 func main() {
 	cfg := config.Load()
+	logger.Init(cfg.LogLevel)
 
 	repo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
 	if err != nil {
-		log.Fatalf("failed to initialize address database: %v", err)
+		logger.Fatal().Err(err).Msg("failed to initialize address database")
 	}
 
 	locationRepo, err := database.NewLocationDB(cfg.LocationDBPath, cfg.DBMaxOpenConns)
 	if err != nil {
-		log.Fatalf("failed to initialize location database: %v", err)
+		logger.Fatal().Err(err).Msg("failed to initialize location database")
 	}
 
 	s := sanitizer.New(sanitizer.DefaultPolicy())
@@ -31,7 +30,8 @@ func main() {
 
 	e := router.Setup(h, cfg)
 
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("server starting on %s", addr)
-	e.Logger.Fatal(e.Start(addr))
+	logger.Info().Int("port", cfg.Port).Msg("server starting")
+	if err := e.StartServer(e.Server); err != nil {
+		logger.Fatal().Err(err).Msg("server failed to start")
+	}
 }

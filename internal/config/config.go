@@ -1,9 +1,9 @@
 package config
 
 import (
-	"log"
-
 	"github.com/spf13/viper"
+
+	"address-quality/internal/logger"
 )
 
 type Config struct {
@@ -19,6 +19,7 @@ type Config struct {
 	LocationDBPath   string
 	DBMaxOpenConns    int
 	LocationSourceCode string
+	LogLevel           string
 }
 
 func Load() *Config {
@@ -39,9 +40,10 @@ func Load() *Config {
 	viper.SetDefault("LOCATION_DB_PATH", "db/location.db")
 	viper.SetDefault("DB_MAX_OPEN_CONNS", 10)
 	viper.SetDefault("LOCATION_SOURCE_CODE", "kemendagri")
+	viper.SetDefault("LOG_LEVEL", "info")
 
 	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("warning: .env not found, using defaults: %v", err)
+		logger.Warn().Err(err).Msg(".env not found, using defaults")
 	}
 
 	cfg := &Config{
@@ -57,8 +59,13 @@ func Load() *Config {
 		LocationDBPath:   viper.GetString("LOCATION_DB_PATH"),
 		DBMaxOpenConns:     viper.GetInt("DB_MAX_OPEN_CONNS"),
 		LocationSourceCode: viper.GetString("LOCATION_SOURCE_CODE"),
+		LogLevel:          viper.GetString("LOG_LEVEL"),
 	}
 
-	log.Printf("config loaded: port=%d, rate_limit=%d, rate_window=%ds", cfg.Port, cfg.RateLimit, cfg.RateWindow)
+	logger.Info().
+		Int("port", cfg.Port).
+		Int("rate_limit", cfg.RateLimit).
+		Int("rate_window", cfg.RateWindow).
+		Msg("config loaded")
 	return cfg
 }
