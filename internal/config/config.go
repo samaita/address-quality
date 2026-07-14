@@ -17,6 +17,7 @@ type Config struct {
 	MaxAddressLength int
 	AddressDBPath    string
 	LocationDBPath   string
+	DBMaxOpenConns   int
 }
 
 func Load() *Config {
@@ -35,6 +36,7 @@ func Load() *Config {
 	viper.SetDefault("MAX_ADDRESS_LENGTH", 1000)
 	viper.SetDefault("ADDRESS_DB_PATH", "db/address.db")
 	viper.SetDefault("LOCATION_DB_PATH", "db/location.db")
+	viper.SetDefault("DB_MAX_OPEN_CONNS", 10)
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("warning: .env not found, using defaults: %v", err)
@@ -51,6 +53,7 @@ func Load() *Config {
 		MaxAddressLength: viper.GetInt("MAX_ADDRESS_LENGTH"),
 		AddressDBPath:    viper.GetString("ADDRESS_DB_PATH"),
 		LocationDBPath:   viper.GetString("LOCATION_DB_PATH"),
+		DBMaxOpenConns:   viper.GetInt("DB_MAX_OPEN_CONNS"),
 	}
 
 	log.Printf("config loaded: port=%d, rate_limit=%d, rate_window=%ds", cfg.Port, cfg.RateLimit, cfg.RateWindow)

@@ -17,13 +17,13 @@ type LocationRepository struct {
 	db *sql.DB
 }
 
-func NewLocationDB(dbPath string) (*LocationRepository, error) {
+func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(maxOpenConns)
 
 	if err = db.Ping(); err != nil {
 		return nil, err

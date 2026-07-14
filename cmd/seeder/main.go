@@ -71,7 +71,7 @@ Flags:
 
 	ctx := context.Background()
 
-	repo, err := database.NewLocationDB(dbPath)
+	repo, err := database.NewLocationDB(dbPath, cfg.DBMaxOpenConns)
 	if err != nil {
 		log.Fatalf("open location db: %v", err)
 	}
