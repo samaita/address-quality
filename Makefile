@@ -30,4 +30,4 @@ build-seed:
 	go build -o bin/seeder ./cmd/seeder
 
 seed:
-	go run ./cmd/seeder --drop
+	go run ./cmd/seeder --init

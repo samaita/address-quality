@@ -340,14 +340,20 @@ The `location.db` SQLite database powers the administrative tree parser (v1). It
 The `seeder` binary parses MySQL dumps (`db/source/wilayah.sql`, `db/source/wilayah_kodepos.sql`) and populates `location.db`:
 
 ```bash
-# Full reset: drop tables, recreate schema, seed data
+# First-time: create schema + seed data
 make seed
 
 # Or directly:
+go run ./cmd/seeder --init
+
+# Recreate from scratch (destructive — prompts for confirmation):
 go run ./cmd/seeder --drop
 
-# Retry without dropping schema (truncate data only):
+# Retry without recreating schema (truncate data only):
 go run ./cmd/seeder --truncate
+
+# Update data (tables must already exist):
+go run ./cmd/seeder
 
 # Show all options:
 go run ./cmd/seeder --help
@@ -360,11 +366,12 @@ go run ./cmd/seeder --help
 | `--source-name` | `Kepmendagri No 300.2.2-2138` | Human-readable source name |
 | `--source-date` | `""` | Effective date of the codes |
 | `--source-desc` | `""` | Description of the source dataset |
-| `--drop` | `false` | Drop all tables and recreate from `db/location.sql` before seeding |
+| `--init` | `false` | Create schema from `db/location.sql` (only when no tables exist) |
+| `--drop` | `false` | Drop all tables and recreate (prompts for confirmation) |
 | `--truncate` | `false` | Truncate data rows (keep schema) before seeding |
 | `--db` | from `.env` | Path to `location.db` |
 
-`--drop` and `--truncate` are mutually exclusive — if both set, `--drop` wins.
+`--init`, `--drop`, and `--truncate` are mutually exclusive.
 
 ---
 
