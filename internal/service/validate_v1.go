@@ -29,6 +29,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	now := time.Now().UTC()
 	addressID := uuid.Must(uuid.NewV7()).String()
 	sanitized := svc.sanitize(req.Address)
+	normalized := svc.normalize(sanitized)
 
 	location := model.Location{}
 	sourceCode := req.SourceCode
@@ -37,7 +38,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(ctx, sourceCode)
 	if err == nil {
-		if postalCode := extractPostalCode(sanitized); postalCode != "" {
+		if postalCode := extractPostalCode(normalized); postalCode != "" {
 			if loc, locErr := svc.locationRepo.FindByPostalCode(ctx, postalCode, sourceID); locErr == nil {
 				location = *loc
 			}
@@ -48,7 +49,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		AddressID:       addressID,
 		Confidence:      0.0,
 		Location:        location,
-		NormalizedInput: sanitized,
+		NormalizedInput: normalized,
 		Output:          sanitized,
 		LocationVersion: sourceVersion,
 		RawInput:        req.Address,
