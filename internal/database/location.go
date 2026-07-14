@@ -46,14 +46,29 @@ func (r *LocationRepository) HasLocationTables(ctx context.Context) (bool, error
 	return err == nil, err
 }
 
-func (r *LocationRepository) FindByKode(ctx context.Context, kode string) (*model.Location, error) {
+func (r *LocationRepository) FindSourceByCode(ctx context.Context, code string) (int64, string, error) {
+	var id int64
+	var version string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT id, version FROM location_sources
+		WHERE code = ? AND deleted_at IS NULL
+		ORDER BY id DESC
+		LIMIT 1
+	`, code).Scan(&id, &version)
+	if err != nil {
+		return 0, "", fmt.Errorf("find source by code %s: %w", code, err)
+	}
+	return id, version, nil
+}
+
+func (r *LocationRepository) FindByKode(ctx context.Context, kode string, sourceID int64) (*model.Location, error) {
 	loc := &model.Location{}
 
 	err := r.db.QueryRowContext(ctx, `
 		SELECT name, postal_code
 		FROM location_codes
-		WHERE kode = ? AND deleted_at IS NULL
-	`, kode).Scan(&loc.SubDistrict, &loc.PostalCode)
+		WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL
+	`, kode, sourceID).Scan(&loc.SubDistrict, &loc.PostalCode)
 	if err != nil {
 		return nil, err
 	}
@@ -62,15 +77,15 @@ func (r *LocationRepository) FindByKode(ctx context.Context, kode string) (*mode
 	switch len(parts) {
 	case 4:
 		districtKode := parts[0] + "." + parts[1] + "." + parts[2]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND deleted_at IS NULL`, districtKode).Scan(&loc.District)
+		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, districtKode, sourceID).Scan(&loc.District)
 		fallthrough
 	case 3:
 		cityKode := parts[0] + "." + parts[1]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND deleted_at IS NULL`, cityKode).Scan(&loc.City)
+		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, cityKode, sourceID).Scan(&loc.City)
 		fallthrough
 	case 2:
 		provinceKode := parts[0]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND deleted_at IS NULL`, provinceKode).Scan(&loc.Province)
+		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, provinceKode, sourceID).Scan(&loc.Province)
 	}
 
 	return loc, nil
@@ -297,16 +312,16 @@ func (r *LocationRepository) InsertLocationCodeBatch(ctx context.Context, source
 	return tx.Commit()
 }
 
-func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode string) (*model.Location, error) {
+func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) (*model.Location, error) {
 	var kode string
 	loc := &model.Location{}
 
 	err := r.db.QueryRowContext(ctx, `
 		SELECT kode, name, postal_code
 		FROM location_codes
-		WHERE postal_code = ? AND deleted_at IS NULL
+		WHERE postal_code = ? AND location_source_id = ? AND deleted_at IS NULL
 		LIMIT 1
-	`, postalCode).Scan(&kode, &loc.SubDistrict, &loc.PostalCode)
+	`, postalCode, sourceID).Scan(&kode, &loc.SubDistrict, &loc.PostalCode)
 	if err != nil {
 		return nil, err
 	}
@@ -315,15 +330,15 @@ func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode st
 	switch len(parts) {
 	case 4:
 		districtKode := parts[0] + "." + parts[1] + "." + parts[2]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND deleted_at IS NULL`, districtKode).Scan(&loc.District)
+		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, districtKode, sourceID).Scan(&loc.District)
 		fallthrough
 	case 3:
 		cityKode := parts[0] + "." + parts[1]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND deleted_at IS NULL`, cityKode).Scan(&loc.City)
+		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, cityKode, sourceID).Scan(&loc.City)
 		fallthrough
 	case 2:
 		provinceKode := parts[0]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND deleted_at IS NULL`, provinceKode).Scan(&loc.Province)
+		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, provinceKode, sourceID).Scan(&loc.Province)
 	}
 
 	return loc, nil
