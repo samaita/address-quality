@@ -81,6 +81,16 @@ Flags:
 		}
 	}
 
+	hasTables, err := repo.HasLocationTables(ctx)
+	if err != nil {
+		log.Fatalf("check tables: %v", err)
+	}
+	if !hasTables {
+		fmt.Fprintln(os.Stderr, "Location tables not found. Initialize the schema by running:")
+		fmt.Fprintln(os.Stderr, "  bin/seeder --drop")
+		os.Exit(1)
+	}
+
 	sourceID, err := repo.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
 	if err != nil {
 		log.Fatalf("insert source: %v", err)

@@ -37,6 +37,15 @@ func (r *LocationRepository) Ping(ctx context.Context) error {
 	return r.db.PingContext(ctx)
 }
 
+func (r *LocationRepository) HasLocationTables(ctx context.Context) (bool, error) {
+	var name string
+	err := r.db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='location_sources'`).Scan(&name)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 func (r *LocationRepository) FindByKode(ctx context.Context, kode string) (*model.Location, error) {
 	loc := &model.Location{}
 
