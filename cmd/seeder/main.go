@@ -22,7 +22,7 @@ func main() {
 	sourceName := flag.String("source-name", "Kepmendagri No 300.2.2-2138", "Human-readable source name")
 	sourceDate := flag.String("source-date", "", "Effective date of the codes")
 	sourceDesc := flag.String("source-desc", "", "Description of the source dataset")
-	dropFlag := flag.Bool("drop", false, "Drop all tables and recreate from db/location.sql (requires confirmation)")
+	dropFlag := flag.Bool("drop", false, "Drop all tables (requires confirmation)")
 	initFlag := flag.Bool("init", false, "Create schema from db/location.sql (only when no tables exist)")
 	truncateFlag := flag.Bool("truncate", false, "Truncate all data rows (keep schema) before seeding")
 	dbPathFlag := flag.String("db", "", "Path to location.db (default from config)")
@@ -37,9 +37,9 @@ The seeder parses them, determines hierarchy levels from kode patterns, normaliz
 and batch-inserts into location_codes.
 
 First run:   seeder --init
-Recreate:    seeder --drop   (prompts for confirmation)
-Retry:       seeder --truncate
-Update data: seeder            (tables must already exist)
+Reset:        seeder --drop && seeder --init
+Retry:        seeder --truncate
+Update data:  seeder            (tables must already exist)
 
 Flags:
 `)
@@ -106,15 +106,8 @@ Flags:
 		if err := repo.DropAll(ctx); err != nil {
 			log.Fatalf("drop all: %v", err)
 		}
-		log.Print("running db/location.sql...")
-		schema, err := os.ReadFile("db/location.sql")
-		if err != nil {
-			log.Fatalf("read db/location.sql: %v", err)
-		}
-		if err := repo.ExecSchema(ctx, string(schema)); err != nil {
-			log.Fatalf("exec schema: %v", err)
-		}
-		log.Print("schema created")
+		log.Print("tables dropped")
+		return
 	} else if *truncateFlag {
 		if !hasTables {
 			log.Fatalf("no tables found, use --init for first-time setup")
