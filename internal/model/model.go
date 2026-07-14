@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+type SourceData struct {
+	Code string
+}
+
 type AddressRequest struct {
 	Address string `json:"address" validate:"required"`
 }

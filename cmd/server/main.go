@@ -26,7 +26,7 @@ func main() {
 	}
 
 	s := sanitizer.New(sanitizer.DefaultPolicy())
-	svc := service.New(repo, locationRepo, s, cfg.MaxAddressLength)
+	svc := service.New(repo, locationRepo, s, cfg.MaxAddressLength, cfg.LocationSourceCode)
 	h := handler.New(svc)
 
 	e := router.Setup(h, cfg)
