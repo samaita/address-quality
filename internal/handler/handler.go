@@ -25,7 +25,7 @@ func (h *Handler) HandleHealthCheck(c echo.Context) error {
 	if err := h.svc.Ping(ctx); err != nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "error"})
 	}
-	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok", "database": "ok"})
 }
 
 func errorResponse(c echo.Context, status int, msg string, requestID string) error {
