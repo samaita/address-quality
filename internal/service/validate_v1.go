@@ -21,7 +21,7 @@ func extractPostalCode(s string) string {
 	return ""
 }
 
-func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressRequest, requestID string, src model.SourceData) (*model.AddressResponse, error) {
+func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressRequest, requestID string) (*model.AddressResponse, error) {
 	if err := req.Validate(svc.maxAddressLength); err != nil {
 		return nil, errors.Join(ErrValidation, err)
 	}
@@ -31,7 +31,11 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	sanitized := svc.sanitize(req.Address)
 
 	location := model.Location{}
-	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(ctx, src.Code)
+	sourceCode := req.SourceCode
+	if sourceCode == "" {
+		sourceCode = svc.sourceCode
+	}
+	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(ctx, sourceCode)
 	if err == nil {
 		if postalCode := extractPostalCode(sanitized); postalCode != "" {
 			if loc, locErr := svc.locationRepo.FindByPostalCode(ctx, postalCode, sourceID); locErr == nil {
