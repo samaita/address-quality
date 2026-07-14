@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"address-quality/internal/database"
 	"address-quality/internal/model"
@@ -18,6 +19,7 @@ type AddressRepository interface {
 
 type LocationRepository interface {
 	Ping(ctx context.Context) error
+	FindAllProvinces(ctx context.Context) ([]database.ProvinceRow, error)
 	FindByKode(ctx context.Context, kode string, sourceID int64) (*model.Location, error)
 	FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) (*model.Location, error)
 	FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]database.ProvinceRow, error)
@@ -30,6 +32,10 @@ type Service struct {
 	s                *sanitizer.Sanitizer
 	maxAddressLength int
 	sourceCode       string
+
+	provinceCache map[int64][]database.ProvinceRow
+	provinceOnce  sync.Once
+	provinceErr   error
 }
 
 func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string) *Service {
