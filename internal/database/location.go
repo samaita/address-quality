@@ -98,6 +98,31 @@ type ProvinceRow struct {
 	LowercaseNormalized string
 }
 
+func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT location_source_id, id, name, lowercase_normalized
+		FROM location_codes
+		WHERE level_id = 2 AND deleted_at IS NULL
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("find all provinces: %w", err)
+	}
+	defer rows.Close()
+
+	var provinces []ProvinceRow
+	for rows.Next() {
+		var p ProvinceRow
+		if err := rows.Scan(&p.SourceID, &p.ProvinceID, &p.Name, &p.LowercaseNormalized); err != nil {
+			return nil, fmt.Errorf("scan province: %w", err)
+		}
+		provinces = append(provinces, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows provinces: %w", err)
+	}
+	return provinces, nil
+}
+
 func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]ProvinceRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT location_source_id, id, name, lowercase_normalized

@@ -1,11 +1,11 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"regexp"
 	"strings"
 	"time"
-
-	"encoding/json"
 
 	"address-quality/internal/database"
 	"address-quality/internal/model"
@@ -67,4 +67,25 @@ func buildAddressRecord(requestID, addressID string, quality model.Quality, now 
 		OutputJSON:      string(outputJSON),
 		CreatedAt:       now,
 	}
+}
+
+func (svc *Service) loadProvinces(ctx context.Context) {
+	rows, err := svc.locationRepo.FindAllProvinces(ctx)
+	if err != nil {
+		svc.provinceErr = err
+		return
+	}
+	cache := make(map[int64][]database.ProvinceRow)
+	for _, r := range rows {
+		cache[r.SourceID] = append(cache[r.SourceID], r)
+	}
+	svc.provinceCache = cache
+}
+
+func (svc *Service) getProvinceOutput(ctx context.Context, sourceID int64, normalized string) (string, error) {
+	svc.provinceOnce.Do(func() { svc.loadProvinces(ctx) })
+	if svc.provinceErr != nil {
+		return "", svc.provinceErr
+	}
+	return matchProvince(normalized, svc.provinceCache[sourceID]), nil
 }
