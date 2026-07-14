@@ -5,12 +5,9 @@ import (
 	"fmt"
 )
 
-type SourceData struct {
-	Code string
-}
-
 type AddressRequest struct {
-	Address string `json:"address" validate:"required"`
+	Address    string `json:"address" validate:"required"`
+	SourceCode string `json:"source_code"`
 }
 
 func (r *AddressRequest) Validate(maxLength int) error {

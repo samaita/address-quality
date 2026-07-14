@@ -40,6 +40,5 @@ func (svc *Service) Ping(ctx context.Context) error {
 }
 
 func (svc *Service) ValidateAddress(ctx context.Context, req *model.AddressRequest, requestID string) (*model.AddressResponse, error) {
-	src := model.SourceData{Code: svc.sourceCode}
-	return svc.ValidateAddressV1(ctx, req, requestID, src)
+	return svc.ValidateAddressV1(ctx, req, requestID)
 }
