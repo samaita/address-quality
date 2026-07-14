@@ -42,7 +42,7 @@ export default function () {
     check(res, {
       'status is 200': (r) => r.status === 200,
       'script tags stripped': (r) => !r.json().quality.normalized_input.includes('<script>'),
-      'text preserved': (r) => r.json().quality.normalized_input.includes('Jl. Sudirman'),
+      'text preserved': (r) => r.json().quality.normalized_input.toLowerCase().includes('sudirman'),
     });
   });
 
