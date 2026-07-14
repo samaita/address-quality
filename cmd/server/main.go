@@ -15,12 +15,12 @@ import (
 func main() {
 	cfg := config.Load()
 
-	repo, err := database.New(cfg.AddressDBPath)
+	repo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
 	if err != nil {
 		log.Fatalf("failed to initialize address database: %v", err)
 	}
 
-	locationRepo, err := database.NewLocationDB(cfg.LocationDBPath)
+	locationRepo, err := database.NewLocationDB(cfg.LocationDBPath, cfg.DBMaxOpenConns)
 	if err != nil {
 		log.Fatalf("failed to initialize location database: %v", err)
 	}
