@@ -91,6 +91,38 @@ func (r *LocationRepository) FindByKode(ctx context.Context, kode string, source
 	return loc, nil
 }
 
+type ProvinceRow struct {
+	SourceID            int64
+	ProvinceID          int64
+	Name                string
+	LowercaseNormalized string
+}
+
+func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]ProvinceRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT location_source_id, id, name, lowercase_normalized
+		FROM location_codes
+		WHERE level_id = 2 AND location_source_id = ? AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("find provinces: %w", err)
+	}
+	defer rows.Close()
+
+	var provinces []ProvinceRow
+	for rows.Next() {
+		var p ProvinceRow
+		if err := rows.Scan(&p.SourceID, &p.ProvinceID, &p.Name, &p.LowercaseNormalized); err != nil {
+			return nil, fmt.Errorf("scan province: %w", err)
+		}
+		provinces = append(provinces, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows provinces: %w", err)
+	}
+	return provinces, nil
+}
+
 func (r *LocationRepository) InsertLocationCode(ctx context.Context, sourceID int, kode, name string, levelID int, postalCode string) error {
 	normalized := normalizer.Normalize(name)
 	_, err := r.db.ExecContext(ctx, `
