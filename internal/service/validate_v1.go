@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"address-quality/internal/logger"
 	"address-quality/internal/model"
 )
 
@@ -19,27 +20,37 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	addressID := uuid.Must(uuid.NewV7()).String()
 	sanitized := svc.sanitize(req.Address)
 	normalized := normalize(sanitized)
+	log := logger.L.With().Str("request_id", requestID).Logger()
 
 	sourceCode := req.SourceCode
 	if sourceCode == "" {
 		sourceCode = svc.sourceCode
 	}
 	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(ctx, sourceCode)
+	if err != nil {
+		log.Error().Err(err).Msg("find source by code")
+		return nil, err
+	}
 
 	output := sanitized
 	location := model.Location{}
-	if err == nil {
-		provinces, provErr := svc.locationRepo.FindProvincesBySourceID(ctx, sourceID)
-		if provErr == nil {
-			if matched := matchProvince(normalized, provinces); matched != "" {
-				output = matched
-			}
+
+	provinces, provErr := svc.locationRepo.FindProvincesBySourceID(ctx, sourceID)
+	if provErr != nil {
+		log.Error().Err(provErr).Msg("find provinces by source")
+		return nil, provErr
+	}
+	if matched := matchProvince(normalized, provinces); matched != "" {
+		output = matched
+	}
+
+	if postalCode := extractPostalCode(normalized); postalCode != "" {
+		loc, locErr := svc.locationRepo.FindByPostalCode(ctx, postalCode, sourceID)
+		if locErr != nil {
+			log.Error().Err(locErr).Msg("find by postal code")
+			return nil, locErr
 		}
-		if postalCode := extractPostalCode(normalized); postalCode != "" {
-			if loc, locErr := svc.locationRepo.FindByPostalCode(ctx, postalCode, sourceID); locErr == nil {
-				location = *loc
-			}
-		}
+		location = *loc
 	}
 
 	quality := model.Quality{
