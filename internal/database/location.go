@@ -106,8 +106,18 @@ func (r *LocationRepository) DropAll(ctx context.Context) error {
 func (r *LocationRepository) ExecSchema(ctx context.Context, sqlContent string) error {
 	statements := strings.Split(sqlContent, ";")
 	for _, stmt := range statements {
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" || strings.HasPrefix(stmt, "--") {
+		lines := strings.Split(stmt, "\n")
+		start := 0
+		for start < len(lines) {
+			trimmed := strings.TrimSpace(lines[start])
+			if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+				start++
+			} else {
+				break
+			}
+		}
+		stmt = strings.TrimSpace(strings.Join(lines[start:], "\n"))
+		if stmt == "" {
 			continue
 		}
 		if _, err := r.db.ExecContext(ctx, stmt); err != nil {
