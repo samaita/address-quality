@@ -22,7 +22,8 @@ func main() {
 	sourceName := flag.String("source-name", "Kepmendagri No 300.2.2-2138", "Human-readable source name")
 	sourceDate := flag.String("source-date", "", "Effective date of the codes")
 	sourceDesc := flag.String("source-desc", "", "Description of the source dataset")
-	dropFlag := flag.Bool("drop", false, "Drop all tables and recreate from db/location.sql before seeding")
+	dropFlag := flag.Bool("drop", false, "Drop all tables and recreate from db/location.sql (requires confirmation)")
+	initFlag := flag.Bool("init", false, "Create schema from db/location.sql (only when no tables exist)")
 	truncateFlag := flag.Bool("truncate", false, "Truncate all data rows (keep schema) before seeding")
 	dbPathFlag := flag.String("db", "", "Path to location.db (default from config)")
 
@@ -35,6 +36,11 @@ The source files are MySQL dumps of Indonesian administrative regions and postal
 The seeder parses them, determines hierarchy levels from kode patterns, normalizes names,
 and batch-inserts into location_codes.
 
+First run:   seeder --init
+Recreate:    seeder --drop   (prompts for confirmation)
+Retry:       seeder --truncate
+Update data: seeder            (tables must already exist)
+
 Flags:
 `)
 		flag.PrintDefaults()
@@ -42,14 +48,25 @@ Flags:
 
 	flag.Parse()
 
+	flags := 0
+	if *dropFlag {
+		flags++
+	}
+	if *initFlag {
+		flags++
+	}
+	if *truncateFlag {
+		flags++
+	}
+	if flags > 1 {
+		fmt.Fprintln(os.Stderr, "error: --drop, --init, and --truncate are mutually exclusive")
+		os.Exit(1)
+	}
+
 	cfg := config.Load()
 	dbPath := *dbPathFlag
 	if dbPath == "" {
 		dbPath = cfg.LocationDBPath
-	}
-
-	if *dropFlag && *truncateFlag {
-		log.Printf("warning: both --drop and --truncate set, using --drop")
 	}
 
 	ctx := context.Background()
@@ -59,12 +76,36 @@ Flags:
 		log.Fatalf("open location db: %v", err)
 	}
 
-	if *dropFlag {
+	hasTables, err := repo.HasLocationTables(ctx)
+	if err != nil {
+		log.Fatalf("check tables: %v", err)
+	}
+
+	if *initFlag {
+		if hasTables {
+			log.Fatalf("tables already exist, use --drop to recreate")
+		}
+		log.Print("running db/location.sql...")
+		schema, err := os.ReadFile("db/location.sql")
+		if err != nil {
+			log.Fatalf("read db/location.sql: %v", err)
+		}
+		if err := repo.ExecSchema(ctx, string(schema)); err != nil {
+			log.Fatalf("exec schema: %v", err)
+		}
+		log.Print("schema created")
+	} else if *dropFlag {
+		if !hasTables {
+			log.Fatalf("no tables to drop, use --init for first-time setup")
+		}
+		if !promptConfirm("This will drop all location tables. Continue? [y/N]: ") {
+			fmt.Fprintln(os.Stderr, "aborted")
+			os.Exit(1)
+		}
 		log.Print("dropping all tables...")
 		if err := repo.DropAll(ctx); err != nil {
 			log.Fatalf("drop all: %v", err)
 		}
-
 		log.Print("running db/location.sql...")
 		schema, err := os.ReadFile("db/location.sql")
 		if err != nil {
@@ -75,19 +116,16 @@ Flags:
 		}
 		log.Print("schema created")
 	} else if *truncateFlag {
+		if !hasTables {
+			log.Fatalf("no tables found, use --init for first-time setup")
+		}
 		log.Print("truncating all data...")
 		if err := repo.TruncateAll(ctx); err != nil {
 			log.Fatalf("truncate: %v", err)
 		}
-	}
-
-	hasTables, err := repo.HasLocationTables(ctx)
-	if err != nil {
-		log.Fatalf("check tables: %v", err)
-	}
-	if !hasTables {
+	} else if !hasTables {
 		fmt.Fprintln(os.Stderr, "Location tables not found. Initialize the schema by running:")
-		fmt.Fprintln(os.Stderr, "  bin/seeder --drop")
+		fmt.Fprintln(os.Stderr, "  bin/seeder --init")
 		os.Exit(1)
 	}
 
@@ -166,6 +204,16 @@ func parseWilayah(path string) ([]database.LocationCodeRow, error) {
 	}
 
 	return rows, scanner.Err()
+}
+
+func promptConfirm(prompt string) bool {
+	fmt.Fprint(os.Stderr, prompt)
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		resp := strings.TrimSpace(strings.ToLower(scanner.Text()))
+		return resp == "y" || resp == "yes"
+	}
+	return false
 }
 
 func parseKodepos(path string) (map[string]string, error) {
