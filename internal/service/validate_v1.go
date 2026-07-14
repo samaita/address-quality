@@ -3,37 +3,12 @@ package service
 import (
 	"context"
 	"errors"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
-	"address-quality/internal/database"
 	"address-quality/internal/model"
 )
-
-var postalCodePattern = regexp.MustCompile(`\b(\d{5})\b`)
-
-func extractPostalCode(s string) string {
-	matches := postalCodePattern.FindStringSubmatch(s)
-	if len(matches) > 1 {
-		return matches[1]
-	}
-	return ""
-}
-
-func matchProvince(normalized string, provinces []database.ProvinceRow) string {
-	var best string
-	for _, p := range provinces {
-		if strings.Contains(normalized, p.LowercaseNormalized) {
-			if len(p.Name) > len(best) {
-				best = p.Name
-			}
-		}
-	}
-	return best
-}
 
 func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressRequest, requestID string) (*model.AddressResponse, error) {
 	if err := req.Validate(svc.maxAddressLength); err != nil {

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
@@ -9,6 +10,28 @@ import (
 	"address-quality/internal/database"
 	"address-quality/internal/model"
 )
+
+var postalCodePattern = regexp.MustCompile(`\b(\d{5})\b`)
+
+func extractPostalCode(s string) string {
+	matches := postalCodePattern.FindStringSubmatch(s)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+func matchProvince(normalized string, provinces []database.ProvinceRow) string {
+	var best string
+	for _, p := range provinces {
+		if strings.Contains(normalized, p.LowercaseNormalized) {
+			if len(p.Name) > len(best) {
+				best = p.Name
+			}
+		}
+	}
+	return best
+}
 
 func (svc *Service) sanitize(input string) string {
 	return svc.s.Sanitize(input)
