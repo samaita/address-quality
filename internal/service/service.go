@@ -20,6 +20,7 @@ type LocationRepository interface {
 	Ping(ctx context.Context) error
 	FindByKode(ctx context.Context, kode string, sourceID int64) (*model.Location, error)
 	FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) (*model.Location, error)
+	FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]database.ProvinceRow, error)
 	FindSourceByCode(ctx context.Context, code string) (int64, string, error)
 }
 
