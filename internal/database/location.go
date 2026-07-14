@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 
 	_ "modernc.org/sqlite"
 
+	"address-quality/internal/logger"
 	"address-quality/internal/model"
 	"address-quality/internal/normalizer"
 )
@@ -29,7 +29,7 @@ func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error)
 		return nil, err
 	}
 
-	log.Printf("location database initialized: %s", dbPath)
+	logger.Info().Str("db_path", dbPath).Msg("location database initialized")
 	return &LocationRepository{db: db}, nil
 }
 
@@ -191,7 +191,7 @@ func (r *LocationRepository) TruncateAll(ctx context.Context) error {
 }
 
 func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourceID int64) error {
-	log.Print("building location hierarchy...")
+	logger.Info().Msg("building location hierarchy...")
 
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT kode, id FROM location_codes
@@ -214,7 +214,7 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("rows parents: %w", err)
 	}
-	log.Printf("loaded %d parent kode->id mappings", len(kodeToID))
+	logger.Info().Int("count", len(kodeToID)).Msg("loaded parent kode->id mappings")
 
 	subRows, err := r.db.QueryContext(ctx, `
 		SELECT id, kode FROM location_codes
@@ -259,17 +259,17 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 
 		provinceID, ok := kodeToID[provinceKode]
 		if !ok {
-			log.Printf("skipping %s: parent province %s not found", kode, provinceKode)
+			logger.Warn().Str("kode", kode).Str("parent_province", provinceKode).Msg("skipping: parent province not found")
 			continue
 		}
 		cityID, ok := kodeToID[cityKode]
 		if !ok {
-			log.Printf("skipping %s: parent city %s not found", kode, cityKode)
+			logger.Warn().Str("kode", kode).Str("parent_city", cityKode).Msg("skipping: parent city not found")
 			continue
 		}
 		districtID, ok := kodeToID[districtKode]
 		if !ok {
-			log.Printf("skipping %s: parent district %s not found", kode, districtKode)
+			logger.Warn().Str("kode", kode).Str("parent_district", districtKode).Msg("skipping: parent district not found")
 			continue
 		}
 
@@ -287,7 +287,7 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 		return fmt.Errorf("commit: %w", err)
 	}
 
-	log.Printf("inserted %d hierarchy rows", count)
+	logger.Info().Int("count", count).Msg("inserted hierarchy rows")
 	return nil
 }
 

@@ -5,13 +5,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strings"
 
 	"address-quality/internal/config"
 	"address-quality/internal/database"
+	"address-quality/internal/logger"
 )
 
 var tupleRe = regexp.MustCompile(`\('((?:[^']|'')*)',\s*'((?:[^']|'')*)'\)`)
@@ -64,6 +64,8 @@ Flags:
 	}
 
 	cfg := config.Load()
+	logger.Init(cfg.LogLevel)
+
 	dbPath := *dbPathFlag
 	if dbPath == "" {
 		dbPath = cfg.LocationDBPath
@@ -73,48 +75,48 @@ Flags:
 
 	repo, err := database.NewLocationDB(dbPath, cfg.DBMaxOpenConns)
 	if err != nil {
-		log.Fatalf("open location db: %v", err)
+		logger.Fatal().Err(err).Msg("open location db")
 	}
 
 	hasTables, err := repo.HasLocationTables(ctx)
 	if err != nil {
-		log.Fatalf("check tables: %v", err)
+		logger.Fatal().Err(err).Msg("check tables")
 	}
 
 	if *initFlag {
 		if hasTables {
-			log.Fatalf("tables already exist, use --drop to recreate")
+			logger.Fatal().Msg("tables already exist, use --drop to recreate")
 		}
-		log.Print("running db/location.sql...")
+		logger.Info().Msg("running db/location.sql...")
 		schema, err := os.ReadFile("db/location.sql")
 		if err != nil {
-			log.Fatalf("read db/location.sql: %v", err)
+			logger.Fatal().Err(err).Msg("read db/location.sql")
 		}
 		if err := repo.ExecSchema(ctx, string(schema)); err != nil {
-			log.Fatalf("exec schema: %v", err)
+			logger.Fatal().Err(err).Msg("exec schema")
 		}
-		log.Print("schema created")
+		logger.Info().Msg("schema created")
 	} else if *dropFlag {
 		if !hasTables {
-			log.Fatalf("no tables to drop, use --init for first-time setup")
+			logger.Fatal().Msg("no tables to drop, use --init for first-time setup")
 		}
 		if !promptConfirm("This will drop all location tables. Continue? [y/N]: ") {
 			fmt.Fprintln(os.Stderr, "aborted")
 			os.Exit(1)
 		}
-		log.Print("dropping all tables...")
+		logger.Info().Msg("dropping all tables...")
 		if err := repo.DropAll(ctx); err != nil {
-			log.Fatalf("drop all: %v", err)
+			logger.Fatal().Err(err).Msg("drop all")
 		}
-		log.Print("tables dropped")
+		logger.Info().Msg("tables dropped")
 		return
 	} else if *truncateFlag {
 		if !hasTables {
-			log.Fatalf("no tables found, use --init for first-time setup")
+			logger.Fatal().Msg("no tables found, use --init for first-time setup")
 		}
-		log.Print("truncating all data...")
+		logger.Info().Msg("truncating all data...")
 		if err := repo.TruncateAll(ctx); err != nil {
-			log.Fatalf("truncate: %v", err)
+			logger.Fatal().Err(err).Msg("truncate")
 		}
 	} else if !hasTables {
 		fmt.Fprintln(os.Stderr, "Location tables not found. Initialize the schema by running:")
@@ -124,25 +126,25 @@ Flags:
 
 	sourceID, err := repo.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
 	if err != nil {
-		log.Fatalf("insert source: %v", err)
+		logger.Fatal().Err(err).Msg("insert source")
 	}
-	log.Printf("location_source_id=%d (%s/%s)", sourceID, *sourceCode, *sourceVersion)
+	logger.Info().Int64("location_source_id", sourceID).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
 
-	log.Print("parsing db/source/wilayah.sql...")
+	logger.Info().Msg("parsing db/source/wilayah.sql...")
 	rows, err := parseWilayah("db/source/wilayah.sql")
 	if err != nil {
-		log.Fatalf("parse wilayah: %v", err)
+		logger.Fatal().Err(err).Msg("parse wilayah")
 	}
-	log.Printf("parsed %d wilayah rows", len(rows))
+	logger.Info().Int("count", len(rows)).Msg("parsed wilayah rows")
 
-	log.Print("parsing db/source/wilayah_kodepos.sql...")
+	logger.Info().Msg("parsing db/source/wilayah_kodepos.sql...")
 	kodeposMap, err := parseKodepos("db/source/wilayah_kodepos.sql")
 	if err != nil {
-		log.Fatalf("parse kodepos: %v", err)
+		logger.Fatal().Err(err).Msg("parse kodepos")
 	}
-	log.Printf("parsed %d kodepos entries", len(kodeposMap))
+	logger.Info().Int("count", len(kodeposMap)).Msg("parsed kodepos entries")
 
-	log.Print("joining postal codes...")
+	logger.Info().Msg("joining postal codes...")
 	postalCount := 0
 	for i := range rows {
 		if pc, ok := kodeposMap[rows[i].Kode]; ok {
@@ -150,7 +152,7 @@ Flags:
 			postalCount++
 		}
 	}
-	log.Printf("joined %d postal codes", postalCount)
+	logger.Info().Int("count", postalCount).Msg("joined postal codes")
 
 	batchSize := 500
 	total := len(rows)
@@ -160,18 +162,18 @@ Flags:
 			end = total
 		}
 		if err := repo.InsertLocationCodeBatch(ctx, sourceID, rows[i:end]); err != nil {
-			log.Fatalf("batch insert [%d-%d]: %v", i, end, err)
+			logger.Fatal().Err(err).Int("start", i).Int("end", end).Msg("batch insert")
 		}
-		log.Printf("inserted %d/%d rows", end, total)
+		logger.Info().Int("inserted", end).Int("total", total).Msg("batch progress")
 	}
 
-	log.Print("seeding complete")
+	logger.Info().Msg("seeding complete")
 
-	log.Print("rebuilding location hierarchy...")
+	logger.Info().Msg("rebuilding location hierarchy...")
 	if err := repo.RebuildLocationHierarchy(ctx, sourceID); err != nil {
-		log.Fatalf("rebuild hierarchy: %v", err)
+		logger.Fatal().Err(err).Msg("rebuild hierarchy")
 	}
-	log.Print("hierarchy rebuild complete")
+	logger.Info().Msg("hierarchy rebuild complete")
 }
 
 func parseWilayah(path string) ([]database.LocationCodeRow, error) {

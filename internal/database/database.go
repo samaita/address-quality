@@ -3,10 +3,11 @@ package database
 import (
 	"context"
 	"database/sql"
-	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"address-quality/internal/logger"
 )
 
 type Repository struct {
@@ -25,7 +26,7 @@ func New(dbPath string, maxOpenConns int) (*Repository, error) {
 		return nil, err
 	}
 
-	log.Printf("database initialized: %s", dbPath)
+	logger.Info().Str("db_path", dbPath).Msg("database initialized")
 	return &Repository{db: db}, nil
 }
 

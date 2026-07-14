@@ -8,16 +8,19 @@ import (
 
 	"address-quality/internal/config"
 	"address-quality/internal/handler"
+	"address-quality/internal/logger"
 	mw "address-quality/internal/middleware"
 )
 
 func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
 	e := echo.New()
 
+	e.Logger = logger.NewEchoLogger()
+
 	e.Server.ReadTimeout = time.Duration(cfg.ReadTimeout) * time.Second
 	e.Server.WriteTimeout = time.Duration(cfg.WriteTimeout) * time.Second
 
-	e.Use(middleware.Logger())
+	e.Use(logger.EchoMiddleware())
 	e.Use(middleware.Recover())
 
 	e.GET("/health", h.HandleHealthCheck)
