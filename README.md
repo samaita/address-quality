@@ -333,6 +333,7 @@ The `location.db` SQLite database powers the administrative tree parser (v1). It
 - `location_levels` — hierarchy level lookup (province/city/district/village)
 - `location_sources` — upstream data source registry
 - `location_codes` — core table with 90k+ administrative region records
+- `location_hierarchy` — precomputed tree relation (subdistrict → district → city → province)
 - `location_alias` — alternative names/abbreviations for locations
 
 #### Seeding

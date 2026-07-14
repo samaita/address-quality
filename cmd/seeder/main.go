@@ -173,6 +173,12 @@ Flags:
 	}
 
 	log.Print("seeding complete")
+
+	log.Print("rebuilding location hierarchy...")
+	if err := repo.RebuildLocationHierarchy(ctx, sourceID); err != nil {
+		log.Fatalf("rebuild hierarchy: %v", err)
+	}
+	log.Print("hierarchy rebuild complete")
 }
 
 func parseWilayah(path string) ([]database.LocationCodeRow, error) {
