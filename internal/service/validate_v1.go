@@ -29,7 +29,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	now := time.Now().UTC()
 	addressID := uuid.Must(uuid.NewV7()).String()
 	sanitized := svc.sanitize(req.Address)
-	normalized := svc.normalize(sanitized)
+	normalized := normalize(sanitized)
 
 	location := model.Location{}
 	sourceCode := req.SourceCode

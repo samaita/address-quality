@@ -14,7 +14,7 @@ func (svc *Service) sanitize(input string) string {
 	return svc.s.Sanitize(input)
 }
 
-func (svc *Service) normalize(input string) string {
+func normalize(input string) string {
 	lower := strings.ToLower(strings.TrimSpace(input))
 	words := strings.Fields(lower)
 	filtered := make([]string, 0, len(words))
