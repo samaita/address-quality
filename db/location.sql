@@ -81,3 +81,26 @@ CREATE TABLE IF NOT EXISTS location_alias (
     deleted_at  TEXT,
     UNIQUE(location_id, alias)
 );
+
+-- location_hierarchy: precomputed tree relation mapping each subdistrict to its ancestors
+--   id                 - primary key
+--   location_source_id - FK to location_sources
+--   province_id        - FK to location_codes (level 2, parent province)
+--   city_id            - FK to location_codes (level 3, parent city)
+--   district_id        - FK to location_codes (level 4, parent district)
+--   subdistrict_id     - FK to location_codes (level 5, the subdistrict itself)
+--   created_at         - row creation timestamp
+--   updated_at         - last update timestamp (NULL if never updated)
+--   deleted_at         - soft-delete timestamp (NULL = active)
+CREATE TABLE IF NOT EXISTS location_hierarchy (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_source_id INTEGER NOT NULL REFERENCES location_sources(id),
+    province_id        INTEGER NOT NULL REFERENCES location_codes(id),
+    city_id            INTEGER NOT NULL REFERENCES location_codes(id),
+    district_id        INTEGER NOT NULL REFERENCES location_codes(id),
+    subdistrict_id     INTEGER NOT NULL REFERENCES location_codes(id),
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT,
+    deleted_at         TEXT,
+    UNIQUE(location_source_id, subdistrict_id)
+);

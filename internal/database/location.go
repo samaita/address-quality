@@ -94,7 +94,7 @@ type LocationCodeRow struct {
 }
 
 func (r *LocationRepository) DropAll(ctx context.Context) error {
-	tables := []string{"location_alias", "location_codes", "location_sources", "location_levels"}
+	tables := []string{"location_hierarchy", "location_alias", "location_codes", "location_sources", "location_levels"}
 	for _, t := range tables {
 		if _, err := r.db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", t)); err != nil {
 			return fmt.Errorf("drop %s: %w", t, err)
@@ -129,16 +129,118 @@ func (r *LocationRepository) ExecSchema(ctx context.Context, sqlContent string) 
 
 func (r *LocationRepository) TruncateAll(ctx context.Context) error {
 	queries := []string{
+		"DELETE FROM location_hierarchy",
 		"DELETE FROM location_alias",
 		"DELETE FROM location_codes",
 		"DELETE FROM location_sources",
-		"DELETE FROM sqlite_sequence WHERE name IN ('location_alias', 'location_codes', 'location_sources')",
+		"DELETE FROM sqlite_sequence WHERE name IN ('location_hierarchy', 'location_alias', 'location_codes', 'location_sources')",
 	}
 	for _, q := range queries {
 		if _, err := r.db.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("truncate: %w", err)
 		}
 	}
+	return nil
+}
+
+func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourceID int64) error {
+	log.Print("building location hierarchy...")
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT kode, id FROM location_codes
+		WHERE location_source_id = ? AND level_id IN (2, 3, 4) AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return fmt.Errorf("query parents: %w", err)
+	}
+	defer rows.Close()
+
+	kodeToID := make(map[string]int64)
+	for rows.Next() {
+		var kode string
+		var id int64
+		if err := rows.Scan(&kode, &id); err != nil {
+			return fmt.Errorf("scan parent: %w", err)
+		}
+		kodeToID[kode] = id
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("rows parents: %w", err)
+	}
+	log.Printf("loaded %d parent kode->id mappings", len(kodeToID))
+
+	subRows, err := r.db.QueryContext(ctx, `
+		SELECT id, kode FROM location_codes
+		WHERE location_source_id = ? AND level_id = 5 AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return fmt.Errorf("query subdistricts: %w", err)
+	}
+	defer subRows.Close()
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT OR IGNORE INTO location_hierarchy (location_source_id, province_id, city_id, district_id, subdistrict_id)
+		VALUES (?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	var count int
+	for subRows.Next() {
+		var id int64
+		var kode string
+		if err := subRows.Scan(&id, &kode); err != nil {
+			return fmt.Errorf("scan subdistrict: %w", err)
+		}
+
+		parts := strings.Split(kode, ".")
+		if len(parts) != 4 {
+			continue
+		}
+
+		provinceKode := parts[0]
+		cityKode := parts[0] + "." + parts[1]
+		districtKode := parts[0] + "." + parts[1] + "." + parts[2]
+
+		provinceID, ok := kodeToID[provinceKode]
+		if !ok {
+			log.Printf("skipping %s: parent province %s not found", kode, provinceKode)
+			continue
+		}
+		cityID, ok := kodeToID[cityKode]
+		if !ok {
+			log.Printf("skipping %s: parent city %s not found", kode, cityKode)
+			continue
+		}
+		districtID, ok := kodeToID[districtKode]
+		if !ok {
+			log.Printf("skipping %s: parent district %s not found", kode, districtKode)
+			continue
+		}
+
+		if _, err := stmt.ExecContext(ctx, sourceID, provinceID, cityID, districtID, id); err != nil {
+			return fmt.Errorf("insert hierarchy %s: %w", kode, err)
+		}
+		count++
+	}
+
+	if err := subRows.Err(); err != nil {
+		return fmt.Errorf("rows subdistricts: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	log.Printf("inserted %d hierarchy rows", count)
 	return nil
 }
 
