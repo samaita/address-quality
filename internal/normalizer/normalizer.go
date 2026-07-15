@@ -21,7 +21,7 @@ var adminSet = map[string]struct{}{
 	"prov":      {},
 }
 
-var rePunctuation = regexp.MustCompile(`[^\w\s]`)
+var rePunctuation = regexp.MustCompile(`[^a-zA-Z\s]`)
 var reMultipleSpaces = regexp.MustCompile(`\s+`)
 
 func Normalize(name string) string {
