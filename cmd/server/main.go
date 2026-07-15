@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"address-quality/internal/config"
 	"address-quality/internal/database"
 	"address-quality/internal/handler"
@@ -30,6 +32,7 @@ func main() {
 
 	e := router.Setup(h, cfg)
 
+	e.Server.Addr = fmt.Sprintf(":%d", cfg.Port)
 	logger.Info().Int("port", cfg.Port).Msg("server starting")
 	if err := e.StartServer(e.Server); err != nil {
 		logger.Fatal().Err(err).Msg("server failed to start")
