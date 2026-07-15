@@ -42,15 +42,27 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 	if matched != "" {
 		output = matched
+		location.Province = matched
 	}
 
-	if postalCode := extractPostalCode(normalized); postalCode != "" {
-		loc, locErr := svc.locationRepo.FindByPostalCode(ctx, postalCode, sourceID)
-		if locErr != nil {
-			log.Error().Err(locErr).Msg("find by postal code")
-			return nil, locErr
+	cityLoc, err := svc.getCityLocation(ctx, sourceID, normalized)
+	if err != nil {
+		log.Error().Err(err).Msg("find city")
+		return nil, err
+	}
+	if cityLoc != nil {
+		location = *cityLoc
+	}
+
+	if location == (model.Location{}) {
+		if postalCode := extractPostalCode(normalized); postalCode != "" {
+			loc, locErr := svc.locationRepo.FindByPostalCode(ctx, postalCode, sourceID)
+			if locErr != nil {
+				log.Error().Err(locErr).Msg("find by postal code")
+				return nil, locErr
+			}
+			location = *loc
 		}
-		location = *loc
 	}
 
 	quality := model.Quality{

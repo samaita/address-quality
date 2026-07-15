@@ -93,14 +93,14 @@ func (r *LocationRepository) FindByKode(ctx context.Context, kode string, source
 
 type ProvinceRow struct {
 	SourceID            int64
-	ProvinceID          int64
+	Kode                string
 	Name                string
 	LowercaseNormalized string
 }
 
 func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT location_source_id, id, name, lowercase_normalized
+		SELECT location_source_id, kode, name, lowercase_normalized
 		FROM location_codes
 		WHERE level_id = 2 AND deleted_at IS NULL
 	`)
@@ -112,7 +112,7 @@ func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRo
 	var provinces []ProvinceRow
 	for rows.Next() {
 		var p ProvinceRow
-		if err := rows.Scan(&p.SourceID, &p.ProvinceID, &p.Name, &p.LowercaseNormalized); err != nil {
+		if err := rows.Scan(&p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
 			return nil, fmt.Errorf("scan province: %w", err)
 		}
 		provinces = append(provinces, p)
@@ -125,7 +125,7 @@ func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRo
 
 func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]ProvinceRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT location_source_id, id, name, lowercase_normalized
+		SELECT location_source_id, kode, name, lowercase_normalized
 		FROM location_codes
 		WHERE level_id = 2 AND location_source_id = ? AND deleted_at IS NULL
 	`, sourceID)
@@ -137,7 +137,7 @@ func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, source
 	var provinces []ProvinceRow
 	for rows.Next() {
 		var p ProvinceRow
-		if err := rows.Scan(&p.SourceID, &p.ProvinceID, &p.Name, &p.LowercaseNormalized); err != nil {
+		if err := rows.Scan(&p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
 			return nil, fmt.Errorf("scan province: %w", err)
 		}
 		provinces = append(provinces, p)
@@ -146,6 +146,39 @@ func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, source
 		return nil, fmt.Errorf("rows provinces: %w", err)
 	}
 	return provinces, nil
+}
+
+type CityRow struct {
+	SourceID            int64
+	Kode                string
+	Name                string
+	LowercaseNormalized string
+	PostalCode          string
+}
+
+func (r *LocationRepository) FindAllCities(ctx context.Context) ([]CityRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT location_source_id, kode, name, lowercase_normalized, COALESCE(postal_code, '')
+		FROM location_codes
+		WHERE level_id = 3 AND deleted_at IS NULL
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("find all cities: %w", err)
+	}
+	defer rows.Close()
+
+	var cities []CityRow
+	for rows.Next() {
+		var c CityRow
+		if err := rows.Scan(&c.SourceID, &c.Kode, &c.Name, &c.LowercaseNormalized, &c.PostalCode); err != nil {
+			return nil, fmt.Errorf("scan city: %w", err)
+		}
+		cities = append(cities, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows cities: %w", err)
+	}
+	return cities, nil
 }
 
 func (r *LocationRepository) InsertLocationCode(ctx context.Context, sourceID int, kode, name string, levelID int, postalCode string) error {

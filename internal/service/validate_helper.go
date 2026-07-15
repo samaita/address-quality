@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -21,16 +22,18 @@ func extractPostalCode(s string) string {
 	return ""
 }
 
-func matchProvince(normalized string, provinces []database.ProvinceRow) string {
-	var best string
-	for _, p := range provinces {
-		if strings.Contains(normalized, p.LowercaseNormalized) {
-			if len(p.Name) > len(best) {
-				best = p.Name
+func matchFromCache(cache map[string]string, sourceID int64, normalized string) (string, bool) {
+	words := strings.Fields(normalized)
+	for n := len(words); n >= 1; n-- {
+		for i := 0; i <= len(words)-n; i++ {
+			ngram := strings.Join(words[i:i+n], " ")
+			key := fmt.Sprintf("%d:%s", sourceID, ngram)
+			if val, ok := cache[key]; ok {
+				return val, true
 			}
 		}
 	}
-	return best
+	return "", false
 }
 
 func (svc *Service) sanitize(input string) string {
@@ -75,11 +78,34 @@ func (svc *Service) loadProvinces(ctx context.Context) {
 		svc.provinceErr = err
 		return
 	}
-	cache := make(map[int64][]database.ProvinceRow)
+	cache := make(map[string]string)
+	kodeToName := make(map[string]string)
 	for _, r := range rows {
-		cache[r.SourceID] = append(cache[r.SourceID], r)
+		key := fmt.Sprintf("%d:%s", r.SourceID, r.LowercaseNormalized)
+		cache[key] = r.Name
+		kodeKey := fmt.Sprintf("%d:%s", r.SourceID, r.Kode)
+		kodeToName[kodeKey] = r.Name
 	}
 	svc.provinceCache = cache
+	svc.provinceKodeToName = kodeToName
+}
+
+func (svc *Service) loadCities(ctx context.Context) {
+	rows, err := svc.locationRepo.FindAllCities(ctx)
+	if err != nil {
+		svc.cityErr = err
+		return
+	}
+	cache := make(map[string]*cityEntry)
+	for _, r := range rows {
+		key := fmt.Sprintf("%d:%s", r.SourceID, r.LowercaseNormalized)
+		cache[key] = &cityEntry{
+			Name:       r.Name,
+			Kode:       r.Kode,
+			PostalCode: r.PostalCode,
+		}
+	}
+	svc.cityCache = cache
 }
 
 func (svc *Service) getProvinceOutput(ctx context.Context, sourceID int64, normalized string) (string, error) {
@@ -87,5 +113,41 @@ func (svc *Service) getProvinceOutput(ctx context.Context, sourceID int64, norma
 	if svc.provinceErr != nil {
 		return "", svc.provinceErr
 	}
-	return matchProvince(normalized, svc.provinceCache[sourceID]), nil
+	name, _ := matchFromCache(svc.provinceCache, sourceID, normalized)
+	return name, nil
+}
+
+func (svc *Service) getCityLocation(ctx context.Context, sourceID int64, normalized string) (*model.Location, error) {
+	svc.cityOnce.Do(func() { svc.loadCities(ctx) })
+	if svc.cityErr != nil {
+		return nil, svc.cityErr
+	}
+
+	var entry *cityEntry
+	words := strings.Fields(normalized)
+	for n := len(words); n >= 1; n-- {
+		for i := 0; i <= len(words)-n; i++ {
+			ngram := strings.Join(words[i:i+n], " ")
+			key := fmt.Sprintf("%d:%s", sourceID, ngram)
+			if e, ok := svc.cityCache[key]; ok {
+				entry = e
+				break
+			}
+		}
+		if entry != nil {
+			break
+		}
+	}
+	if entry == nil {
+		return nil, nil
+	}
+
+	parts := strings.Split(entry.Kode, ".")
+	provinceKodeKey := fmt.Sprintf("%d:%s", sourceID, parts[0])
+
+	return &model.Location{
+		Province:   svc.provinceKodeToName[provinceKodeKey],
+		City:       entry.Name,
+		PostalCode: entry.PostalCode,
+	}, nil
 }
