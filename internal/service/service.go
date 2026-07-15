@@ -20,10 +20,17 @@ type AddressRepository interface {
 type LocationRepository interface {
 	Ping(ctx context.Context) error
 	FindAllProvinces(ctx context.Context) ([]database.ProvinceRow, error)
+	FindAllCities(ctx context.Context) ([]database.CityRow, error)
 	FindByKode(ctx context.Context, kode string, sourceID int64) (*model.Location, error)
 	FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) (*model.Location, error)
 	FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]database.ProvinceRow, error)
 	FindSourceByCode(ctx context.Context, code string) (int64, string, error)
+}
+
+type cityEntry struct {
+	Name       string
+	Kode       string
+	PostalCode string
 }
 
 type Service struct {
@@ -33,9 +40,14 @@ type Service struct {
 	maxAddressLength int
 	sourceCode       string
 
-	provinceCache map[int64][]database.ProvinceRow
-	provinceOnce  sync.Once
-	provinceErr   error
+	provinceCache     map[string]string
+	provinceOnce      sync.Once
+	provinceErr       error
+	provinceKodeToName map[string]string
+
+	cityCache map[string]*cityEntry
+	cityOnce  sync.Once
+	cityErr   error
 }
 
 func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string) *Service {
