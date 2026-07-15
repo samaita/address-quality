@@ -46,10 +46,10 @@ type LevelExplain struct {
 }
 
 type Explainability struct {
-	Province *LevelExplain `json:"province,omitempty"`
-	City     *LevelExplain `json:"city,omitempty"`
-	District *LevelExplain `json:"district,omitempty"`
-	Village  *LevelExplain `json:"village,omitempty"`
+	Province    *LevelExplain `json:"province,omitempty"`
+	City        *LevelExplain `json:"city,omitempty"`
+	District    *LevelExplain `json:"district,omitempty"`
+	SubDistrict *LevelExplain `json:"subdistrict,omitempty"`
 }
 
 type Quality struct {

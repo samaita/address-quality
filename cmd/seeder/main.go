@@ -25,6 +25,7 @@ func main() {
 	dropFlag := flag.Bool("drop", false, "Drop all tables (requires confirmation)")
 	initFlag := flag.Bool("init", false, "Create schema from db/location.sql (only when no tables exist)")
 	truncateFlag := flag.Bool("truncate", false, "Truncate all data rows (keep schema) before seeding")
+	normalizeFlag := flag.Bool("normalize", false, "Rebuild lowercase_normalized column for all existing location_codes")
 	dbPathFlag := flag.String("db", "", "Path to location.db (default from config)")
 
 	flag.Usage = func() {
@@ -39,6 +40,7 @@ and batch-inserts into location_codes.
 First run:   seeder --init
 Reset:        seeder --drop && seeder --init
 Retry:        seeder --truncate
+Recalc:       seeder --normalize
 Update data:  seeder            (tables must already exist)
 
 Flags:
@@ -58,8 +60,11 @@ Flags:
 	if *truncateFlag {
 		flags++
 	}
+	if *normalizeFlag {
+		flags++
+	}
 	if flags > 1 {
-		fmt.Fprintln(os.Stderr, "error: --drop, --init, and --truncate are mutually exclusive")
+		fmt.Fprintln(os.Stderr, "error: --drop, --init, --truncate, and --normalize are mutually exclusive")
 		os.Exit(1)
 	}
 
@@ -118,6 +123,16 @@ Flags:
 		if err := repo.TruncateAll(ctx); err != nil {
 			logger.Fatal().Err(err).Msg("truncate")
 		}
+	} else if *normalizeFlag {
+		if !hasTables {
+			logger.Fatal().Msg("no tables found, use --init for first-time setup")
+		}
+		logger.Info().Msg("rebuilding lowercase_normalized...")
+		if err := repo.RebuildNormalized(ctx); err != nil {
+			logger.Fatal().Err(err).Msg("rebuild normalized")
+		}
+		logger.Info().Msg("normalize rebuild complete")
+		return
 	} else if !hasTables {
 		fmt.Fprintln(os.Stderr, "Location tables not found. Initialize the schema by running:")
 		fmt.Fprintln(os.Stderr, "  bin/seeder --init")

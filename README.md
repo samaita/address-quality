@@ -327,10 +327,10 @@ CREATE TABLE IF NOT EXISTS address_requests (
 
 ### Location Database
 
-The `location.db` SQLite database powers the administrative tree parser (v1). It stores Indonesian administrative region codes (province → city → district → village), their names, normalized forms, and postal codes — sourced from Kepmendagri No 300.2.2-2138 Tahun 2025.
+The `location.db` SQLite database powers the administrative tree parser (v1). It stores Indonesian administrative region codes (province → city → district → subdistrict), their names, normalized forms, and postal codes — sourced from Kepmendagri No 300.2.2-2138 Tahun 2025.
 
 **Schema** is defined in `db/location.sql`:
-- `location_levels` — hierarchy level lookup (province/city/district/village)
+- `location_levels` — hierarchy level lookup (province/city/district/subdistrict)
 - `location_sources` — upstream data source registry
 - `location_codes` — core table with 90k+ administrative region records
 - `location_hierarchy` — precomputed tree relation (subdistrict → district → city → province)

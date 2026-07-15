@@ -6,9 +6,9 @@ No 300.2.2-2430 Tahun 2025 (original source: [cahyadsn/wilayah](https://github.c
 ## File
 
 - **`wilayah.sql`** — SQL dump (~92k lines) containing all administrative regions
-  of Indonesia (provinces, cities/regencies, districts, sub-districts, and villages).
+  of Indonesia (provinces, cities/regencies, districts, sub-districts, and subdistricts).
 - **`wilayah_kodepos.sql`** — SQL dump (~84k lines) containing postal codes (`kodepos`)
-  mapped to subdistrict/village-level region codes (kode). Both datasets share the
+  mapped to subdistrict/subdistrict-level region codes (kode). Both datasets share the
   same source and use `kode` as the common key.
 
 ## Schema
@@ -42,7 +42,7 @@ The `kode` field encodes the administrative tree using dot-separated levels:
 | 1     | 2 chars  | `11`             | Province                   |
 | 2     | 5 chars  | `11.01`          | City / Regency             |
 | 3     | 8 chars  | `11.01.01`       | District (Kecamatan)       |
-| 4     | 13 chars | `11.01.01.2001`  | Village (Kelurahan/Desa)   |
+| 4     | 13 chars | `11.01.01.2001`  | SubDistrict (Kelurahan/Desa)   |
 
 Example: `11.01.01.2001` → `Keude Bakongan`
 (Aceh → Aceh Selatan → Bakongan → Keude Bakongan)

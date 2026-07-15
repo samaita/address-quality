@@ -58,7 +58,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		return nil, err
 	}
 
-	winnerProvinceID, winnerCityID, winnerDistrictID, winnerVillageID, pathOK := resolveWinner(
+	winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID, pathOK := resolveWinner(
 		provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates, svc.hierarchyCache,
 	)
 
@@ -95,9 +95,9 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		}
 	}
 
-	if winnerVillageID > 0 {
+	if winnerSubDistrictID > 0 {
 		for _, c := range subDistrictCandidates {
-			if c.LocationID == winnerVillageID {
+			if c.LocationID == winnerSubDistrictID {
 				location.SubDistrict = c.Name
 				location.PostalCode = inputPostalCode
 				output = c.Name
@@ -121,9 +121,9 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 
 	postalCodeMatched := false
-	if inputPostalCode != "" && winnerVillageID > 0 {
+	if inputPostalCode != "" && winnerSubDistrictID > 0 {
 		for _, c := range subDistrictCandidates {
-			if c.LocationID == winnerVillageID {
+			if c.LocationID == winnerSubDistrictID {
 				if c.PostalCode == inputPostalCode {
 					postalCodeMatched = true
 				}
@@ -134,7 +134,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 
 	confidence := calculateConfidence(
 		provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates,
-		winnerProvinceID, winnerCityID, winnerDistrictID, winnerVillageID,
+		winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID,
 		postalCodeMatched, svc.hierarchyCache,
 	)
 
@@ -172,7 +172,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		if pathOK {
 			reasonsVil = append(reasonsVil, "parent_valid")
 		}
-		explainability.Village = buildExplainability("village", inputVil, subDistrictCandidates, winnerVillageID, reasonsVil)
+		explainability.SubDistrict = buildExplainability("subdistrict", inputVil, subDistrictCandidates, winnerSubDistrictID, reasonsVil)
 	}
 
 	log.Debug().
