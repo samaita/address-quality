@@ -92,6 +92,7 @@ func (r *LocationRepository) FindByKode(ctx context.Context, kode string, source
 }
 
 type ProvinceRow struct {
+	ID                  int64
 	SourceID            int64
 	Kode                string
 	Name                string
@@ -100,7 +101,7 @@ type ProvinceRow struct {
 
 func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT location_source_id, kode, name, lowercase_normalized
+		SELECT id, location_source_id, kode, name, lowercase_normalized
 		FROM location_codes
 		WHERE level_id = 2 AND deleted_at IS NULL
 	`)
@@ -112,7 +113,7 @@ func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRo
 	var provinces []ProvinceRow
 	for rows.Next() {
 		var p ProvinceRow
-		if err := rows.Scan(&p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
+		if err := rows.Scan(&p.ID, &p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
 			return nil, fmt.Errorf("scan province: %w", err)
 		}
 		provinces = append(provinces, p)
@@ -125,7 +126,7 @@ func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRo
 
 func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]ProvinceRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT location_source_id, kode, name, lowercase_normalized
+		SELECT id, location_source_id, kode, name, lowercase_normalized
 		FROM location_codes
 		WHERE level_id = 2 AND location_source_id = ? AND deleted_at IS NULL
 	`, sourceID)
@@ -137,7 +138,7 @@ func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, source
 	var provinces []ProvinceRow
 	for rows.Next() {
 		var p ProvinceRow
-		if err := rows.Scan(&p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
+		if err := rows.Scan(&p.ID, &p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
 			return nil, fmt.Errorf("scan province: %w", err)
 		}
 		provinces = append(provinces, p)
@@ -149,6 +150,7 @@ func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, source
 }
 
 type CityRow struct {
+	ID                  int64
 	SourceID            int64
 	Kode                string
 	Name                string
@@ -158,7 +160,7 @@ type CityRow struct {
 
 func (r *LocationRepository) FindAllCities(ctx context.Context) ([]CityRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT location_source_id, kode, name, lowercase_normalized, COALESCE(postal_code, '')
+		SELECT id, location_source_id, kode, name, lowercase_normalized, COALESCE(postal_code, '')
 		FROM location_codes
 		WHERE level_id = 3 AND deleted_at IS NULL
 	`)
@@ -170,7 +172,7 @@ func (r *LocationRepository) FindAllCities(ctx context.Context) ([]CityRow, erro
 	var cities []CityRow
 	for rows.Next() {
 		var c CityRow
-		if err := rows.Scan(&c.SourceID, &c.Kode, &c.Name, &c.LowercaseNormalized, &c.PostalCode); err != nil {
+		if err := rows.Scan(&c.ID, &c.SourceID, &c.Kode, &c.Name, &c.LowercaseNormalized, &c.PostalCode); err != nil {
 			return nil, fmt.Errorf("scan city: %w", err)
 		}
 		cities = append(cities, c)
@@ -432,4 +434,31 @@ func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode st
 	}
 
 	return loc, nil
+}
+
+func (r *LocationRepository) LoadCityProvinceMapping(ctx context.Context, sourceID int64) (map[int64]int64, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT city_id, province_id
+		FROM location_hierarchy
+		WHERE location_source_id = ? AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("load city province mapping: %w", err)
+	}
+	defer rows.Close()
+
+	mapping := make(map[int64]int64)
+	for rows.Next() {
+		var cityID, provinceID int64
+		if err := rows.Scan(&cityID, &provinceID); err != nil {
+			return nil, fmt.Errorf("scan city province mapping: %w", err)
+		}
+		if _, exists := mapping[cityID]; !exists {
+			mapping[cityID] = provinceID
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows city province mapping: %w", err)
+	}
+	return mapping, nil
 }

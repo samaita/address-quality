@@ -34,18 +34,20 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 
 	output := sanitized
 	location := model.Location{}
+	var provinceID int64
 
-	matched, err := svc.getProvinceOutput(ctx, sourceID, normalized)
+	provinceEntry, err := svc.getProvinceLocation(ctx, sourceID, normalized)
 	if err != nil {
 		log.Error().Err(err).Msg("find provinces by source")
 		return nil, err
 	}
-	if matched != "" {
-		output = matched
-		location.Province = matched
+	if provinceEntry != nil {
+		output = provinceEntry.Name
+		location.Province = provinceEntry.Name
+		provinceID = provinceEntry.ID
 	}
 
-	cityLoc, err := svc.getCityLocation(ctx, sourceID, normalized)
+	cityLoc, err := svc.getCityLocation(ctx, sourceID, normalized, provinceID)
 	if err != nil {
 		log.Error().Err(err).Msg("find city")
 		return nil, err
