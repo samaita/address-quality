@@ -436,6 +436,130 @@ func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode st
 	return loc, nil
 }
 
+type DistrictRow struct {
+	ID                  int64
+	SourceID            int64
+	Kode                string
+	Name                string
+	LowercaseNormalized string
+}
+
+func (r *LocationRepository) FindAllDistricts(ctx context.Context, sourceID int64) ([]DistrictRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, location_source_id, kode, name, lowercase_normalized
+		FROM location_codes
+		WHERE level_id = 4 AND location_source_id = ? AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("find all districts: %w", err)
+	}
+	defer rows.Close()
+
+	var districts []DistrictRow
+	for rows.Next() {
+		var d DistrictRow
+		if err := rows.Scan(&d.ID, &d.SourceID, &d.Kode, &d.Name, &d.LowercaseNormalized); err != nil {
+			return nil, fmt.Errorf("scan district: %w", err)
+		}
+		districts = append(districts, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows districts: %w", err)
+	}
+	return districts, nil
+}
+
+type SubDistrictRow struct {
+	ID                  int64
+	SourceID            int64
+	Kode                string
+	Name                string
+	LowercaseNormalized string
+	PostalCode          string
+}
+
+func (r *LocationRepository) FindAllSubDistricts(ctx context.Context, sourceID int64) ([]SubDistrictRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, location_source_id, kode, name, lowercase_normalized, COALESCE(postal_code, '')
+		FROM location_codes
+		WHERE level_id = 5 AND location_source_id = ? AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("find all subdistricts: %w", err)
+	}
+	defer rows.Close()
+
+	var subdistricts []SubDistrictRow
+	for rows.Next() {
+		var s SubDistrictRow
+		if err := rows.Scan(&s.ID, &s.SourceID, &s.Kode, &s.Name, &s.LowercaseNormalized, &s.PostalCode); err != nil {
+			return nil, fmt.Errorf("scan subdistrict: %w", err)
+		}
+		subdistricts = append(subdistricts, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows subdistricts: %w", err)
+	}
+	return subdistricts, nil
+}
+
+type HierarchyRow struct {
+	ProvinceID    int64
+	CityID        int64
+	DistrictID    int64
+	SubDistrictID int64
+}
+
+type HierarchyMap struct {
+	ProvinceChildren map[int64][]int64
+	CityChildren     map[int64][]int64
+	DistrictChildren map[int64][]int64
+	CityToProvince   map[int64]int64
+	DistrictToCity   map[int64]int64
+	SubDistrictToDist map[int64]int64
+}
+
+func (r *LocationRepository) LoadFullHierarchy(ctx context.Context, sourceID int64) (*HierarchyMap, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT province_id, city_id, district_id, subdistrict_id
+		FROM location_hierarchy
+		WHERE location_source_id = ? AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("load full hierarchy: %w", err)
+	}
+	defer rows.Close()
+
+	h := &HierarchyMap{
+		ProvinceChildren:  make(map[int64][]int64),
+		CityChildren:      make(map[int64][]int64),
+		DistrictChildren:  make(map[int64][]int64),
+		CityToProvince:    make(map[int64]int64),
+		DistrictToCity:    make(map[int64]int64),
+		SubDistrictToDist: make(map[int64]int64),
+	}
+
+	for rows.Next() {
+		var pID, cID, dID, sID int64
+		if err := rows.Scan(&pID, &cID, &dID, &sID); err != nil {
+			return nil, fmt.Errorf("scan hierarchy: %w", err)
+		}
+
+		h.ProvinceChildren[pID] = append(h.ProvinceChildren[pID], cID)
+		h.CityChildren[cID] = append(h.CityChildren[cID], dID)
+		h.DistrictChildren[dID] = append(h.DistrictChildren[dID], sID)
+		h.CityToProvince[cID] = pID
+		h.DistrictToCity[dID] = cID
+		h.SubDistrictToDist[sID] = dID
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows hierarchy: %w", err)
+	}
+
+	return h, nil
+}
+
 func (r *LocationRepository) LoadCityProvinceMapping(ctx context.Context, sourceID int64) (map[int64]int64, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT city_id, province_id

@@ -21,11 +21,14 @@ type LocationRepository interface {
 	Ping(ctx context.Context) error
 	FindAllProvinces(ctx context.Context) ([]database.ProvinceRow, error)
 	FindAllCities(ctx context.Context) ([]database.CityRow, error)
+	FindAllDistricts(ctx context.Context, sourceID int64) ([]database.DistrictRow, error)
+	FindAllSubDistricts(ctx context.Context, sourceID int64) ([]database.SubDistrictRow, error)
 	FindByKode(ctx context.Context, kode string, sourceID int64) (*model.Location, error)
 	FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) (*model.Location, error)
 	FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]database.ProvinceRow, error)
 	FindSourceByCode(ctx context.Context, code string) (int64, string, error)
 	LoadCityProvinceMapping(ctx context.Context, sourceID int64) (map[int64]int64, error)
+	LoadFullHierarchy(ctx context.Context, sourceID int64) (*database.HierarchyMap, error)
 }
 
 type provinceEntry struct {
@@ -41,6 +44,19 @@ type cityEntry struct {
 	PostalCode string
 }
 
+type districtEntry struct {
+	ID         int64
+	Name       string
+	Kode       string
+}
+
+type subDistrictEntry struct {
+	ID         int64
+	Name       string
+	Kode       string
+	PostalCode string
+}
+
 type Service struct {
 	repo             AddressRepository
 	locationRepo     LocationRepository
@@ -48,16 +64,28 @@ type Service struct {
 	maxAddressLength int
 	sourceCode       string
 
-	provinceCache      map[string]*provinceEntry
+	provinceCache      map[string][]*provinceEntry
 	provinceOnce       sync.Once
 	provinceErr        error
 	provinceKodeToEntry map[string]*provinceEntry
 
-	cityCache        map[string]*cityEntry
+	cityCache        map[string][]*cityEntry
 	cityOnce         sync.Once
 	cityErr          error
 	cityProvinceMap  map[int64]int64
 	cityProvinceOnce sync.Once
+
+	districtCache map[string][]*districtEntry
+	districtOnce  sync.Once
+	districtErr   error
+
+	subDistrictCache map[string][]*subDistrictEntry
+	subDistrictOnce  sync.Once
+	subDistrictErr   error
+
+	hierarchyCache *database.HierarchyMap
+	hierarchyOnce  sync.Once
+	hierarchyErr   error
 }
 
 func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string) *Service {
