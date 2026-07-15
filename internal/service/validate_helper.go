@@ -373,11 +373,11 @@ func resolveWinner(allProvinces, allCities, allDistricts, allSubDistricts []mode
 	}
 
 	type path struct {
-		provinceID int64
-		cityID     int64
-		districtID int64
-		villageID  int64
-		score      int
+		provinceID    int64
+		cityID        int64
+		districtID    int64
+		subdistrictID int64
+		score         int
 	}
 
 	provinceID := allProvinces[0].LocationID
@@ -410,13 +410,13 @@ func resolveWinner(allProvinces, allCities, allDistricts, allSubDistricts []mode
 				}
 				continue
 			}
-			for _, village := range allSubDistricts {
+			for _, subdistrict := range allSubDistricts {
 				if hierarchy != nil {
-					if hierarchy.SubDistrictToDist[village.LocationID] != district.LocationID {
+					if hierarchy.SubDistrictToDist[subdistrict.LocationID] != district.LocationID {
 						continue
 					}
 				}
-				p := &path{provinceID: provinceID, cityID: city.LocationID, districtID: district.LocationID, villageID: village.LocationID, score: 4}
+				p := &path{provinceID: provinceID, cityID: city.LocationID, districtID: district.LocationID, subdistrictID: subdistrict.LocationID, score: 4}
 				if bestPath == nil || p.score > bestPath.score {
 					bestPath = p
 				}
@@ -427,10 +427,10 @@ func resolveWinner(allProvinces, allCities, allDistricts, allSubDistricts []mode
 	if bestPath == nil {
 		return provinceID, 0, 0, 0, true
 	}
-	return bestPath.provinceID, bestPath.cityID, bestPath.districtID, bestPath.villageID, true
+	return bestPath.provinceID, bestPath.cityID, bestPath.districtID, bestPath.subdistrictID, true
 }
 
-func calculateConfidence(provinceCands, cityCands, districtCands, subDistrictCands []model.Candidate, winnerProvinceID, winnerCityID, winnerDistrictID, winnerVillageID int64, postalCodeMatched bool, hierarchy *database.HierarchyMap) float64 {
+func calculateConfidence(provinceCands, cityCands, districtCands, subDistrictCands []model.Candidate, winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID int64, postalCodeMatched bool, hierarchy *database.HierarchyMap) float64 {
 	var score float64
 
 	hasExact := false
@@ -483,8 +483,8 @@ func calculateConfidence(provinceCands, cityCands, districtCands, subDistrictCan
 			parentValid = false
 		}
 	}
-	if winnerVillageID > 0 && parentValid && hierarchy != nil {
-		distID := hierarchy.SubDistrictToDist[winnerVillageID]
+	if winnerSubDistrictID > 0 && parentValid && hierarchy != nil {
+		distID := hierarchy.SubDistrictToDist[winnerSubDistrictID]
 		if distID == winnerDistrictID {
 			parentValid = true
 		} else {

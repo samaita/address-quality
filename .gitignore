@@ -6,4 +6,5 @@ tests/api/result/
 tests/api/cases/*.csv
 !tests/api/cases/example.csv
 docs/ISSUES.md
-bin
+bin*.db
+.DS_Store

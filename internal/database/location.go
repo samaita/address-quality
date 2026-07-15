@@ -351,6 +351,54 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 	return nil
 }
 
+func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, name FROM location_codes WHERE deleted_at IS NULL
+	`)
+	if err != nil {
+		return fmt.Errorf("rebuild normalized query: %w", err)
+	}
+	defer rows.Close()
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		UPDATE location_codes SET lowercase_normalized = ?, updated_at = datetime('now') WHERE id = ?
+	`)
+	if err != nil {
+		return fmt.Errorf("prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	var count int
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return fmt.Errorf("scan: %w", err)
+		}
+		normalized := normalizer.Normalize(name)
+		if _, err := stmt.ExecContext(ctx, normalized, id); err != nil {
+			return fmt.Errorf("update %d: %w", id, err)
+		}
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("rows: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	logger.Info().Int("count", count).Msg("rebuilt lowercase_normalized")
+	return nil
+}
+
 func (r *LocationRepository) InsertLocationSource(ctx context.Context, code, version, name, codeDate, desc string) (int64, error) {
 	result, err := r.db.ExecContext(ctx, `
 		INSERT OR IGNORE INTO location_sources (code, version, name, code_date, desc)
