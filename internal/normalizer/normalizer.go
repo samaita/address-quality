@@ -5,15 +5,20 @@ import (
 	"strings"
 )
 
-var abbreviationMap = map[string]string{
-	"kab.": "kabupaten",
-	"kab":  "kabupaten",
-	"kec.": "kecamatan",
-	"kec":  "kecamatan",
-	"kel.": "kelurahan",
-	"kel":  "kelurahan",
-	"prov.": "provinsi",
-	"prov": "provinsi",
+var adminSet = map[string]struct{}{
+	"kabupaten": {},
+	"kab.":      {},
+	"kab":       {},
+	"kota":      {},
+	"kecamatan": {},
+	"kec.":      {},
+	"kec":       {},
+	"kelurahan": {},
+	"kel.":      {},
+	"kel":       {},
+	"provinsi":  {},
+	"prov.":     {},
+	"prov":      {},
 }
 
 var rePunctuation = regexp.MustCompile(`[^\w\s]`)
@@ -22,13 +27,14 @@ var reMultipleSpaces = regexp.MustCompile(`\s+`)
 func Normalize(name string) string {
 	lower := strings.ToLower(strings.TrimSpace(name))
 	words := strings.Fields(lower)
-	for i, w := range words {
-		if expanded, ok := abbreviationMap[w]; ok {
-			words[i] = expanded
+	filtered := make([]string, 0, len(words))
+	for _, w := range words {
+		if _, ok := adminSet[w]; !ok {
+			filtered = append(filtered, w)
 		}
 	}
-	expanded := strings.Join(words, " ")
-	noPunct := rePunctuation.ReplaceAllString(expanded, "")
+	joined := strings.Join(filtered, " ")
+	noPunct := rePunctuation.ReplaceAllString(joined, "")
 	result := reMultipleSpaces.ReplaceAllString(noPunct, " ")
 	return strings.TrimSpace(result)
 }
