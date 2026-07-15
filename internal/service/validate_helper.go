@@ -10,6 +10,7 @@ import (
 
 	"address-quality/internal/database"
 	"address-quality/internal/model"
+	"address-quality/internal/normalizer"
 )
 
 var postalCodePattern = regexp.MustCompile(`\b(\d{5})\b`)
@@ -24,18 +25,6 @@ func extractPostalCode(s string) string {
 
 func (svc *Service) sanitize(input string) string {
 	return svc.s.Sanitize(input)
-}
-
-func normalize(input string) string {
-	lower := strings.ToLower(strings.TrimSpace(input))
-	words := strings.Fields(lower)
-	filtered := make([]string, 0, len(words))
-	for _, w := range words {
-		if _, ok := abbreviationSet[w]; !ok {
-			filtered = append(filtered, w)
-		}
-	}
-	return strings.Join(filtered, " ")
 }
 
 func buildAddressRecord(requestID, addressID string, quality model.Quality, now time.Time) *database.AddressRecord {
@@ -68,7 +57,7 @@ func (svc *Service) loadProvinces(ctx context.Context) {
 	kodeToEntry := make(map[string]*provinceEntry)
 	for _, r := range rows {
 		entry := &provinceEntry{ID: r.ID, Name: r.Name, Kode: r.Kode}
-		normalizedKey := normalize(r.Name)
+		normalizedKey := normalizer.Normalize(r.Name)
 		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
 		cache[key] = append(cache[key], entry)
 		kodeKey := fmt.Sprintf("%d:%s", r.SourceID, r.Kode)
@@ -86,7 +75,7 @@ func (svc *Service) loadCities(ctx context.Context) {
 	}
 	cache := make(map[string][]*cityEntry)
 	for _, r := range rows {
-		normalizedKey := normalize(r.Name)
+		normalizedKey := normalizer.Normalize(r.Name)
 		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
 		cache[key] = append(cache[key], &cityEntry{
 			ID:         r.ID,
@@ -115,7 +104,7 @@ func (svc *Service) loadDistricts(ctx context.Context, sourceID int64) {
 	}
 	cache := make(map[string][]*districtEntry)
 	for _, r := range rows {
-		normalizedKey := normalize(r.Name)
+		normalizedKey := normalizer.Normalize(r.Name)
 		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
 		cache[key] = append(cache[key], &districtEntry{
 			ID:   r.ID,
@@ -134,7 +123,7 @@ func (svc *Service) loadSubDistricts(ctx context.Context, sourceID int64) {
 	}
 	cache := make(map[string][]*subDistrictEntry)
 	for _, r := range rows {
-		normalizedKey := normalize(r.Name)
+		normalizedKey := normalizer.Normalize(r.Name)
 		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
 		cache[key] = append(cache[key], &subDistrictEntry{
 			ID:         r.ID,
@@ -215,7 +204,7 @@ func (svc *Service) findProvinceCandidates(ctx context.Context, sourceID int64, 
 		for _, entry := range svc.provinceCache[key] {
 			matchedNgram := extractNgramFromKey(key)
 			matchType := "PARTIAL"
-			if strings.TrimSpace(normalized) == entry.Kode || matchedNgram == normalize(entry.Name) {
+			if strings.TrimSpace(normalized) == entry.Kode || matchedNgram == normalizer.Normalize(entry.Name) {
 				matchType = "EXACT"
 			}
 			candidates = append(candidates, model.Candidate{
@@ -260,7 +249,7 @@ func (svc *Service) findCityCandidates(ctx context.Context, sourceID int64, norm
 			}
 			matchedNgram := extractNgramFromKey(key)
 			matchType := "PARTIAL"
-			if matchedNgram == normalize(entry.Name) {
+			if matchedNgram == normalizer.Normalize(entry.Name) {
 				matchType = "EXACT"
 			}
 			candidates = append(candidates, model.Candidate{
@@ -305,7 +294,7 @@ func (svc *Service) findDistrictCandidates(ctx context.Context, sourceID int64, 
 			}
 			matchedNgram := extractNgramFromKey(key)
 			matchType := "PARTIAL"
-			if matchedNgram == normalize(entry.Name) {
+			if matchedNgram == normalizer.Normalize(entry.Name) {
 				matchType = "EXACT"
 			}
 			candidates = append(candidates, model.Candidate{
@@ -350,7 +339,7 @@ func (svc *Service) findSubDistrictCandidates(ctx context.Context, sourceID int6
 			}
 			matchedNgram := extractNgramFromKey(key)
 			matchType := "PARTIAL"
-			if matchedNgram == normalize(entry.Name) {
+			if matchedNgram == normalizer.Normalize(entry.Name) {
 				matchType = "EXACT"
 			}
 			candidates = append(candidates, model.Candidate{

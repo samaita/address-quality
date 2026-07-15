@@ -9,6 +9,7 @@ import (
 
 	"address-quality/internal/logger"
 	"address-quality/internal/model"
+	"address-quality/internal/normalizer"
 )
 
 func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressRequest, requestID string) (*model.AddressResponse, error) {
@@ -19,7 +20,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	now := time.Now().UTC()
 	addressID := uuid.Must(uuid.NewV7()).String()
 	sanitized := svc.sanitize(req.Address)
-	normalized := normalize(sanitized)
+	normalized := normalizer.Normalize(sanitized)
 	log := logger.L.With().Str("request_id", requestID).Logger()
 
 	sourceCode := req.SourceCode
