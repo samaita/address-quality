@@ -28,6 +28,7 @@ func TestNormalize(t *testing.T) {
 		{"_test_", "test"},
 		{"KAB. BANDUNG 40114", "bandung"},
 		{"jl_foo_123", "jlfoo"},
+		{"Ciomas, Bogor, Jawa Barat", "ciomas bogor jawa barat"},
 	}
 
 	for _, tt := range tests {
