@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -64,13 +65,11 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	)
 
 	location := model.Location{}
-	output := sanitized
 
 	if winnerProvinceID > 0 {
 		for _, c := range provinceCandidates {
 			if c.LocationID == winnerProvinceID {
 				location.Province = c.Name
-				output = c.Name
 				break
 			}
 		}
@@ -80,7 +79,6 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		for _, c := range cityCandidates {
 			if c.LocationID == winnerCityID {
 				location.City = c.Name
-				output = c.Name
 				break
 			}
 		}
@@ -90,7 +88,6 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		for _, c := range districtCandidates {
 			if c.LocationID == winnerDistrictID {
 				location.District = c.Name
-				output = c.Name
 				break
 			}
 		}
@@ -101,7 +98,6 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 			if c.LocationID == winnerSubDistrictID {
 				location.SubDistrict = c.Name
 				location.PostalCode = c.PostalCode
-				output = c.Name
 				break
 			}
 		}
@@ -116,7 +112,6 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 			}
 			if loc != nil {
 				location = *loc
-				output = loc.SubDistrict
 			}
 		}
 	}
@@ -198,12 +193,23 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		Float64("confidence", confidence).
 		Msg("candidate resolution")
 
+	formParts := []string{}
+	for _, s := range []string{location.SubDistrict, location.District, location.City, location.Province} {
+		if s != "" {
+			formParts = append(formParts, s)
+		}
+	}
+	formattedOutput := strings.Join(formParts, ", ")
+	if location.PostalCode != "" {
+		formattedOutput += " " + location.PostalCode
+	}
+
 	quality := model.Quality{
 		AddressID:       addressID,
 		Confidence:      confidence,
 		Location:        location,
 		NormalizedInput: normalized,
-		Output:          output,
+		FormattedOutput: formattedOutput,
 		LocationVersion: sourceVersion,
 		RawInput:        req.Address,
 		Explainability:  explainability,

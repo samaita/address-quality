@@ -57,7 +57,7 @@ type Quality struct {
 	Confidence      float64        `json:"confidence"`
 	Location        Location       `json:"location"`
 	NormalizedInput string         `json:"normalized_input"`
-	Output          string         `json:"output"`
+	FormattedOutput string         `json:"formatted_output"`
 	LocationVersion string         `json:"location_version"`
 	RawInput        string         `json:"raw_input"`
 	Explainability  Explainability `json:"-"`
