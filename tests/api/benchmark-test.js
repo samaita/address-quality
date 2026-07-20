@@ -7,6 +7,9 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:7300';
 const API_VERSION = process.env.API_VERSION || 'v1';
 const OUTPUT_DIR = 'tests/api/benchmark';
 
+const sourceArg = process.argv.find(a => a.startsWith('--source='));
+const SOURCE = sourceArg ? sourceArg.split('=')[1] : '';
+
 function csvEscape(value) {
   if (value == null) return '';
   const str = String(value);
@@ -62,7 +65,7 @@ function readInputCsv(filePath) {
       console.warn(`Skipping row ${i + 1}: only ${cols.length} columns found`);
       continue;
     }
-    rows.push({ source: cols[0].trim(), address: cols[2].trim() });
+    rows.push(cols[2].trim());
   }
   return rows;
 }
@@ -164,15 +167,15 @@ async function main() {
   let failed = 0;
 
   for (let i = 0; i < rows.length; i++) {
-    const { source, address } = rows[i];
+    const address = rows[i];
     process.stdout.write(`[${i + 1}/${rows.length}] ${address.slice(0, 60)}... `);
 
-    const result = await postRequest(address, source);
+    const result = await postRequest(address, SOURCE);
     if (result.ok) {
       const q = result.data.quality;
       const loc = q.location || {};
       outLines.push([
-        source,
+        SOURCE,
         address,
         q.formatted_output || '',
         loc.province || '',
@@ -190,7 +193,7 @@ async function main() {
       console.log('OK');
     } else {
       outLines.push([
-        source,
+        SOURCE,
         address,
         '', '', '', '', '', '', '', '', '', '', '',
       ].map(csvEscape).join(','));
