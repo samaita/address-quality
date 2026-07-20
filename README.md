@@ -2,68 +2,173 @@
 
 ## 1. Overview
 
-A lightweight Go HTTP server that accepts free-text Indonesian address input, sanitizes it, stores the request in SQLite, and returns a structured JSON response with quality metadata. Built for extensibility — geocoding, validation, and enrichment can be layered on top.
+A lightweight Go HTTP server that accepts free-text Indonesian addresses, normalizes and validates them against Indonesia's administrative hierarchy, and returns structured quality metadata. Designed as an Address Intelligence layer, the API sits between raw user input and downstream systems such as geocoders, logistics platforms, KYC services, and customer databases.
 
 **Status**: v0.1.0 · MVP  
 **License**: MIT
 
 ---
 
-### 1.1 Problem: Bad Addresses in Indonesian E-Commerce
+### 1.1 Problem: Indonesian Addresses Are Difficult for Machines
 
-Indonesian e-commerce end users routinely submit addresses that are structurally undeliverable: landmark-based inputs (*"dekat masjid Al-Ikhlas, gang Mawar, Bekasi Timur"*), missing kelurahan / kecamatan, abbreviated informal names, or references to non-standard geographic features. Developers at 3PL-integrating startups (JNE, SiCepat, AnterAja) forward these strings directly to routing APIs — the failure surfaces days later as a failed delivery, a CS ticket, or a re-delivery charge.
+Most software systems assume addresses are already clean and structured.
 
-**How bad addresses contribute to failed delivery.** Bad address data is a top-two structural cause of failed first-attempt deliveries globally, ranking second only to recipient unavailability. Across global research:
+In reality, Indonesian users submit addresses as free text containing abbreviations, aliases, landmarks, incomplete administrative information, inconsistent spelling, and ambiguous location names. These inputs are easy for humans to interpret but difficult for software systems to process consistently.
 
-- First-attempt delivery failure rates run **5–20%** domestically.
-- In a 10,000-delivery study, incorrect address data alone caused **28% of failed deliveries** — second only to recipient unavailability.
-- Industry surveys attribute **60–71%** of all failed deliveries to inaccurate or incomplete address data when counting every address-related failure mode.
-- Incorrect / incomplete addresses consistently account for **25–45%** of first-attempt failures in large-scale datasets.
+Developers often forward raw addresses directly into downstream systems—including geocoders, logistics APIs, KYC platforms, and CRMs—where poor-quality address data propagates into operational workflows.
 
-Indonesia's context amplifies the problem: 17,000+ islands, informal addressing (`gang`, RT/RW, landmark references), continuous pemekaran (new administrative subdivisions), and a World Bank LPI 2023 rank of **63/139** (down from 46 in 2018) with pronounced weaknesses in Timeliness and Tracking — both address-sensitive dimensions.
+Unlike countries with standardized street addressing, Indonesia presents unique challenges:
 
-**Common bad-address patterns:**
+- 17,000+ islands with diverse addressing conventions.
+- Frequent use of landmarks, RT/RW, gang names, and informal descriptions.
+- Multiple administrative locations sharing identical names.
+- Continuous administrative changes (pemekaran daerah).
+- Inconsistent abbreviations and unofficial aliases used by end users.
 
-1. **Typo / informal spelling of a location name**
-   Input: `"4 Koto, Kabupaten Agam, Sumatera Barat"`
-   — The official name is "IV Koto" (Roman numeral), but users commonly type
-     "4 Koto" or "Empat Koto". Courier systems may not resolve "4" → "IV",
-     causing failed geocoding or misrouting to a different sorting zone.
+These characteristics make Indonesian addresses significantly harder to process automatically.
 
-2. **Postal code / location mismatch**
-   Input: `"Jl. Siliwangi No.1, Bogor 16119"`
-   — Address is in Kota Bogor (postal code range specific to kelurahan), but
-     16119 is a Kabupaten Bogor code. The mismatch can trigger wrong regional
-     pricing (ongkir) or route the package to a sorting center in the wrong
-     administrative area.
+**Common address-quality problems include:**
+
+1. **Typographical errors and unofficial location names**
+
+   Input:
+
+   ```text
+   4 Koto, Kabupaten Agam, Sumatera Barat
+   ```
+
+   Official administrative name:
+
+   ```text
+   IV Koto
+   ```
+
+   Humans immediately understand the intended location, while many systems treat these as different places.
+
+2. **Administrative hierarchy inconsistencies**
+
+   Input:
+
+   ```text
+   Jl. Siliwangi No.1
+   Bogor
+   16119
+   ```
+
+   The postal code belongs to a different administrative region than the stated city, introducing ambiguity and increasing downstream validation effort.
 
 3. **Incomplete administrative hierarchy**
-   Input: `"Kapuas Tengah, Kalimantan"`
-   — Kapuas Tengah is a district (kecamatan) in Kabupaten Kapuas, Kalimantan
-     Tengah. Omitting "Tengah" from the province name introduces ambiguity —
-     there are four other Kapuas-named districts across Kalimantan Barat and
-     Kalimantan Timur, any of which could be inferred by the courier's system.
 
-**Rank among failure causes (Indonesia, qualitative).** Local studies (2024 Bandung e-commerce logistics study; distribution irregularity analyses in Indonesian 3PLs) identify data-entry errors, wrong address / route, and order-accuracy failures as primary drivers of customer dissatisfaction and operational loss — pairing with global benchmarks to place address quality as the #1 or #2 failure cause depending on the dataset.
+   Input:
 
-**Cost spent, monthly (IDR).** Per-failure cost in developed markets is **>USD 15** (~Rp 225.000 at Rp 15.000 / USD) when re-delivery, reverse logistics, CS handling, and refund processing are summed. Indonesian 3PLs operate under higher baseline logistics costs (25–30% of GDP) and thin-margin routes, so the marginal cost of each failed attempt is comparable or higher. A representative developer-team exposure:
+   ```text
+   Kapuas Tengah, Kalimantan
+   ```
 
-| Scenario | Monthly bad-address loss (IDR) |
-|---|---|
-| 1.000 orders / mo × 10% failed × 30% address-attributable × Rp 225.000 | **~Rp 6.750.000 / mo** (~USD 450) |
-| 10.000 orders / mo (same ratios) | **~Rp 67.500.000 / mo** (~USD 4.500) |
-| 100.000 orders / mo (same ratios) | **~Rp 675.000.000 / mo** (~USD 45.000) |
+   The province is incomplete ("Kalimantan Tengah"), making the address ambiguous because multiple regions share similar names.
 
-**Proof that validation moves the metric.** Tokopedia's internal address validation platform reported a **~10% uplift in successfully completed addresses** after deployment; Paxel reports **up to 99% reduction in pickup/delivery time**. Both are enterprise-scale builds unavailable to small developer teams.
+4. **Ambiguous location names**
 
-**Market gap.** No lightweight, API-first, self-serve Indonesian address validation tool is publicly available at the developer layer. Existing options fail:
-- **Google Maps Geocoding:** priced and designed for lat/lng, not deliverability validation; developers pay USD 0.005 / call for a side-effect check.
-- **Raja Ongkir / Biteship:** logistics-layer APIs that assume the address is already clean.
-- **In-house builds:** require a curated corpus + parsing logic + ongoing maintenance — out of scope for 2–10 person teams.
+   Input:
+
+   ```text
+   Bogor
+   ```
+
+   The address may refer to either:
+
+   - Kota Bogor
+   - Kabupaten Bogor
+
+   Without additional context, downstream systems must guess.
+
+5. **Alias and abbreviation variations**
+
+   Examples:
+
+   ```text
+   Gg. Mawar
+   Gang Mawar
+
+   Kab. Bogor
+   Kabupaten Bogor
+
+   DIY
+   Daerah Istimewa Yogyakarta
+   ```
+
+   These refer to the same location but often appear as different strings.
+
+---
+
+Poor address quality affects every downstream system consuming customer addresses.
+
+Typical consequences include:
+
+- Ambiguous location resolution
+- Incorrect administrative mapping
+- Duplicate customer records
+- Manual customer verification
+- Failed or inconsistent geocoding
+- Increased operational overhead
+- Higher risk of delivery and fulfillment issues
+
+For logistics and e-commerce, address quality is a significant contributor to failed deliveries and customer support costs. For fintech, insurance, marketplaces, and CRM platforms, poor address quality reduces data reliability and increases operational complexity.
+
+---
+
+**Market gap.**
+
+Existing solutions address only part of the problem.
+
+- **Google Maps Geocoding** converts addresses into coordinates but is designed primarily for location lookup rather than administrative validation or address quality assessment.
+- **Logistics APIs** (Raja Ongkir, Biteship, courier integrations) generally assume address data has already been cleaned.
+- **In-house solutions** require maintaining Indonesian administrative datasets, alias mappings, parsing logic, and continuous updates as administrative boundaries evolve.
+
+Existing APIs primarily focus on geocoding, shipping, or logistics workflows, leaving address quality and administrative consistency as responsibilities for application developers.
+
+---
 
 ### 1.2 Solution
 
-The API is a **classification signal, not a gate**. Given a free-text string, it returns a structured response with quality metadata — confidence score, parsed location fields, and normalized output. Integrators decide the action: accept with warnings, request correction, or enrich before forwarding to the courier.
+Address Quality API acts as an **Address Intelligence layer** between raw user input and downstream systems.
+
+Rather than replacing geocoding or logistics providers, it improves the quality of address data before those systems consume it.
+
+```mermaid
+flowchart LR
+    A[Raw Address] --> B[Address Quality API]
+    B --> C[Normalize spelling]
+    B --> D[Parse address components]
+    B --> E[Resolve aliases]
+    B --> F[Validate administrative hierarchy]
+    B --> G[Detect ambiguity]
+    B --> H[Match candidate locations]
+    B --> I[Generate confidence score]
+    C & D & E & F & G & H & I --> J[Structured Address]
+    J --> K[Geocoder / Logistics / KYC / CRM]
+```
+
+The API is a **classification signal, not a gate**.
+
+Given a free-text Indonesian address, it returns structured metadata describing the quality and consistency of the input. Integrators decide how to use that information—for example:
+
+- Accept the address.
+- Accept with warnings.
+- Request user correction.
+- Trigger manual review.
+- Enrich the address before forwarding it to downstream systems.
+
+Typical outputs include:
+
+- Normalized address
+- Parsed administrative components
+- Administrative consistency status
+- Confidence score
+- Ambiguity indicators
+- Candidate matches
+
+The goal is not to determine whether a package can be delivered, but to help developers detect, understand, and improve address quality before the data enters operational systems.
 
 ---
 
