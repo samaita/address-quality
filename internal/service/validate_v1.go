@@ -100,7 +100,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		for _, c := range subDistrictCandidates {
 			if c.LocationID == winnerSubDistrictID {
 				location.SubDistrict = c.Name
-				location.PostalCode = inputPostalCode
+				location.PostalCode = c.PostalCode
 				output = c.Name
 				break
 			}
@@ -128,6 +128,15 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 				if c.PostalCode == inputPostalCode {
 					postalCodeMatched = true
 				}
+				break
+			}
+		}
+	}
+
+	if winnerSubDistrictID > 0 {
+		for _, c := range subDistrictCandidates {
+			if c.LocationID == winnerSubDistrictID {
+				postalCodeMatched = true
 				break
 			}
 		}
@@ -185,6 +194,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		Str("resolved_city", location.City).
 		Str("resolved_district", location.District).
 		Str("resolved_subdistrict", location.SubDistrict).
+		Str("resolved_postal_code", location.PostalCode).
 		Float64("confidence", confidence).
 		Msg("candidate resolution")
 
