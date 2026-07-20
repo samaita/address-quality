@@ -34,7 +34,7 @@ func buildAddressRecord(requestID, addressID string, quality model.Quality, now 
 		ID:              requestID,
 		AddressID:       addressID,
 		RawInput:        quality.RawInput,
-		NormalizedAddr:  quality.Output,
+		NormalizedAddr:  quality.FormattedOutput,
 		Confidence:      quality.Confidence,
 		PostalCode:      quality.Location.PostalCode,
 		SubDistrict:     quality.Location.SubDistrict,
