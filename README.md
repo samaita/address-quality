@@ -137,16 +137,21 @@ Rather than replacing geocoding or logistics providers, it improves the quality 
 
 ```mermaid
 flowchart LR
-    A[Raw Address] --> B[Address Quality API]
-    B --> C[Normalize spelling]
-    B --> D[Parse address components]
-    B --> E[Resolve aliases]
-    B --> F[Validate administrative hierarchy]
-    B --> G[Detect ambiguity]
-    B --> H[Match candidate locations]
-    B --> I[Generate confidence score]
-    C & D & E & F & G & H & I --> J[Structured Address]
-    J --> K[Geocoder / Logistics / KYC / CRM]
+    A["Raw Address"] --> B["Address Quality API
+
+• Normalize
+• Parse
+• Resolve aliases
+• Validate hierarchy
+• Detect ambiguity
+• Score confidence"]
+
+    B --> C["Structured Address w Quality Metadata"]
+
+    C --> D["Geocoder"]
+    C --> E["Logistics"]
+    C --> F["KYC"]
+    C --> G["CRM"]
 ```
 
 The API is a **classification signal, not a gate**.
@@ -168,7 +173,9 @@ Typical outputs include:
 - Ambiguity indicators
 - Candidate matches
 
-The goal is not to determine whether a package can be delivered, but to help developers detect, understand, and improve address quality before the data enters operational systems.
+The goal is to help developers understand the quality of an address before it is used by other applications.
+
+Instead of treating addresses as a ready-to-use strings, Address Quality API transforms free-text input into structured, validated, and machine-readable location data.
 
 ---
 
