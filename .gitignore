@@ -3,6 +3,7 @@
 tmp/
 db/*.db
 tests/api/result/
+tests/api/benchmark/*.csv
 tests/api/cases/*.csv
 !tests/api/cases/example.csv
 docs/ISSUES.md
