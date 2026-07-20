@@ -1,6 +1,7 @@
 package service
 
 import (
+	"math"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -495,7 +496,7 @@ func calculateConfidence(provinceCands, cityCands, districtCands, subDistrictCan
 	if score > 1.0 {
 		score = 1.0
 	}
-	return score
+return math.Round(score*10000) / 10000
 }
 
 func buildExplainability(level string, input string, candidates []model.Candidate, winnerID int64, reasons []string) *model.LevelExplain {
