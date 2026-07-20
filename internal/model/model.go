@@ -59,6 +59,7 @@ type Quality struct {
 	NormalizedInput string         `json:"normalized_input"`
 	FormattedOutput string         `json:"formatted_output"`
 	LocationVersion string         `json:"location_version"`
+	LocationSource  string         `json:"location_source"`
 	RawInput        string         `json:"raw_input"`
 	Explainability  Explainability `json:"-"`
 }

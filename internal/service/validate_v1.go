@@ -211,6 +211,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		NormalizedInput: normalized,
 		FormattedOutput: formattedOutput,
 		LocationVersion: sourceVersion,
+		LocationSource:  sourceCode,
 		RawInput:        req.Address,
 		Explainability:  explainability,
 	}
