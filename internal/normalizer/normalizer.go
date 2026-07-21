@@ -28,6 +28,7 @@ var rePunctuation = regexp.MustCompile(`[^a-zA-Z\s]`)
 var reMultipleSpaces = regexp.MustCompile(`\s+`)
 
 func Normalize(name string) string {
+	name = strings.ReplaceAll(name, "\\n", " ")
 	lower := strings.ToLower(strings.TrimSpace(name))
 	words := strings.Fields(lower)
 	filtered := make([]string, 0, len(words))
