@@ -4,8 +4,11 @@ tmp/
 db/*.db
 tests/api/result/
 tests/api/benchmark/*.csv
+tests/api/**/*.xlsx
 tests/api/cases/*.csv
 !tests/api/cases/example.csv
 docs/ISSUES.md
 bin*.db
 .DS_Store
+node_modules/
+package-lock.json

@@ -1,23 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const XLSX = require('xlsx');
 
-const INPUT_FILE = process.env.INPUT_FILE || 'tests/api/cases/address-tagged.csv';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:7300';
 const API_VERSION = process.env.API_VERSION || 'v1';
 const OUTPUT_DIR = 'tests/api/benchmark';
 
+let INPUT_FILE = 'tests/api/cases/address-tagged.csv';
+if (process.env.INPUT_FILE) INPUT_FILE = process.env.INPUT_FILE;
+
+const csvArg = process.argv.find(a => a.startsWith('--csv='));
+if (csvArg) INPUT_FILE = csvArg.split('=')[1];
+
 const sourceArg = process.argv.find(a => a.startsWith('--source='));
 const SOURCE = sourceArg ? sourceArg.split('=')[1] : '';
-
-function csvEscape(value) {
-  if (value == null) return '';
-  const str = String(value);
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return '"' + str.replace(/"/g, '""') + '"';
-  }
-  return str;
-}
 
 function parseCsvLine(line, delimiter) {
   const result = [];
@@ -53,16 +50,37 @@ function parseCsvLine(line, delimiter) {
 
 function readInputCsv(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8');
-  const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
-  if (lines.length < 2) {
+  const rawLines = content.split(/\r?\n/);
+
+  const joinedLines = [];
+  let buffer = '';
+  let inQuotes = false;
+  for (const line of rawLines) {
+    if (!inQuotes && line.trim() === '' && buffer === '') continue;
+    if (buffer === '') {
+      buffer = line;
+    } else {
+      buffer += '\n' + line;
+    }
+    for (const ch of line) {
+      if (ch === '"') inQuotes = !inQuotes;
+    }
+    if (!inQuotes) {
+      joinedLines.push(buffer);
+      buffer = '';
+    }
+  }
+  if (buffer.trim() !== '') joinedLines.push(buffer);
+
+  if (joinedLines.length < 2) {
     console.error('Input CSV must have at least a header row + 1 data row');
     process.exit(1);
   }
 
-  const delimiter = lines[0].includes(';') ? ';' : ',';
+  const delimiter = joinedLines[0].includes(';') ? ';' : ',';
   const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = parseCsvLine(lines[i], delimiter);
+  for (let i = 1; i < joinedLines.length; i++) {
+    const cols = parseCsvLine(joinedLines[i], delimiter);
     if (cols.length < 3) {
       console.warn(`Skipping row ${i + 1}: only ${cols.length} columns found`);
       continue;
@@ -93,7 +111,7 @@ function determineOutputFile() {
   let maxSerial = -1;
   const files = fs.readdirSync(OUTPUT_DIR);
   for (const f of files) {
-    if (f.startsWith(prefix) && f.endsWith('.csv')) {
+    if (f.startsWith(prefix) && f.endsWith('.xlsx')) {
       const serialPart = f.slice(prefix.length, -4);
       const serial = parseInt(serialPart, 10);
       if (!isNaN(serial) && serial > maxSerial) {
@@ -103,7 +121,7 @@ function determineOutputFile() {
   }
 
   const nextSerial = String(maxSerial + 1).padStart(4, '0');
-  return path.join(OUTPUT_DIR, `${prefix}${nextSerial}.csv`);
+  return path.join(OUTPUT_DIR, `${prefix}${nextSerial}.xlsx`);
 }
 
 function postRequest(address, source) {
@@ -178,7 +196,7 @@ async function main() {
     'SameSubdistrict',
   ];
 
-  const outLines = [header.map(csvEscape).join(',')];
+  const outRows = [];
   let succeeded = 0;
   let failed = 0;
 
@@ -186,7 +204,8 @@ async function main() {
     const row = rows[i];
     process.stdout.write(`[${i + 1}/${rows.length}] ${row.address.slice(0, 60)}... `);
 
-    const result = await postRequest(row.address, SOURCE);
+    const escapedAddress = row.address.replace(/\n/g, ' ');
+    const result = await postRequest(escapedAddress, SOURCE);
     if (result.ok) {
       const q = result.data.quality;
       const loc = q.location || {};
@@ -200,8 +219,8 @@ async function main() {
       const sameDistrict = outputDistrict.toLowerCase() === row.actualDistrict.toLowerCase();
       const sameSubdistrict = outputSubdistrict.toLowerCase() === row.actualSubdistrict.toLowerCase();
 
-      outLines.push([
-        '',
+      outRows.push([
+        SOURCE,
         row.address,
         q.formatted_output || '',
         row.actualProvince,
@@ -222,12 +241,12 @@ async function main() {
         sameCity,
         sameDistrict,
         sameSubdistrict,
-      ].map(csvEscape).join(','));
+      ]);
       succeeded++;
       console.log('OK');
     } else {
-      outLines.push([
-        '',
+      outRows.push([
+        SOURCE,
         row.address,
         '',
         row.actualProvince,
@@ -237,13 +256,17 @@ async function main() {
         '', '', '', '',
         '', '', '', '', '', '',
         false, false, false, false,
-      ].map(csvEscape).join(','));
+      ]);
       failed++;
       console.log(`FAIL (${result.error})`);
     }
   }
 
-  fs.writeFileSync(outputFile, outLines.join('\n') + '\n', 'utf-8');
+  const ws = XLSX.utils.aoa_to_sheet([header, ...outRows]);
+  ws['!cols'] = header.map(() => ({ wch: 20 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Benchmark');
+  XLSX.writeFile(wb, outputFile);
   console.log(`\nDone. ${succeeded} succeeded, ${failed} failed.`);
   console.log(`Results written to ${outputFile}`);
 }
