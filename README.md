@@ -5,7 +5,7 @@
 A lightweight Go HTTP server that accepts free-text Indonesian addresses, normalizes and validates them against Indonesia's administrative hierarchy, and returns structured quality metadata. Designed as an Address Intelligence layer, the API sits between raw user input and downstream systems such as geocoders, logistics platforms, KYC services, and customer databases.
 
 **Status**: v0.1.0 · MVP  
-**License**: MIT
+**License**: [BUSL-1.1](LICENSE) · [Commercial Use](COMMERCIAL_LICENSE.md)
 
 ---
 
@@ -541,7 +541,7 @@ Future: Redis-backed distributed rate limiting for multi-instance deployments.
 
 ---
 
-## 11. Future Features (Open for Contribution)
+## 11. Future Features
 
 - [ ] **API authentication** (API key via `API_KEY` env var, header validation)
 - [x] **Health check endpoint** (`GET /health`)
