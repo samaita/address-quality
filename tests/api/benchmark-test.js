@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
-const INPUT_FILE = process.env.INPUT_FILE || 'tests/api/cases/address.csv';
+const INPUT_FILE = process.env.INPUT_FILE || 'tests/api/cases/address-tagged.csv';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:7300';
 const API_VERSION = process.env.API_VERSION || 'v1';
 const OUTPUT_DIR = 'tests/api/benchmark';
@@ -19,7 +19,7 @@ function csvEscape(value) {
   return str;
 }
 
-function parseCsvLine(line) {
+function parseCsvLine(line, delimiter) {
   const result = [];
   let current = '';
   let inQuotes = false;
@@ -39,7 +39,7 @@ function parseCsvLine(line) {
     } else {
       if (ch === '"') {
         inQuotes = true;
-      } else if (ch === ',') {
+      } else if (ch === delimiter) {
         result.push(current);
         current = '';
       } else {
@@ -58,14 +58,22 @@ function readInputCsv(filePath) {
     console.error('Input CSV must have at least a header row + 1 data row');
     process.exit(1);
   }
+
+  const delimiter = lines[0].includes(';') ? ';' : ',';
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
-    const cols = parseCsvLine(lines[i]);
+    const cols = parseCsvLine(lines[i], delimiter);
     if (cols.length < 3) {
       console.warn(`Skipping row ${i + 1}: only ${cols.length} columns found`);
       continue;
     }
-    rows.push(cols[2].trim());
+    rows.push({
+      address: cols[2].trim(),
+      actualProvince: (cols[3] || '').trim(),
+      actualCity: (cols[4] || '').trim(),
+      actualDistrict: (cols[5] || '').trim(),
+      actualSubdistrict: (cols[6] || '').trim(),
+    });
   }
   return rows;
 }
@@ -150,16 +158,24 @@ async function main() {
     'Source',
     'Address',
     'FormattedOutput',
-    'Province',
-    'City',
-    'District',
-    'SubDistrict',
+    'ActualProvince',
+    'ActualCity',
+    'ActualDistrict',
+    'ActualSubdistrict',
+    'OutputProvince',
+    'OutputCity',
+    'OutputDistrict',
+    'OutputSubDistrict',
     'PostalCode',
     'Confidence',
     'NormalizedInput',
     'LocationVersion',
     'LocationSource',
     'AddressID',
+    'SameProvince',
+    'SameCity',
+    'SameDistrict',
+    'SameSubdistrict',
   ];
 
   const outLines = [header.map(csvEscape).join(',')];
@@ -167,35 +183,60 @@ async function main() {
   let failed = 0;
 
   for (let i = 0; i < rows.length; i++) {
-    const address = rows[i];
-    process.stdout.write(`[${i + 1}/${rows.length}] ${address.slice(0, 60)}... `);
+    const row = rows[i];
+    process.stdout.write(`[${i + 1}/${rows.length}] ${row.address.slice(0, 60)}... `);
 
-    const result = await postRequest(address, SOURCE);
+    const result = await postRequest(row.address, SOURCE);
     if (result.ok) {
       const q = result.data.quality;
       const loc = q.location || {};
+      const outputProvince = (loc.province || '').trim();
+      const outputCity = (loc.city || '').trim();
+      const outputDistrict = (loc.district || '').trim();
+      const outputSubdistrict = (loc.sub_district || '').trim();
+
+      const sameProvince = outputProvince.toLowerCase() === row.actualProvince.toLowerCase();
+      const sameCity = outputCity.toLowerCase() === row.actualCity.toLowerCase();
+      const sameDistrict = outputDistrict.toLowerCase() === row.actualDistrict.toLowerCase();
+      const sameSubdistrict = outputSubdistrict.toLowerCase() === row.actualSubdistrict.toLowerCase();
+
       outLines.push([
-        SOURCE,
-        address,
+        '',
+        row.address,
         q.formatted_output || '',
-        loc.province || '',
-        loc.city || '',
-        loc.district || '',
-        loc.sub_district || '',
+        row.actualProvince,
+        row.actualCity,
+        row.actualDistrict,
+        row.actualSubdistrict,
+        outputProvince,
+        outputCity,
+        outputDistrict,
+        outputSubdistrict,
         loc.postal_code || '',
         q.confidence !== undefined ? q.confidence : '',
         q.normalized_input || '',
         q.location_version || '',
         q.location_source || '',
         q.address_id || '',
+        sameProvince,
+        sameCity,
+        sameDistrict,
+        sameSubdistrict,
       ].map(csvEscape).join(','));
       succeeded++;
       console.log('OK');
     } else {
       outLines.push([
-        SOURCE,
-        address,
-        '', '', '', '', '', '', '', '', '', '', '',
+        '',
+        row.address,
+        '',
+        row.actualProvince,
+        row.actualCity,
+        row.actualDistrict,
+        row.actualSubdistrict,
+        '', '', '', '',
+        '', '', '', '', '', '',
+        false, false, false, false,
       ].map(csvEscape).join(','));
       failed++;
       console.log(`FAIL (${result.error})`);
