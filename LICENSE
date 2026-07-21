@@ -1,0 +1,52 @@
+Business Source License 1.1
+
+Licensor:          Samaita
+Licensed Work:     Address Quality API — Indonesia
+                   The Licensed Work is © 2025 Samaita.
+
+Additional Use Grant:  You may use, copy, and run the Licensed Work for
+                       evaluation, non-production testing, and personal learning purposes.
+                       You may self-host the Licensed Work only if the source repository
+                       is publicly accessible and the Licensor is notified via email at
+                       garysamaita@gmail.com. Any production, commercial, or revenue-generating
+                       use requires a separate Commercial License obtained from the Licensor.
+
+Change Date:       Ten (10) years from the release date of each version.
+
+Change License:    GNU General Public License, Version 2.0 (GPL-2.0-only).
+
+Notice:           Each version of the Licensed Work, upon and after its Change Date,
+                  becomes available under the Change License. Future major versions may
+                  be released under different licensing terms.
+
+---------------------------------------------------------------------
+
+Business Source License 1.1
+
+Terms
+
+The Licensor hereby grants you the right to copy, modify, create derivative
+works, redistribute, and make non-production use of the Licensed Work. The
+Licensor may make an Additional Use Grant, above, permitting limited production
+use.
+
+Any use of the Licensed Work in violation of these terms will automatically
+terminate your rights under this license for the current and all other versions
+of the Licensed Work.
+
+For the avoidance of doubt, the terms of this license do not apply to the
+third-party data files in db/source/, which are separately licensed under the
+MIT License as attributed in db/source/README.md.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---------------------------------------------------------------------
+
+This license is the Business Source License 1.1, adapted from the original
+at https://mariadb.com/bsl11/.
