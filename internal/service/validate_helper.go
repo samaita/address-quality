@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -31,21 +30,21 @@ func (svc *Service) sanitize(input string) string {
 	return svc.s.Sanitize(input)
 }
 
-func buildAddressRecord(requestID, addressID string, quality model.Quality, now time.Time) *database.AddressRecord {
-	outputJSON, _ := json.Marshal(quality)
+func buildAddressRecord(requestID string, data model.ResponseData, now time.Time) *database.AddressRecord {
+	outputJSON, _ := json.Marshal(data)
 
 	return &database.AddressRecord{
 		ID:              requestID,
-		AddressID:       addressID,
-		RawInput:        quality.RawInput,
-		NormalizedAddr:  quality.FormattedOutput,
-		Confidence:      quality.Confidence,
-		PostalCode:      quality.Location.PostalCode,
-		SubDistrict:     quality.Location.SubDistrict,
-		District:        quality.Location.District,
-		City:            quality.Location.City,
-		Province:        quality.Location.Province,
-		LocationVersion: quality.LocationVersion,
+		AddressID:       data.AddressID,
+		RawInput:        data.RawInput,
+		NormalizedAddr:  data.FormattedAddr,
+		Confidence:      data.Confidence,
+		PostalCode:      data.Location.PostalCode,
+		SubDistrict:     data.Location.SubDistrict,
+		District:        data.Location.District,
+		City:            data.Location.City,
+		Province:        data.Location.Province,
+		LocationVersion: data.Metadata.LocationVersion,
 		OutputJSON:      string(outputJSON),
 		CreatedAt:       now,
 	}
@@ -811,106 +810,4 @@ func (svc *Service) inferProvinceCandidates(cityCands, districtCands, subCands [
 	}
 
 	return provinceCands, cityCands, districtCands
-}
-
-func calculateConfidence(provinceCands, cityCands, districtCands, subDistrictCands []model.Candidate, winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID int64, postalCodeMatched bool, hierarchy *database.HierarchyMap) float64 {
-	var score float64
-
-	hasExact := false
-	for _, c := range provinceCands {
-		if c.MatchType == "EXACT" {
-			hasExact = true
-			break
-		}
-	}
-	if !hasExact {
-		for _, c := range cityCands {
-			if c.MatchType == "EXACT" {
-				hasExact = true
-				break
-			}
-		}
-	}
-	if !hasExact {
-		for _, c := range districtCands {
-			if c.MatchType == "EXACT" {
-				hasExact = true
-				break
-			}
-		}
-	}
-	if !hasExact {
-		for _, c := range subDistrictCands {
-			if c.MatchType == "EXACT" {
-				hasExact = true
-				break
-			}
-		}
-	}
-	if hasExact {
-		score += 0.40
-	}
-
-	parentValid := false
-	if hierarchy != nil && winnerCityID > 0 {
-		provID := hierarchy.CityToProvince[winnerCityID]
-		if provID == winnerProvinceID {
-			parentValid = true
-		}
-	}
-	if winnerDistrictID > 0 && parentValid && hierarchy != nil {
-		cityID := hierarchy.DistrictToCity[winnerDistrictID]
-		if cityID == winnerCityID {
-			parentValid = true
-		} else {
-			parentValid = false
-		}
-	}
-	if winnerSubDistrictID > 0 && parentValid && hierarchy != nil {
-		distID := hierarchy.SubDistrictToDist[winnerSubDistrictID]
-		if distID == winnerDistrictID {
-			parentValid = true
-		} else {
-			parentValid = false
-		}
-	}
-	if parentValid {
-		score += 0.30
-	}
-
-	if postalCodeMatched {
-		score += 0.20
-	}
-
-	if winnerProvinceID > 0 {
-		score += 0.10
-	}
-
-	if score > 1.0 {
-		score = 1.0
-	}
-	return math.Round(score*10000) / 10000
-}
-
-func buildExplainability(level string, input string, candidates []model.Candidate, winnerID int64, reasons []string) *model.LevelExplain {
-	if len(candidates) == 0 {
-		return nil
-	}
-	candNames := make([]string, len(candidates))
-	for i, c := range candidates {
-		candNames[i] = c.Name
-	}
-	winnerName := ""
-	for _, c := range candidates {
-		if c.LocationID == winnerID {
-			winnerName = c.Name
-			break
-		}
-	}
-	return &model.LevelExplain{
-		Input:      input,
-		Candidates: candNames,
-		Winner:     winnerName,
-		Reasons:    reasons,
-	}
 }
