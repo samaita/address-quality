@@ -37,8 +37,6 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		return nil, err
 	}
 
-	inputPostalCode := extractPostalCode(normalized)
-
 	provinceCandidates, err := svc.findProvinceCandidates(ctx, sourceID, normalized)
 	if err != nil {
 		log.Error().Err(err).Msg("find province candidates")
@@ -66,6 +64,35 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID, pathOK := resolveWinner(
 		provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates, svc.hierarchyCache,
 	)
+
+	bCityCandidates, bDistrictCandidates, bSubDistrictCandidates, err := svc.findCandidatesByAnyLevel(ctx, sourceID, normalized)
+	if err != nil {
+		log.Error().Err(err).Msg("find candidates by any level")
+		return nil, err
+	}
+
+	bProvinceCandidates, bCityCandidates, bDistrictCandidates := svc.inferProvinceCandidates(bCityCandidates, bDistrictCandidates, bSubDistrictCandidates)
+
+	bWinnerProvinceID, bWinnerCityID, bWinnerDistrictID, bWinnerSubDistrictID, _ := resolveWinner(
+		bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates, svc.hierarchyCache,
+	)
+
+	confB := calculateConfidence(
+		bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates,
+		bWinnerProvinceID, bWinnerCityID, bWinnerDistrictID, bWinnerSubDistrictID,
+		false, svc.hierarchyCache,
+	)
+	confA := calculateConfidence(
+		provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates,
+		winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID,
+		false, svc.hierarchyCache,
+	)
+
+	useB := confB > confA && len(bProvinceCandidates) > 0
+	if useB {
+		provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates = bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates
+		winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID, pathOK = bWinnerProvinceID, bWinnerCityID, bWinnerDistrictID, bWinnerSubDistrictID, true
+	}
 
 	location := model.Location{}
 
@@ -106,6 +133,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		}
 	}
 
+	inputPostalCode := extractPostalCode(normalized)
 	if location == (model.Location{}) {
 		if inputPostalCode != "" {
 			loc, locErr := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
