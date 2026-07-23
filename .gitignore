@@ -4,6 +4,7 @@ tmp/
 db/*.db
 tests/api/result/
 tests/api/benchmark/*.csv
+tests/api/benchmark/*.json
 tests/api/**/*.xlsx
 tests/api/cases/*.csv
 !tests/api/cases/example.csv
