@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Samaita
+// Copyright (c) 2026 Samaita
 
 package config
 
@@ -10,17 +10,17 @@ import (
 )
 
 type Config struct {
-	Port             int
-	APIKey           string
-	RateLimit        int
-	RateWindow       int
-	ReadTimeout      int
-	WriteTimeout     int
-	MaxBodySize      string
-	MaxAddressLength int
-	AddressDBPath    string
-	LocationDBPath   string
-	DBMaxOpenConns    int
+	Port               int
+	APIKey             string
+	RateLimit          int
+	RateWindow         int
+	ReadTimeout        int
+	WriteTimeout       int
+	MaxBodySize        string
+	MaxAddressLength   int
+	AddressDBPath      string
+	LocationDBPath     string
+	DBMaxOpenConns     int
 	LocationSourceCode string
 	LogLevel           string
 }
@@ -50,19 +50,19 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:             viper.GetInt("PORT"),
-		APIKey:           viper.GetString("API_KEY"),
-		RateLimit:        viper.GetInt("RATE_LIMIT"),
-		RateWindow:       viper.GetInt("RATE_WINDOW"),
-		ReadTimeout:      viper.GetInt("READ_TIMEOUT"),
-		WriteTimeout:     viper.GetInt("WRITE_TIMEOUT"),
-		MaxBodySize:      viper.GetString("MAX_BODY_SIZE"),
-		MaxAddressLength: viper.GetInt("MAX_ADDRESS_LENGTH"),
-		AddressDBPath:    viper.GetString("ADDRESS_DB_PATH"),
-		LocationDBPath:   viper.GetString("LOCATION_DB_PATH"),
+		Port:               viper.GetInt("PORT"),
+		APIKey:             viper.GetString("API_KEY"),
+		RateLimit:          viper.GetInt("RATE_LIMIT"),
+		RateWindow:         viper.GetInt("RATE_WINDOW"),
+		ReadTimeout:        viper.GetInt("READ_TIMEOUT"),
+		WriteTimeout:       viper.GetInt("WRITE_TIMEOUT"),
+		MaxBodySize:        viper.GetString("MAX_BODY_SIZE"),
+		MaxAddressLength:   viper.GetInt("MAX_ADDRESS_LENGTH"),
+		AddressDBPath:      viper.GetString("ADDRESS_DB_PATH"),
+		LocationDBPath:     viper.GetString("LOCATION_DB_PATH"),
 		DBMaxOpenConns:     viper.GetInt("DB_MAX_OPEN_CONNS"),
 		LocationSourceCode: viper.GetString("LOCATION_SOURCE_CODE"),
-		LogLevel:          viper.GetString("LOG_LEVEL"),
+		LogLevel:           viper.GetString("LOG_LEVEL"),
 	}
 
 	logger.Info().

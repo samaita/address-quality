@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Samaita
+// Copyright (c) 2026 Samaita
 
 package service
 
 import (
-	"math"
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -499,7 +499,7 @@ func calculateConfidence(provinceCands, cityCands, districtCands, subDistrictCan
 	if score > 1.0 {
 		score = 1.0
 	}
-return math.Round(score*10000) / 10000
+	return math.Round(score*10000) / 10000
 }
 
 func buildExplainability(level string, input string, candidates []model.Candidate, winnerID int64, reasons []string) *model.LevelExplain {
