@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const XLSX = require('xlsx');
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:7300';
 const API_VERSION = process.env.API_VERSION || 'v1';
@@ -111,7 +110,7 @@ function determineOutputFile() {
   let maxSerial = -1;
   const files = fs.readdirSync(OUTPUT_DIR);
   for (const f of files) {
-    if (f.startsWith(prefix) && f.endsWith('.xlsx')) {
+    if (f.startsWith(prefix) && f.endsWith('.json')) {
       const serialPart = f.slice(prefix.length, -4);
       const serial = parseInt(serialPart, 10);
       if (!isNaN(serial) && serial > maxSerial) {
@@ -121,7 +120,7 @@ function determineOutputFile() {
   }
 
   const nextSerial = String(maxSerial + 1).padStart(4, '0');
-  return path.join(OUTPUT_DIR, `${prefix}${nextSerial}.xlsx`);
+  return path.join(OUTPUT_DIR, `${prefix}${nextSerial}.json`);
 }
 
 function postRequest(address, source) {
@@ -172,30 +171,6 @@ async function main() {
   const outputFile = determineOutputFile();
   console.log(`Output: ${outputFile}`);
 
-  const header = [
-    'Source',
-    'Address',
-    'FormattedOutput',
-    'ActualProvince',
-    'ActualCity',
-    'ActualDistrict',
-    'ActualSubdistrict',
-    'OutputProvince',
-    'OutputCity',
-    'OutputDistrict',
-    'OutputSubDistrict',
-    'PostalCode',
-    'Confidence',
-    'NormalizedInput',
-    'LocationVersion',
-    'LocationSource',
-    'AddressID',
-    'SameProvince',
-    'SameCity',
-    'SameDistrict',
-    'SameSubdistrict',
-  ];
-
   const outRows = [];
   let succeeded = 0;
   let failed = 0;
@@ -219,54 +194,45 @@ async function main() {
       const sameDistrict = outputDistrict.toLowerCase() === row.actualDistrict.toLowerCase();
       const sameSubdistrict = outputSubdistrict.toLowerCase() === row.actualSubdistrict.toLowerCase();
 
-      outRows.push([
-        SOURCE,
-        row.address,
-        q.formatted_output || '',
-        row.actualProvince,
-        row.actualCity,
-        row.actualDistrict,
-        row.actualSubdistrict,
-        outputProvince,
-        outputCity,
-        outputDistrict,
-        outputSubdistrict,
-        loc.postal_code || '',
-        q.confidence !== undefined ? q.confidence : '',
-        q.normalized_input || '',
-        q.location_version || '',
-        q.location_source || '',
-        q.address_id || '',
-        sameProvince,
-        sameCity,
-        sameDistrict,
-        sameSubdistrict,
-      ]);
+      outRows.push({
+        source: SOURCE,
+        raw_address: row.address,
+        quality: result.data.quality,
+        comparison: {
+          actual_province: row.actualProvince,
+          actual_city: row.actualCity,
+          actual_district: row.actualDistrict,
+          actual_subdistrict: row.actualSubdistrict,
+          same_province: sameProvince,
+          same_city: sameCity,
+          same_district: sameDistrict,
+          same_subdistrict: sameSubdistrict,
+        },
+      });
       succeeded++;
       console.log('OK');
     } else {
-      outRows.push([
-        SOURCE,
-        row.address,
-        '',
-        row.actualProvince,
-        row.actualCity,
-        row.actualDistrict,
-        row.actualSubdistrict,
-        '', '', '', '',
-        '', '', '', '', '', '',
-        false, false, false, false,
-      ]);
+      outRows.push({
+        source: SOURCE,
+        raw_address: row.address,
+        quality: null,
+        comparison: {
+          actual_province: row.actualProvince,
+          actual_city: row.actualCity,
+          actual_district: row.actualDistrict,
+          actual_subdistrict: row.actualSubdistrict,
+          same_province: false,
+          same_city: false,
+          same_district: false,
+          same_subdistrict: false,
+        },
+      });
       failed++;
       console.log(`FAIL (${result.error})`);
     }
   }
 
-  const ws = XLSX.utils.aoa_to_sheet([header, ...outRows]);
-  ws['!cols'] = header.map(() => ({ wch: 20 }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Benchmark');
-  XLSX.writeFile(wb, outputFile);
+  fs.writeFileSync(outputFile, JSON.stringify(outRows, null, 2));
   console.log(`\nDone. ${succeeded} succeeded, ${failed} failed.`);
   console.log(`Results written to ${outputFile}`);
 }
