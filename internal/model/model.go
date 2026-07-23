@@ -41,34 +41,79 @@ type Candidate struct {
 	PostalCode string
 }
 
-type LevelExplain struct {
-	Input      string   `json:"input,omitempty"`
-	Candidates []string `json:"candidates,omitempty"`
-	Winner     string   `json:"winner,omitempty"`
-	Reasons    []string `json:"reasons,omitempty"`
+type QualityStatus string
+
+const (
+	StatusValid      QualityStatus = "VALID"
+	StatusIncomplete QualityStatus = "INCOMPLETE"
+	StatusAmbiguous  QualityStatus = "AMBIGUOUS"
+	StatusConflict   QualityStatus = "CONFLICT"
+	StatusUnknown    QualityStatus = "UNKNOWN"
+)
+
+type Component string
+
+const (
+	ComponentProvince    Component = "province"
+	ComponentCity        Component = "city"
+	ComponentDistrict    Component = "district"
+	ComponentSubDistrict Component = "sub_district"
+	ComponentPostalCode  Component = "postal_code"
+)
+
+type Conflict struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
 }
 
-type Explainability struct {
-	Province    *LevelExplain `json:"province,omitempty"`
-	City        *LevelExplain `json:"city,omitempty"`
-	District    *LevelExplain `json:"district,omitempty"`
-	SubDistrict *LevelExplain `json:"subdistrict,omitempty"`
+type CandidateEvaluation struct {
+	Confidence float64
+	Status     QualityStatus
+	Matched    []Component
+	Missing    []Component
+	Conflicts  []Conflict
+	Reasons    []string
 }
 
-type Quality struct {
-	AddressID       string         `json:"address_id"`
-	Confidence      float64        `json:"confidence"`
-	Location        Location       `json:"location"`
-	NormalizedInput string         `json:"normalized_input"`
-	FormattedOutput string         `json:"formatted_output"`
-	LocationVersion string         `json:"location_version"`
-	LocationSource  string         `json:"location_source"`
-	RawInput        string         `json:"raw_input"`
-	Explainability  Explainability `json:"explainability"`
+type Assessment struct {
+	Matched   []string   `json:"matched"`
+	Missing   []string   `json:"missing"`
+	Conflicts []Conflict `json:"conflicts"`
+	Ambiguous []string   `json:"ambiguous"`
+}
+
+type Resolution struct {
+	Strategy       []string             `json:"strategy"`
+	CandidateCount int                  `json:"candidate_count"`
+	Candidates     []ResolutionCandidate `json:"candidates"`
+}
+
+type ResolutionCandidate struct {
+	Score    float64  `json:"score"`
+	Location Location `json:"location"`
+	Reasons  []string `json:"reasons"`
+}
+
+type Metadata struct {
+	LocationSource  string `json:"location_source"`
+	LocationVersion string `json:"location_version"`
+}
+
+type ResponseData struct {
+	AddressID       string        `json:"address_id"`
+	Status          QualityStatus `json:"status"`
+	Confidence      float64       `json:"confidence"`
+	RawInput        string        `json:"raw_input"`
+	NormalizedInput string        `json:"normalized_input"`
+	FormattedAddr   string        `json:"formatted_address"`
+	Location        Location      `json:"location"`
+	Assessment      Assessment    `json:"assessment"`
+	Resolution      Resolution    `json:"resolution"`
+	Metadata        Metadata      `json:"metadata"`
 }
 
 type AddressResponse struct {
-	Timestamp string  `json:"timestamp"`
-	RequestID string  `json:"request_id"`
-	Quality   Quality `json:"quality"`
+	Timestamp string       `json:"timestamp"`
+	RequestID string       `json:"request_id"`
+	Data      ResponseData `json:"data"`
 }
