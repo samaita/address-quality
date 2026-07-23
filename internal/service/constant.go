@@ -4,8 +4,16 @@
 package service
 
 const (
-	WeightExactMatch  = 0.40
-	WeightHierarchy   = 0.30
-	WeightPostalCode  = 0.20
-	WeightProvince    = 0.10
+	WeightExactMatch       = 0.25
+	WeightHierarchy        = 0.15
+	WeightPostalCode       = 0.25
+	WeightProvince         = 0.15
+	WeightCity             = 0.12
+	WeightDistrict         = 0.08
+	WeightSubDistrict      = 0.05
+	WeightMultiProvince    = 0.20
+	WeightMultiCity        = 0.15
+	WeightMultiDistrict    = 0.10
+	WeightMultiSubDistrict = 0.05
+	MaxMultiEvidenceBonus  = 0.40
 )

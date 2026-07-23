@@ -162,25 +162,29 @@ type MatchedEvidence struct {
 }
 
 type Province struct {
-	ID   int64
-	Name string
+	ID             int64
+	Name           string
+	NormalizedName string
 }
 
 type City struct {
-	ID         int64
-	Name       string
-	PostalCode string
+	ID             int64
+	Name           string
+	NormalizedName string
+	PostalCode     string
 }
 
 type District struct {
-	ID   int64
-	Name string
+	ID             int64
+	Name           string
+	NormalizedName string
 }
 
 type SubDistrict struct {
-	ID         int64
-	Name       string
-	PostalCode string
+	ID             int64
+	Name           string
+	NormalizedName string
+	PostalCode     string
 }
 
 type PostalCode struct {

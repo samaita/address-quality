@@ -71,20 +71,24 @@ type Service struct {
 	provinceOnce        sync.Once
 	provinceErr         error
 	provinceKodeToEntry map[string]*provinceEntry
+	provinceByID        map[int64]*provinceEntry
 
 	cityCache        map[string][]*cityEntry
 	cityOnce         sync.Once
 	cityErr          error
 	cityProvinceMap  map[int64]int64
 	cityProvinceOnce sync.Once
+	cityByID         map[int64]*cityEntry
 
 	districtCache map[string][]*districtEntry
 	districtOnce  sync.Once
 	districtErr   error
+	districtByID  map[int64]*districtEntry
 
 	subDistrictCache map[string][]*subDistrictEntry
 	subDistrictOnce  sync.Once
 	subDistrictErr   error
+	subDistrictByID  map[int64]*subDistrictEntry
 
 	hierarchyCache *database.HierarchyMap
 	hierarchyOnce  sync.Once
