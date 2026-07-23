@@ -6,6 +6,8 @@ package service
 import (
 	"context"
 	"errors"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -37,68 +39,54 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		return nil, err
 	}
 
-	provinceCands, cityCands, districtCands, subCands, err := svc.findCandidatesByLevels(ctx, sourceID, normalized)
-	if err != nil {
-		log.Error().Err(err).Msg("find candidates by levels")
+	if err := svc.ensureEntitiesCachesLoaded(ctx, sourceID); err != nil {
+		log.Error().Err(err).Msg("load caches")
 		return nil, err
 	}
-	provID, cityID, distID, subID, _ := resolveWinner(provinceCands, cityCands, districtCands, subCands, svc.hierarchyCache)
 
-	bProvCands, bCityCands, bDistCands, bSubCands,
-		bProvID, bCityID, bDistID, bSubID, err := svc.findBCandidates(ctx, sourceID, normalized)
-	if err != nil {
-		log.Error().Err(err).Msg("find B candidates")
-		return nil, err
+	evidence := ExtractEvidence(normalized)
+	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
+
+	resolved := svc.ResolveEvidence(ctx, sourceID, evidence)
+	log.Debug().Int("resolved_count", len(resolved)).Msg("entity resolution")
+
+	candidates := svc.DiscoverCandidates(resolved, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
+	candidates = DeduplicateCandidates(candidates)
+	log.Debug().Int("candidate_count", len(candidates)).Msg("candidate discovery")
+
+	var scored []scoredCandidate
+	for _, c := range candidates {
+		eval := EvaluateCandidate(&c, svc.hierarchyCache, evidenceAsSlice(evidence))
+		scored = append(scored, scoredCandidate{candidate: c, eval: eval})
+	}
+
+	sort.Slice(scored, func(i, j int) bool {
+		if scored[i].eval.Confidence != scored[j].eval.Confidence {
+			return scored[i].eval.Confidence > scored[j].eval.Confidence
+		}
+		return len(scored[i].eval.Conflicts) < len(scored[j].eval.Conflicts)
+	})
+
+	status := model.StatusUnknown
+	if len(scored) > 0 {
+		status = scored[0].eval.Status
+		if len(scored) > 1 {
+			top := scored[0].eval.Confidence
+			second := scored[1].eval.Confidence
+			if status == model.StatusValid && math.Abs(top-second) < 0.1 {
+				status = model.StatusAmbiguous
+			}
+		}
 	}
 
 	inputPostalCode := extractPostalCode(normalized)
 
-	postalA := postalCodeMatches(subCands, subID, inputPostalCode)
-	ctxA := &EvaluationContext{
-		WinnerProvinceID:    provID,
-		WinnerCityID:        cityID,
-		WinnerDistrictID:    distID,
-		WinnerSubDistrictID: subID,
-		PostalCodeMatched:   postalA,
-		InputPostalCode:     inputPostalCode,
-		ExactMatchFound:     hasExactMatch(provinceCands, cityCands, districtCands, subCands),
-	}
-	evalA := EvaluateCandidate(ctxA, svc.hierarchyCache)
-	evalA.Reasons = BuildExplainability(ctxA)
-
-	postalB := postalCodeMatches(bSubCands, bSubID, inputPostalCode)
-	ctxB := &EvaluationContext{
-		WinnerProvinceID:    bProvID,
-		WinnerCityID:        bCityID,
-		WinnerDistrictID:    bDistID,
-		WinnerSubDistrictID: bSubID,
-		PostalCodeMatched:   postalB,
-		InputPostalCode:     inputPostalCode,
-		ExactMatchFound:     hasExactMatch(bProvCands, bCityCands, bDistCands, bSubCands),
-	}
-	evalB := EvaluateCandidate(ctxB, svc.hierarchyCache)
-	evalB.Reasons = BuildExplainability(ctxB)
-
-	useB := evalB.Confidence > evalA.Confidence && len(bProvCands) > 0
-	if useB {
-		provinceCands, cityCands, districtCands, subCands = bProvCands, bCityCands, bDistCands, bSubCands
-		provID, cityID, distID, subID = bProvID, bCityID, bDistID, bSubID
+	var winner *scoredCandidate
+	if len(scored) > 0 {
+		winner = &scored[0]
 	}
 
-	postalMatched := postalCodeMatches(subCands, subID, inputPostalCode)
-	evalCtx := &EvaluationContext{
-		WinnerProvinceID:    provID,
-		WinnerCityID:        cityID,
-		WinnerDistrictID:    distID,
-		WinnerSubDistrictID: subID,
-		PostalCodeMatched:   postalMatched,
-		InputPostalCode:     inputPostalCode,
-		ExactMatchFound:     hasExactMatch(provinceCands, cityCands, districtCands, subCands),
-	}
-	eval := EvaluateCandidate(evalCtx, svc.hierarchyCache)
-	eval.Reasons = BuildExplainability(evalCtx)
-
-	location := resolveLocation(provinceCands, cityCands, districtCands, subCands, provID, cityID, distID, subID)
+	location := resolveLocationFromCandidate(winner)
 
 	if location == (model.Location{}) && inputPostalCode != "" {
 		loc, locErr := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
@@ -112,23 +100,26 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 
 	var resolutionCands []model.ResolutionCandidate
-	if provID > 0 {
-		resolutionCands = append(resolutionCands, model.ResolutionCandidate{
-			Score:    eval.Confidence,
-			Location: location,
-			Reasons:  eval.Reasons,
-		})
-	}
-
-	formParts := []string{}
-	for _, s := range []string{location.SubDistrict, location.District, location.City, location.Province} {
-		if s != "" {
-			formParts = append(formParts, s)
+	for _, s := range scored {
+		if s.candidate.Location.Province != nil {
+			loc := resolveLocationFromCandidate(&s)
+			reasons := make([]string, len(s.eval.Reasons))
+			for i, r := range s.eval.Reasons {
+				reasons[i] = string(r)
+			}
+			resolutionCands = append(resolutionCands, model.ResolutionCandidate{
+				Score:    s.eval.Confidence,
+				Location: loc,
+				Reasons:  reasons,
+			})
 		}
 	}
-	formattedAddr := strings.Join(formParts, ", ")
-	if location.PostalCode != "" {
-		formattedAddr += " " + location.PostalCode
+
+	formattedAddr := formatLocation(location)
+
+	var eval model.CandidateEvaluation
+	if winner != nil {
+		eval = winner.eval
 	}
 
 	matchedStrs := make([]string, len(eval.Matched))
@@ -140,9 +131,19 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		missingStrs[i] = string(c)
 	}
 
+	reasons := make([]string, len(eval.Reasons))
+	for i, r := range eval.Reasons {
+		reasons[i] = string(r)
+	}
+
+	unusedStrs := make([]string, len(eval.UnusedEvidence))
+	for i, u := range eval.UnusedEvidence {
+		unusedStrs[i] = u.Value
+	}
+
 	data := model.ResponseData{
 		AddressID:       addressID,
-		Status:          eval.Status,
+		Status:          status,
 		Confidence:      eval.Confidence,
 		RawInput:        req.Address,
 		NormalizedInput: normalized,
@@ -152,10 +153,10 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 			Matched:   matchedStrs,
 			Missing:   missingStrs,
 			Conflicts: eval.Conflicts,
-			Ambiguous: []string{},
+			Ambiguous: unusedStrs,
 		},
 		Resolution: model.Resolution{
-			Strategy:       eval.Reasons,
+			Strategy:       reasons,
 			CandidateCount: len(resolutionCands),
 			Candidates:     resolutionCands,
 		},
@@ -166,18 +167,15 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 
 	log.Debug().
-		Int("province_candidates", len(provinceCands)).
-		Int("city_candidates", len(cityCands)).
-		Int("district_candidates", len(districtCands)).
-		Int("subdistrict_candidates", len(subCands)).
+		Int("candidates", len(scored)).
 		Str("resolved_province", location.Province).
 		Str("resolved_city", location.City).
 		Str("resolved_district", location.District).
 		Str("resolved_subdistrict", location.SubDistrict).
 		Str("resolved_postal_code", location.PostalCode).
 		Float64("confidence", eval.Confidence).
-		Str("status", string(eval.Status)).
-		Msg("candidate resolution")
+		Str("status", string(status)).
+		Msg("address resolution")
 
 	record := buildAddressRecord(requestID, data, now)
 	if err := svc.repo.InsertAddressRequest(ctx, record); err != nil {
@@ -193,57 +191,53 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	return resp, nil
 }
 
-func resolveLocation(provinceCands, cityCands, districtCands, subCands []model.Candidate, provID, cityID, distID, subID int64) model.Location {
+func resolveLocationFromCandidate(winner *scoredCandidate) model.Location {
+	if winner == nil {
+		return model.Location{}
+	}
+
 	loc := model.Location{}
+	c := winner.candidate
 
-	if provID > 0 {
-		for _, c := range provinceCands {
-			if c.LocationID == provID {
-				loc.Province = c.Name
-				break
-			}
-		}
+	if c.Location.Province != nil {
+		loc.Province = c.Location.Province.Name
 	}
-
-	if cityID > 0 {
-		for _, c := range cityCands {
-			if c.LocationID == cityID {
-				loc.City = c.Name
-				break
-			}
-		}
+	if c.Location.City != nil {
+		loc.City = c.Location.City.Name
 	}
-
-	if distID > 0 {
-		for _, c := range districtCands {
-			if c.LocationID == distID {
-				loc.District = c.Name
-				break
-			}
-		}
+	if c.Location.District != nil {
+		loc.District = c.Location.District.Name
 	}
-
-	if subID > 0 {
-		for _, c := range subCands {
-			if c.LocationID == subID {
-				loc.SubDistrict = c.Name
-				loc.PostalCode = c.PostalCode
-				break
-			}
-		}
+	if c.Location.SubDistrict != nil {
+		loc.SubDistrict = c.Location.SubDistrict.Name
+		loc.PostalCode = c.Location.SubDistrict.PostalCode
+	}
+	if c.Location.PostalCode != nil {
+		loc.PostalCode = c.Location.PostalCode.Code
 	}
 
 	return loc
 }
 
-func postalCodeMatches(subCands []model.Candidate, subID int64, inputPostalCode string) bool {
-	if inputPostalCode == "" || subID == 0 {
-		return false
-	}
-	for _, c := range subCands {
-		if c.LocationID == subID {
-			return c.PostalCode == inputPostalCode
+func formatLocation(location model.Location) string {
+	parts := []string{}
+	for _, s := range []string{location.SubDistrict, location.District, location.City, location.Province} {
+		if s != "" {
+			parts = append(parts, s)
 		}
 	}
-	return false
+	formatted := strings.Join(parts, ", ")
+	if location.PostalCode != "" {
+		formatted += " " + location.PostalCode
+	}
+	return formatted
+}
+
+func evidenceAsSlice(evidence []model.Evidence) []model.Evidence {
+	return evidence
+}
+
+type scoredCandidate struct {
+	candidate model.AdminCandidate
+	eval      model.CandidateEvaluation
 }

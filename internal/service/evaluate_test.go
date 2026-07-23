@@ -20,75 +20,73 @@ func validHierarchy() *database.HierarchyMap {
 
 func TestEvaluateHierarchy(t *testing.T) {
 	tests := []struct {
-		name    string
-		provID  int64
-		cityID  int64
-		distID  int64
-		subID   int64
-		hier    *database.HierarchyMap
-		want    bool
+		name   string
+		provID int64
+		cityID int64
+		distID int64
+		subID  int64
+		hier   *database.HierarchyMap
+		want   int
 	}{
 		{
 			name:   "valid full chain",
 			provID: 1, cityID: 2, distID: 3, subID: 4,
 			hier: validHierarchy(),
-			want: true,
+			want: 0,
 		},
 		{
 			name:   "invalid city-province",
 			provID: 1, cityID: 99, distID: 0, subID: 0,
 			hier: validHierarchy(),
-			want: false,
+			want: 1,
 		},
 		{
 			name:   "invalid district-city",
 			provID: 1, cityID: 2, distID: 99, subID: 0,
 			hier: validHierarchy(),
-			want: false,
+			want: 1,
 		},
 		{
 			name:   "invalid subdistrict-district",
 			provID: 1, cityID: 2, distID: 3, subID: 99,
 			hier: validHierarchy(),
-			want: false,
-		},
-		{
-			name:   "nil hierarchy no children",
-			provID: 1, cityID: 0, distID: 0, subID: 0,
-			hier: nil,
-			want: true,
-		},
-		{
-			name:   "nil hierarchy with children",
-			provID: 1, cityID: 2, distID: 0, subID: 0,
-			hier: nil,
-			want: false,
+			want: 1,
 		},
 		{
 			name:   "empty IDs valid",
 			provID: 0, cityID: 0, distID: 0, subID: 0,
 			hier: validHierarchy(),
-			want: true,
+			want: 0,
 		},
 		{
 			name:   "province only valid",
 			provID: 1, cityID: 0, distID: 0, subID: 0,
 			hier: validHierarchy(),
-			want: true,
+			want: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &EvaluationContext{
-				WinnerProvinceID:    tt.provID,
-				WinnerCityID:        tt.cityID,
-				WinnerDistrictID:    tt.distID,
-				WinnerSubDistrictID: tt.subID,
+			candidate := &model.AdminCandidate{
+				Location: model.AdminLocation{},
 			}
-			evaluateHierarchy(ctx, tt.hier)
-			if ctx.HierarchyValid != tt.want {
-				t.Errorf("got %v, want %v", ctx.HierarchyValid, tt.want)
+			if tt.provID > 0 {
+				candidate.Location.Province = &model.Province{ID: tt.provID}
+			}
+			if tt.cityID > 0 {
+				candidate.Location.City = &model.City{ID: tt.cityID}
+			}
+			if tt.distID > 0 {
+				candidate.Location.District = &model.District{ID: tt.distID}
+			}
+			if tt.subID > 0 {
+				candidate.Location.SubDistrict = &model.SubDistrict{ID: tt.subID}
+			}
+
+			evaluateHierarchy(candidate, tt.hier)
+			if len(candidate.Location.Conflicts) != tt.want {
+				t.Errorf("got %d conflicts, want %d: %v", len(candidate.Location.Conflicts), tt.want, candidate.Location.Conflicts)
 			}
 		})
 	}
@@ -96,51 +94,35 @@ func TestEvaluateHierarchy(t *testing.T) {
 
 func TestEvaluateCompleteness(t *testing.T) {
 	tests := []struct {
-		name          string
-		provID        int64
-		cityID        int64
-		distID        int64
-		subID         int64
-		postalMatched bool
-		inputPostal   string
-		wantMatched   []model.Component
-		wantMissing   []model.Component
+		name        string
+		provID      int64
+		cityID      int64
+		distID      int64
+		subID       int64
+		wantMatched []model.Component
+		wantMissing []model.Component
 	}{
 		{
-			name:          "all matched",
+			name:        "all matched",
 			provID: 1, cityID: 2, distID: 3, subID: 4,
-			postalMatched: true, inputPostal: "12345",
 			wantMatched: []model.Component{
 				model.ComponentProvince, model.ComponentCity,
 				model.ComponentDistrict, model.ComponentSubDistrict,
-				model.ComponentPostalCode,
 			},
 			wantMissing: nil,
 		},
 		{
-			name:          "province only no postal",
+			name:        "province only",
 			provID: 1, cityID: 0, distID: 0, subID: 0,
-			postalMatched: false, inputPostal: "",
-			wantMatched:   []model.Component{model.ComponentProvince},
+			wantMatched: []model.Component{model.ComponentProvince},
 			wantMissing: []model.Component{
 				model.ComponentCity, model.ComponentDistrict, model.ComponentSubDistrict,
 			},
 		},
 		{
-			name:          "postal code missing when input provided",
-			provID: 1, cityID: 2, distID: 3, subID: 4,
-			postalMatched: false, inputPostal: "12345",
-			wantMatched: []model.Component{
-				model.ComponentProvince, model.ComponentCity,
-				model.ComponentDistrict, model.ComponentSubDistrict,
-			},
-			wantMissing: []model.Component{model.ComponentPostalCode},
-		},
-		{
-			name:          "no province and no postal input",
+			name:        "no province and no postal input",
 			provID: 0, cityID: 0, distID: 0, subID: 0,
-			postalMatched: false, inputPostal: "",
-			wantMatched:   nil,
+			wantMatched: nil,
 			wantMissing: []model.Component{
 				model.ComponentProvince, model.ComponentCity,
 				model.ComponentDistrict, model.ComponentSubDistrict,
@@ -150,20 +132,30 @@ func TestEvaluateCompleteness(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &EvaluationContext{
-				WinnerProvinceID:    tt.provID,
-				WinnerCityID:        tt.cityID,
-				WinnerDistrictID:    tt.distID,
-				WinnerSubDistrictID: tt.subID,
-				PostalCodeMatched:   tt.postalMatched,
-				InputPostalCode:     tt.inputPostal,
+			candidate := &model.AdminCandidate{
+				Location: model.AdminLocation{},
 			}
-			evaluateCompleteness(ctx)
-			if !componentsEqual(ctx.Matched, tt.wantMatched) {
-				t.Errorf("Matched = %v, want %v", ctx.Matched, tt.wantMatched)
+			if tt.provID > 0 {
+				candidate.Location.Province = &model.Province{ID: tt.provID, Name: "Province"}
 			}
-			if !componentsEqual(ctx.Missing, tt.wantMissing) {
-				t.Errorf("Missing = %v, want %v", ctx.Missing, tt.wantMissing)
+			if tt.cityID > 0 {
+				candidate.Location.City = &model.City{ID: tt.cityID, Name: "City"}
+			}
+			if tt.distID > 0 {
+				candidate.Location.District = &model.District{ID: tt.distID, Name: "District"}
+			}
+			if tt.subID > 0 {
+				candidate.Location.SubDistrict = &model.SubDistrict{ID: tt.subID, Name: "SubDistrict"}
+			}
+
+			matched := getMatchedComponents(candidate)
+			missing := getMissingComponents(candidate)
+
+			if !componentsEqual(matched, tt.wantMatched) {
+				t.Errorf("Matched = %v, want %v", matched, tt.wantMatched)
+			}
+			if !componentsEqual(missing, tt.wantMissing) {
+				t.Errorf("Missing = %v, want %v", missing, tt.wantMissing)
 			}
 		})
 	}
@@ -183,69 +175,78 @@ func componentsEqual(a, b []model.Component) bool {
 
 func TestDetectConflicts(t *testing.T) {
 	tests := []struct {
-		name          string
-		hierValid     bool
-		provID        int64
-		cityID        int64
-		distID        int64
-		subID         int64
-		postalMatched bool
-		inputPostal   string
-		hier          *database.HierarchyMap
-		wantCount     int
+		name      string
+		provID    int64
+		cityID    int64
+		distID    int64
+		subID     int64
+		postalSub bool
+		evidence  []model.MatchedEvidence
+		wantCount int
 	}{
 		{
 			name:      "no conflicts",
-			hierValid: true, provID: 1, cityID: 2, subID: 4,
-			postalMatched: true, inputPostal: "12345",
+			provID: 1, cityID: 2, distID: 3, subID: 4,
+			postalSub: true,
 			wantCount: 0,
 		},
 		{
-			name:      "hierarchy conflict",
-			hierValid: false, provID: 1, cityID: 2, subID: 0,
-			postalMatched: false, inputPostal: "",
+			name:      "orphan city",
+			provID: 0, cityID: 2, distID: 1, subID: 0,
+			postalSub: false,
 			wantCount: 1,
-		},
-		{
-			name:      "postal code mismatch",
-			hierValid: true, provID: 1, cityID: 2, subID: 4,
-			postalMatched: false, inputPostal: "12345",
-			wantCount: 1,
-		},
-		{
-			name:      "both conflicts",
-			hierValid: false, provID: 1, cityID: 2, subID: 4,
-			postalMatched: false, inputPostal: "12345",
-			wantCount: 2,
 		},
 		{
 			name:      "no postal conflict when no input postal",
-			hierValid: true, provID: 1, cityID: 2, subID: 4,
-			postalMatched: false, inputPostal: "",
+			provID: 1, cityID: 2, subID: 0,
+			postalSub: false,
 			wantCount: 0,
 		},
 		{
-			name:      "no postal conflict when no subdistrict",
-			hierValid: true, provID: 1, cityID: 2, subID: 0,
-			postalMatched: false, inputPostal: "12345",
-			wantCount: 0,
+			name:      "multiple cities",
+			provID: 1, cityID: 2, distID: 0, subID: 0,
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Value: "a"}, Resolved: &model.Entity{ID: 2, Level: "CITY"}},
+				{Evidence: model.Evidence{Value: "b"}, Resolved: &model.Entity{ID: 99, Level: "CITY"}},
+			},
+			wantCount: 1,
+		},
+		{
+			name:      "duplicate level",
+			provID: 1, cityID: 2, distID: 0, subID: 0,
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Value: "a"}, Resolved: &model.Entity{ID: 99, Level: "PROVINCE"}},
+			},
+			wantCount: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &EvaluationContext{
-				WinnerProvinceID:    tt.provID,
-				WinnerCityID:        tt.cityID,
-				WinnerDistrictID:    tt.distID,
-				WinnerSubDistrictID: tt.subID,
-				PostalCodeMatched:   tt.postalMatched,
-				InputPostalCode:     tt.inputPostal,
-				HierarchyValid:      tt.hierValid,
+			candidate := &model.AdminCandidate{
+				Location: model.AdminLocation{},
+				Evidence: tt.evidence,
 			}
-			detectConflicts(ctx, tt.hier, defaultConflictRules)
-			if len(ctx.Conflicts) != tt.wantCount {
-				t.Errorf("got %d conflicts, want %d: %v", len(ctx.Conflicts), tt.wantCount, ctx.Conflicts)
+			if tt.provID > 0 {
+				candidate.Location.Province = &model.Province{ID: tt.provID}
+			}
+			if tt.cityID > 0 {
+				candidate.Location.City = &model.City{ID: tt.cityID}
+			}
+			if tt.distID > 0 {
+				candidate.Location.District = &model.District{ID: tt.distID}
+			}
+			if tt.subID > 0 {
+				candidate.Location.SubDistrict = &model.SubDistrict{ID: tt.subID}
+			}
+			if tt.postalSub {
+				candidate.Location.PostalCode = &model.PostalCode{ID: tt.subID}
+			}
+
+			detectConflicts(candidate, nil)
+
+			if len(candidate.Location.Conflicts) != tt.wantCount {
+				t.Errorf("got %d conflicts, want %d: %v", len(candidate.Location.Conflicts), tt.wantCount, candidate.Location.Conflicts)
 			}
 		})
 	}
@@ -253,74 +254,90 @@ func TestDetectConflicts(t *testing.T) {
 
 func TestScoreConfidence(t *testing.T) {
 	tests := []struct {
-		name          string
-		hierValid     bool
-		cityID        int64
-		provID        int64
-		postalMatched bool
-		exactMatch    bool
-		want          float64
+		name     string
+		provID   int64
+		cityID   int64
+		postalID int64
+		evidence []model.MatchedEvidence
+		conflicts []model.Conflict
+		want     float64
 	}{
 		{
-			name:          "all signals",
-			hierValid: true, cityID: 2, provID: 1,
-			postalMatched: true, exactMatch: true,
-			want: 1.0,
+			name:     "all signals",
+			provID: 1, cityID: 2, postalID: 3,
+			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
+			conflicts: nil,
+			want:     1.0,
 		},
 		{
-			name:          "exact match only",
-			hierValid: false, cityID: 0, provID: 0,
-			postalMatched: false, exactMatch: true,
-			want: 0.40,
+			name:     "exact match only",
+			provID: 0, cityID: 0, postalID: 0,
+			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
+			want:     0.40,
 		},
 		{
-			name:          "hierarchy only",
-			hierValid: true, cityID: 2, provID: 0,
-			postalMatched: false, exactMatch: false,
-			want: 0.30,
+			name:     "hierarchy only (city without conflict)",
+			provID: 0, cityID: 2, postalID: 0,
+			evidence: nil,
+			want:     0.30,
 		},
 		{
-			name:          "postal code only",
-			hierValid: false, cityID: 0, provID: 0,
-			postalMatched: true, exactMatch: false,
-			want: 0.20,
+			name:     "postal code only",
+			provID: 0, cityID: 0, postalID: 3,
+			evidence: nil,
+			want:     0.20,
 		},
 		{
-			name:          "province only",
-			hierValid: false, cityID: 0, provID: 1,
-			postalMatched: false, exactMatch: false,
-			want: 0.10,
+			name:     "province only",
+			provID: 1, cityID: 0, postalID: 0,
+			evidence: nil,
+			want:     0.10,
 		},
 		{
-			name:          "no signals",
-			hierValid: false, cityID: 0, provID: 0,
-			postalMatched: false, exactMatch: false,
-			want: 0.0,
+			name:     "no signals",
+			provID: 0, cityID: 0, postalID: 0,
+			evidence: nil,
+			want:     0.0,
 		},
 		{
-			name:          "exact + hierarchy",
-			hierValid: true, cityID: 2, provID: 0,
-			postalMatched: false, exactMatch: true,
-			want: 0.70,
+			name:     "exact + hierarchy",
+			provID: 0, cityID: 2, postalID: 0,
+			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
+			want:     0.70,
 		},
 		{
-			name:          "exact + province",
-			hierValid: false, cityID: 0, provID: 1,
-			postalMatched: false, exactMatch: true,
-			want: 0.50,
+			name:     "exact + province",
+			provID: 1, cityID: 0, postalID: 0,
+			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
+			want:     0.50,
+		},
+		{
+			name:     "hierarchy conflict blocks hierarchy weight",
+			provID: 1, cityID: 2, postalID: 0,
+			evidence: nil,
+			conflicts: []model.Conflict{{Type: "hierarchy_conflict"}},
+			want:     0.10,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &EvaluationContext{
-				WinnerProvinceID:  tt.provID,
-				WinnerCityID:      tt.cityID,
-				HierarchyValid:    tt.hierValid,
-				PostalCodeMatched: tt.postalMatched,
-				ExactMatchFound:   tt.exactMatch,
+			candidate := &model.AdminCandidate{
+				Location: model.AdminLocation{},
+				Evidence: tt.evidence,
 			}
-			got := scoreConfidence(ctx)
+			if tt.provID > 0 {
+				candidate.Location.Province = &model.Province{ID: tt.provID}
+			}
+			if tt.cityID > 0 {
+				candidate.Location.City = &model.City{ID: tt.cityID}
+			}
+			if tt.postalID > 0 {
+				candidate.Location.PostalCode = &model.PostalCode{ID: tt.postalID}
+			}
+			candidate.Location.Conflicts = tt.conflicts
+
+			got := scoreConfidence(candidate)
 			if got != tt.want {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
@@ -330,72 +347,78 @@ func TestScoreConfidence(t *testing.T) {
 
 func TestAssessQuality(t *testing.T) {
 	tests := []struct {
-		name     string
-		conflict bool
-		provID   int64
-		missing  []model.Component
-		want     model.QualityStatus
+		name       string
+		provID     int64
+		cityID     int64
+		distID     int64
+		subID      int64
+		conflicts  []model.Conflict
+		want       model.QualityStatus
 	}{
 		{
-			name:     "valid",
-			conflict: false, provID: 1,
-			missing: nil,
+			name:   "valid",
+			provID: 1, cityID: 2, distID: 3,
 			want:   model.StatusValid,
 		},
 		{
-			name:     "valid with postal code missing",
-			conflict: false, provID: 1,
-			missing: []model.Component{model.ComponentPostalCode},
-			want:   model.StatusValid,
+			name:   "conflict",
+			provID: 1, cityID: 2, distID: 3,
+			conflicts: []model.Conflict{{Type: "hierarchy_conflict"}},
+			want:     model.StatusConflict,
 		},
 		{
-			name:     "conflict",
-			conflict: true, provID: 1,
-			missing: nil,
-			want:   model.StatusConflict,
+			name:   "unknown truly empty",
+			provID: 0, cityID: 0, distID: 0, subID: 0,
+			want: model.StatusUnknown,
 		},
 		{
-			name:     "unknown no province",
-			conflict: false, provID: 0,
-			missing: nil,
-			want:   model.StatusUnknown,
+			name:   "conflict overrides unknown",
+			provID: 0, cityID: 0, distID: 0, subID: 0,
+			conflicts: []model.Conflict{{Type: "hierarchy_conflict"}},
+			want:     model.StatusConflict,
 		},
 		{
-			name:     "conflict overrides unknown",
-			conflict: true, provID: 0,
-			missing: nil,
-			want:   model.StatusConflict,
-		},
-		{
-			name:     "incomplete missing city",
-			conflict: false, provID: 1,
-			missing: []model.Component{model.ComponentCity},
+			name:   "incomplete missing city",
+			provID: 1, cityID: 0, distID: 0,
 			want:   model.StatusIncomplete,
 		},
 		{
-			name:     "incomplete multiple missing",
-			conflict: false, provID: 1,
-			missing: []model.Component{model.ComponentCity, model.ComponentDistrict},
+			name:   "incomplete missing city and district",
+			provID: 1, cityID: 0, distID: 0, subID: 4,
 			want:   model.StatusIncomplete,
 		},
 		{
-			name:     "incomplete with conflict takes precedence",
-			conflict: true, provID: 1,
-			missing: []model.Component{model.ComponentCity},
-			want:   model.StatusConflict,
+			name:   "incomplete has subdistrict but no province",
+			provID: 0, cityID: 0, distID: 0, subID: 4,
+			want:   model.StatusIncomplete,
+		},
+		{
+			name:   "incomplete has city but no province",
+			provID: 0, cityID: 2, distID: 3,
+			want:   model.StatusIncomplete,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &EvaluationContext{
-				WinnerProvinceID: tt.provID,
-				Missing:          tt.missing,
+			candidate := &model.AdminCandidate{
+				Location: model.AdminLocation{},
 			}
-			if tt.conflict {
-				ctx.Conflicts = []model.Conflict{{Type: "test"}}
+			if tt.provID > 0 {
+				candidate.Location.Province = &model.Province{ID: tt.provID}
 			}
-			got := assessQuality(ctx)
+			if tt.cityID > 0 {
+				candidate.Location.City = &model.City{ID: tt.cityID}
+			}
+			if tt.distID > 0 {
+				candidate.Location.District = &model.District{ID: tt.distID}
+			}
+			if tt.subID > 0 {
+				candidate.Location.SubDistrict = &model.SubDistrict{ID: tt.subID}
+			}
+			candidate.Location.Conflicts = tt.conflicts
+
+			got := assessQuality(candidate)
 			if got != tt.want {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
@@ -407,38 +430,36 @@ func TestEvaluateCandidate_FullPipeline(t *testing.T) {
 	hier := validHierarchy()
 
 	t.Run("valid address", func(t *testing.T) {
-		ctx := &EvaluationContext{
-			WinnerProvinceID:    1,
-			WinnerCityID:        2,
-			WinnerDistrictID:    3,
-			WinnerSubDistrictID: 4,
-			PostalCodeMatched:   true,
-			InputPostalCode:     "12345",
-			ExactMatchFound:     true,
+		candidate := &model.AdminCandidate{
+			Location: model.AdminLocation{
+				Province:    &model.Province{ID: 1, Name: "Province"},
+				City:        &model.City{ID: 2, Name: "City"},
+				District:    &model.District{ID: 3, Name: "District"},
+				SubDistrict: &model.SubDistrict{ID: 4, Name: "SubDistrict"},
+			},
+			Evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Value: "bandung"}, Resolved: &model.Entity{ID: 2}},
+			},
 		}
-		eval := EvaluateCandidate(ctx, hier)
+		eval := EvaluateCandidate(candidate, hier, []model.Evidence{{Value: "bandung"}})
 		if eval.Status != model.StatusValid {
 			t.Errorf("Status = %v, want VALID", eval.Status)
 		}
-		if eval.Confidence != 1.0 {
-			t.Errorf("Confidence = %v, want 1.0", eval.Confidence)
-		}
-		if len(eval.Conflicts) != 0 {
-			t.Errorf("Conflicts = %v, want none", eval.Conflicts)
+		if eval.Confidence != 0.80 {
+			t.Errorf("Confidence = %v, want 0.80", eval.Confidence)
 		}
 	})
 
 	t.Run("conflict address", func(t *testing.T) {
-		ctx := &EvaluationContext{
-			WinnerProvinceID:    1,
-			WinnerCityID:        99,
-			WinnerDistrictID:    3,
-			WinnerSubDistrictID: 4,
-			PostalCodeMatched:   true,
-			InputPostalCode:     "12345",
-			ExactMatchFound:     false,
+		candidate := &model.AdminCandidate{
+			Location: model.AdminLocation{
+				Province:    &model.Province{ID: 1, Name: "Province"},
+				City:        &model.City{ID: 99, Name: "WrongCity"},
+				District:    &model.District{ID: 3, Name: "District"},
+				SubDistrict: &model.SubDistrict{ID: 4, Name: "SubDistrict"},
+			},
 		}
-		eval := EvaluateCandidate(ctx, hier)
+		eval := EvaluateCandidate(candidate, hier, nil)
 		if eval.Status != model.StatusConflict {
 			t.Errorf("Status = %v, want CONFLICT", eval.Status)
 		}
@@ -448,16 +469,8 @@ func TestEvaluateCandidate_FullPipeline(t *testing.T) {
 	})
 
 	t.Run("unknown address", func(t *testing.T) {
-		ctx := &EvaluationContext{
-			WinnerProvinceID:    0,
-			WinnerCityID:        0,
-			WinnerDistrictID:    0,
-			WinnerSubDistrictID: 0,
-			PostalCodeMatched:   false,
-			InputPostalCode:     "",
-			ExactMatchFound:     false,
-		}
-		eval := EvaluateCandidate(ctx, hier)
+		candidate := &model.AdminCandidate{Location: model.AdminLocation{}}
+		eval := EvaluateCandidate(candidate, hier, nil)
 		if eval.Status != model.StatusUnknown {
 			t.Errorf("Status = %v, want UNKNOWN", eval.Status)
 		}
@@ -467,102 +480,132 @@ func TestEvaluateCandidate_FullPipeline(t *testing.T) {
 	})
 
 	t.Run("incomplete address", func(t *testing.T) {
-		ctx := &EvaluationContext{
-			WinnerProvinceID:    1,
-			WinnerCityID:        0,
-			WinnerDistrictID:    0,
-			WinnerSubDistrictID: 0,
-			PostalCodeMatched:   false,
-			InputPostalCode:     "",
-			ExactMatchFound:     false,
+		candidate := &model.AdminCandidate{
+			Location: model.AdminLocation{
+				Province: &model.Province{ID: 1, Name: "Province"},
+			},
 		}
-		eval := EvaluateCandidate(ctx, hier)
+		eval := EvaluateCandidate(candidate, hier, nil)
 		if eval.Status != model.StatusIncomplete {
 			t.Errorf("Status = %v, want INCOMPLETE", eval.Status)
 		}
 	})
 }
 
-func TestBuildExplainability(t *testing.T) {
+func TestBuildReasons(t *testing.T) {
 	tests := []struct {
 		name       string
-		exactMatch bool
-		hierValid  bool
-		want       []string
+		evidence   []model.MatchedEvidence
+		conflicts  []model.Conflict
+		strategies []model.DiscoveryStrategy
+		wantLen    int
 	}{
 		{
 			name:       "exact match and hierarchy",
-			exactMatch: true, hierValid: true,
-			want: []string{"exact_match", "hierarchy_validation"},
+			evidence:   []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
+			conflicts:  nil,
+			wantLen:    2,
 		},
 		{
 			name:       "exact match only",
-			exactMatch: true, hierValid: false,
-			want: []string{"exact_match"},
+			evidence:   []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
+			conflicts:  []model.Conflict{{Type: "hierarchy_conflict"}},
+			wantLen:    1,
 		},
 		{
-			name:       "hierarchy only",
-			exactMatch: false, hierValid: true,
-			want: []string{"hierarchy_validation"},
+			name:       "with strategies",
+			evidence:   []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
+			conflicts:  nil,
+			strategies: []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel},
+			wantLen:    4,
 		},
 		{
 			name:       "no reasons",
-			exactMatch: false, hierValid: false,
-			want: nil,
+			evidence:   nil,
+			conflicts:  []model.Conflict{{Type: "hierarchy_conflict"}},
+			wantLen:    0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &EvaluationContext{
-				ExactMatchFound: tt.exactMatch,
-				HierarchyValid:  tt.hierValid,
+			candidate := &model.AdminCandidate{
+				Location:            model.AdminLocation{Conflicts: tt.conflicts},
+				Evidence:            tt.evidence,
+				DiscoveryStrategies: tt.strategies,
 			}
-			got := BuildExplainability(ctx)
-			if !stringSliceEqual(got, tt.want) {
-				t.Errorf("got %v, want %v", got, tt.want)
+			got := BuildReasons(candidate)
+			if len(got) != tt.wantLen {
+				t.Errorf("got %d reasons, want %d: %v", len(got), tt.wantLen, got)
 			}
 		})
 	}
 }
 
-func stringSliceEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func TestCustomConflictRule(t *testing.T) {
-	ctx := &EvaluationContext{
-		WinnerProvinceID:    1,
-		WinnerCityID:        2,
-		HierarchyValid:      true,
-		PostalCodeMatched:   true,
-		InputPostalCode:     "12345",
-		WinnerSubDistrictID: 4,
+func TestEvidenceCoverageReturnsUnused(t *testing.T) {
+	allEvidence := []model.Evidence{
+		{Value: "bandung"},
+		{Value: "citarum"},
 	}
 
-	rule := &customRule{}
-	detectConflicts(ctx, validHierarchy(), []ConflictRule{rule})
-	if len(ctx.Conflicts) != 1 {
-		t.Fatalf("expected 1 custom conflict, got %d", len(ctx.Conflicts))
+	candidate := &model.AdminCandidate{
+		Location: model.AdminLocation{
+			Province: &model.Province{ID: 1},
+			City:     &model.City{ID: 2},
+		},
+		Evidence: []model.MatchedEvidence{
+			{Evidence: model.Evidence{Value: "bandung"}, Resolved: &model.Entity{ID: 2}},
+		},
 	}
-	if ctx.Conflicts[0].Type != "custom" {
-		t.Errorf("expected type 'custom', got %q", ctx.Conflicts[0].Type)
+
+	eval := EvaluateCandidate(candidate, validHierarchy(), allEvidence)
+
+	if len(eval.UnusedEvidence) != 1 {
+				t.Errorf("expected 1 unused evidence, got %d: %v", len(eval.UnusedEvidence), eval.UnusedEvidence)
+	}
+	if len(eval.UnusedEvidence) > 0 && eval.UnusedEvidence[0].Value != "citarum" {
+		t.Errorf("expected unused 'citarum', got %v", eval.UnusedEvidence[0].Value)
 	}
 }
 
-type customRule struct{}
+func TestMultipleCitiesConflict(t *testing.T) {
+	candidate := &model.AdminCandidate{
+		Location: model.AdminLocation{
+			Province: &model.Province{ID: 1},
+			City:     &model.City{ID: 2},
+		},
+		Evidence: []model.MatchedEvidence{
+			{Evidence: model.Evidence{Value: "a"}, Resolved: &model.Entity{ID: 2, Level: "CITY", Name: "CityA"}},
+			{Evidence: model.Evidence{Value: "b"}, Resolved: &model.Entity{ID: 99, Level: "CITY", Name: "CityB"}},
+		},
+	}
 
-func (customRule) Evaluate(_ *EvaluationContext, _ *database.HierarchyMap) *model.Conflict {
-	return &model.Conflict{
-		Type:    "custom",
-		Message: "custom rule triggered",
+	detectMultipleCities(candidate)
+
+	if len(candidate.Location.Conflicts) != 1 {
+		t.Errorf("expected 1 conflict, got %d: %v", len(candidate.Location.Conflicts), candidate.Location.Conflicts)
+	}
+	if len(candidate.Location.Conflicts) > 0 && candidate.Location.Conflicts[0].Type != "multiple_city" {
+		t.Errorf("expected type 'multiple_city', got %q", candidate.Location.Conflicts[0].Type)
+	}
+}
+
+func TestDuplicateLevelConflict(t *testing.T) {
+	candidate := &model.AdminCandidate{
+		Location: model.AdminLocation{
+			Province: &model.Province{ID: 1},
+		},
+		Evidence: []model.MatchedEvidence{
+			{Evidence: model.Evidence{Value: "a"}, Resolved: &model.Entity{ID: 99, Level: "PROVINCE", Name: "OtherProvince"}},
+		},
+	}
+
+	detectDuplicateLevel(candidate)
+
+	if len(candidate.Location.Conflicts) != 1 {
+		t.Errorf("expected 1 conflict, got %d: %v", len(candidate.Location.Conflicts), candidate.Location.Conflicts)
+	}
+	if len(candidate.Location.Conflicts) > 0 && candidate.Location.Conflicts[0].Type != "duplicate_level" {
+		t.Errorf("expected type 'duplicate_level', got %q", candidate.Location.Conflicts[0].Type)
 	}
 }
