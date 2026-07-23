@@ -511,6 +511,17 @@ func (svc *Service) findCandidatesByAnyLevel(ctx context.Context, sourceID int64
 	return nil, nil, nil, nil
 }
 
+func hasExactMatch(candidateLists ...[]model.Candidate) bool {
+	for _, list := range candidateLists {
+		for _, c := range list {
+			if c.MatchType == "EXACT" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func isNameInInput(name, normalized string) bool {
 	words := strings.Fields(normalized)
 	nameWords := strings.Fields(name)
