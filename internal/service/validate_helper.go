@@ -423,6 +423,356 @@ func resolveWinner(allProvinces, allCities, allDistricts, allSubDistricts []mode
 	return bestPath.provinceID, bestPath.cityID, bestPath.districtID, bestPath.subdistrictID, true
 }
 
+func (svc *Service) findCandidatesByAnyLevel(ctx context.Context, sourceID int64, normalized string) ([]model.Candidate, []model.Candidate, []model.Candidate, error) {
+	if err := ensureCitiesLoaded(svc, ctx); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := ensureDistrictsLoaded(svc, ctx, sourceID); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := ensureSubDistrictsLoaded(svc, ctx, sourceID); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := ensureHierarchyLoaded(svc, ctx, sourceID); err != nil {
+		return nil, nil, nil, err
+	}
+
+	districtIDToName := buildDistrictIDNameMap(svc.districtCache)
+	subIDToEntry := buildSubIDEntryMap(svc.subDistrictCache)
+
+	cityKeys := matchCandidates(svc.cityCache, sourceID, normalized)
+	if len(cityKeys) > 0 {
+		cities := buildCityCandidatesDFS(cityKeys, svc.cityCache)
+		for _, city := range cities {
+			matchedDists, matchedSubs := dfsExpandCity(city, svc.hierarchyCache, districtIDToName, subIDToEntry, normalized)
+			if len(matchedDists) > 0 || len(matchedSubs) > 0 {
+				return []model.Candidate{city}, matchedDists, matchedSubs, nil
+			}
+		}
+		return []model.Candidate{cities[0]}, nil, nil, nil
+	}
+
+	districtKeys := matchCandidates(svc.districtCache, sourceID, normalized)
+	if len(districtKeys) > 0 {
+		districts := buildDistrictCandidatesDFS(districtKeys, svc.districtCache)
+		for _, dist := range districts {
+			matchedSubs := dfsExpandDistrict(dist, svc.hierarchyCache, subIDToEntry, normalized)
+			if len(matchedSubs) > 0 {
+				return nil, []model.Candidate{dist}, matchedSubs, nil
+			}
+		}
+		return nil, []model.Candidate{districts[0]}, nil, nil
+	}
+
+	subKeys := matchCandidates(svc.subDistrictCache, sourceID, normalized)
+	if len(subKeys) > 0 {
+		return nil, nil, buildSubCandidatesDFS(subKeys, svc.subDistrictCache), nil
+	}
+
+	return nil, nil, nil, nil
+}
+
+func isNameInInput(name, normalized string) bool {
+	words := strings.Fields(normalized)
+	nameWords := strings.Fields(name)
+	if len(nameWords) == 0 || len(words) == 0 || len(nameWords) > len(words) {
+		return false
+	}
+	for i := 0; i <= len(words)-len(nameWords); i++ {
+		match := true
+		for j := 0; j < len(nameWords); j++ {
+			if words[i+j] != nameWords[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+func buildDistrictIDNameMap(cache map[string][]*districtEntry) map[int64]string {
+	m := make(map[int64]string)
+	for _, entries := range cache {
+		for _, e := range entries {
+			m[e.ID] = e.Name
+		}
+	}
+	return m
+}
+
+func buildSubIDEntryMap(cache map[string][]*subDistrictEntry) map[int64]*subDistrictEntry {
+	m := make(map[int64]*subDistrictEntry)
+	for _, entries := range cache {
+		for _, e := range entries {
+			m[e.ID] = e
+		}
+	}
+	return m
+}
+
+func buildCityCandidatesDFS(keys []string, cache map[string][]*cityEntry) []model.Candidate {
+	candidates := make([]model.Candidate, 0, len(keys))
+	for _, key := range keys {
+		for _, entry := range cache[key] {
+			matchedNgram := extractNgramFromKey(key)
+			matchType := "PARTIAL"
+			if matchedNgram == normalizer.Normalize(entry.Name) {
+				matchType = "EXACT"
+			}
+			candidates = append(candidates, model.Candidate{
+				LocationID: entry.ID,
+				Name:       entry.Name,
+				Level:      "CITY",
+				Score:      1.0,
+				Source:     "cache",
+				MatchType:  matchType,
+			})
+		}
+	}
+	return candidates
+}
+
+func buildDistrictCandidatesDFS(keys []string, cache map[string][]*districtEntry) []model.Candidate {
+	candidates := make([]model.Candidate, 0, len(keys))
+	for _, key := range keys {
+		for _, entry := range cache[key] {
+			matchedNgram := extractNgramFromKey(key)
+			matchType := "PARTIAL"
+			if matchedNgram == normalizer.Normalize(entry.Name) {
+				matchType = "EXACT"
+			}
+			candidates = append(candidates, model.Candidate{
+				LocationID: entry.ID,
+				Name:       entry.Name,
+				Level:      "DISTRICT",
+				Score:      1.0,
+				Source:     "cache",
+				MatchType:  matchType,
+			})
+		}
+	}
+	return candidates
+}
+
+func buildSubCandidatesDFS(keys []string, cache map[string][]*subDistrictEntry) []model.Candidate {
+	candidates := make([]model.Candidate, 0, len(keys))
+	for _, key := range keys {
+		for _, entry := range cache[key] {
+			matchedNgram := extractNgramFromKey(key)
+			matchType := "PARTIAL"
+			if matchedNgram == normalizer.Normalize(entry.Name) {
+				matchType = "EXACT"
+			}
+			candidates = append(candidates, model.Candidate{
+				LocationID: entry.ID,
+				Name:       entry.Name,
+				Level:      "SUBDISTRICT",
+				Score:      1.0,
+				Source:     "cache",
+				MatchType:  matchType,
+				PostalCode: entry.PostalCode,
+			})
+		}
+	}
+	return candidates
+}
+
+func dfsExpandCity(city model.Candidate, hierarchy *database.HierarchyMap, districtIDToName map[int64]string, subIDToEntry map[int64]*subDistrictEntry, normalized string) ([]model.Candidate, []model.Candidate) {
+	childDistIDs := hierarchy.CityChildren[city.LocationID]
+
+	var matchedDists []model.Candidate
+	for _, distID := range childDistIDs {
+		name, ok := districtIDToName[distID]
+		if !ok {
+			continue
+		}
+		if isNameInInput(normalizer.Normalize(name), normalized) {
+			distCand := model.Candidate{
+				LocationID: distID,
+				Name:       name,
+				Level:      "DISTRICT",
+				Score:      1.0,
+				Source:     "cache",
+				MatchType:  "EXACT",
+			}
+
+			subs := dfsExpandDistrict(distCand, hierarchy, subIDToEntry, normalized)
+			if len(subs) > 0 {
+				return []model.Candidate{distCand}, subs
+			}
+
+			matchedDists = append(matchedDists, distCand)
+		}
+	}
+
+	if len(matchedDists) > 0 {
+		return matchedDists, nil
+	}
+
+	for _, distID := range childDistIDs {
+		childSubIDs := hierarchy.DistrictChildren[distID]
+		for _, subID := range childSubIDs {
+			entry, ok := subIDToEntry[subID]
+			if !ok {
+				continue
+			}
+			if isNameInInput(normalizer.Normalize(entry.Name), normalized) {
+				return nil, []model.Candidate{
+					{
+						LocationID: entry.ID,
+						Name:       entry.Name,
+						Level:      "SUBDISTRICT",
+						Score:      1.0,
+						Source:     "cache",
+						MatchType:  "EXACT",
+						PostalCode: entry.PostalCode,
+					},
+				}
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func dfsExpandDistrict(dist model.Candidate, hierarchy *database.HierarchyMap, subIDToEntry map[int64]*subDistrictEntry, normalized string) []model.Candidate {
+	childSubIDs := hierarchy.DistrictChildren[dist.LocationID]
+	var matchedSubs []model.Candidate
+	for _, subID := range childSubIDs {
+		entry, ok := subIDToEntry[subID]
+		if !ok {
+			continue
+		}
+		if isNameInInput(normalizer.Normalize(entry.Name), normalized) {
+			matchedSubs = append(matchedSubs, model.Candidate{
+				LocationID: entry.ID,
+				Name:       entry.Name,
+				Level:      "SUBDISTRICT",
+				Score:      1.0,
+				Source:     "cache",
+				MatchType:  "EXACT",
+				PostalCode: entry.PostalCode,
+			})
+		}
+	}
+	return matchedSubs
+}
+
+func (svc *Service) inferProvinceCandidates(cityCands, districtCands, subCands []model.Candidate) ([]model.Candidate, []model.Candidate, []model.Candidate) {
+	provinceIDToName := make(map[int64]string)
+	for _, entries := range svc.provinceCache {
+		for _, e := range entries {
+			provinceIDToName[e.ID] = e.Name
+		}
+	}
+	cityIDToName := make(map[int64]string)
+	for _, entries := range svc.cityCache {
+		for _, e := range entries {
+			cityIDToName[e.ID] = e.Name
+		}
+	}
+	districtIDToName := make(map[int64]string)
+	for _, entries := range svc.districtCache {
+		for _, e := range entries {
+			districtIDToName[e.ID] = e.Name
+		}
+	}
+
+	provinceIDs := make(map[int64]bool)
+	enhancedCityIDs := make(map[int64]bool)
+	enhancedDistrictIDs := make(map[int64]bool)
+
+	for _, c := range cityCands {
+		enhancedCityIDs[c.LocationID] = true
+		provinceID := svc.hierarchyCache.CityToProvince[c.LocationID]
+		if provinceID > 0 {
+			provinceIDs[provinceID] = true
+		}
+	}
+	for _, d := range districtCands {
+		enhancedDistrictIDs[d.LocationID] = true
+		cityID := svc.hierarchyCache.DistrictToCity[d.LocationID]
+		if cityID > 0 {
+			enhancedCityIDs[cityID] = true
+			provinceID := svc.hierarchyCache.CityToProvince[cityID]
+			if provinceID > 0 {
+				provinceIDs[provinceID] = true
+			}
+		}
+	}
+	for _, s := range subCands {
+		distID := svc.hierarchyCache.SubDistrictToDist[s.LocationID]
+		if distID > 0 {
+			enhancedDistrictIDs[distID] = true
+			cityID := svc.hierarchyCache.DistrictToCity[distID]
+			if cityID > 0 {
+				enhancedCityIDs[cityID] = true
+				provinceID := svc.hierarchyCache.CityToProvince[cityID]
+				if provinceID > 0 {
+					provinceIDs[provinceID] = true
+				}
+			}
+		}
+	}
+
+	provinceCands := make([]model.Candidate, 0, len(provinceIDs))
+	for pid := range provinceIDs {
+		if name, ok := provinceIDToName[pid]; ok {
+			provinceCands = append(provinceCands, model.Candidate{
+				LocationID: pid,
+				Name:       name,
+				Level:      "PROVINCE",
+				Score:      1.0,
+				Source:     "inferred",
+				MatchType:  "INFERRED",
+			})
+		}
+	}
+
+	existingCityIDs := make(map[int64]bool)
+	for _, c := range cityCands {
+		existingCityIDs[c.LocationID] = true
+	}
+	for cid := range enhancedCityIDs {
+		if !existingCityIDs[cid] {
+			if name, ok := cityIDToName[cid]; ok {
+				cityCands = append(cityCands, model.Candidate{
+					LocationID: cid,
+					Name:       name,
+					Level:      "CITY",
+					Score:      1.0,
+					Source:     "inferred",
+					MatchType:  "INFERRED",
+				})
+			}
+		}
+	}
+
+	existingDistrictIDs := make(map[int64]bool)
+	for _, d := range districtCands {
+		existingDistrictIDs[d.LocationID] = true
+	}
+	for did := range enhancedDistrictIDs {
+		if !existingDistrictIDs[did] {
+			if name, ok := districtIDToName[did]; ok {
+				districtCands = append(districtCands, model.Candidate{
+					LocationID: did,
+					Name:       name,
+					Level:      "DISTRICT",
+					Score:      1.0,
+					Source:     "inferred",
+					MatchType:  "INFERRED",
+				})
+			}
+		}
+	}
+
+	return provinceCands, cityCands, districtCands
+}
+
 func calculateConfidence(provinceCands, cityCands, districtCands, subDistrictCands []model.Candidate, winnerProvinceID, winnerCityID, winnerDistrictID, winnerSubDistrictID int64, postalCodeMatched bool, hierarchy *database.HierarchyMap) float64 {
 	var score float64
 
