@@ -64,7 +64,7 @@ type Quality struct {
 	LocationVersion string         `json:"location_version"`
 	LocationSource  string         `json:"location_source"`
 	RawInput        string         `json:"raw_input"`
-	Explainability  Explainability `json:"-"`
+	Explainability  Explainability `json:"explainability"`
 }
 
 type AddressResponse struct {

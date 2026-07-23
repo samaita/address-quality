@@ -423,6 +423,46 @@ func resolveWinner(allProvinces, allCities, allDistricts, allSubDistricts []mode
 	return bestPath.provinceID, bestPath.cityID, bestPath.districtID, bestPath.subdistrictID, true
 }
 
+func (svc *Service) findCandidatesByLevels(ctx context.Context, sourceID int64, normalized string) ([]model.Candidate, []model.Candidate, []model.Candidate, []model.Candidate, error) {
+	provinceCandidates, err := svc.findProvinceCandidates(ctx, sourceID, normalized)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	cityCandidates, err := svc.findCityCandidates(ctx, sourceID, normalized, provinceCandidates)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	districtCandidates, err := svc.findDistrictCandidates(ctx, sourceID, normalized, cityCandidates)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	subDistrictCandidates, err := svc.findSubDistrictCandidates(ctx, sourceID, normalized, districtCandidates)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates, nil
+}
+
+func (svc *Service) findBCandidates(ctx context.Context, sourceID int64, normalized string) (
+	[]model.Candidate, []model.Candidate, []model.Candidate, []model.Candidate,
+	int64, int64, int64, int64, error,
+) {
+	bCityCandidates, bDistrictCandidates, bSubDistrictCandidates, err := svc.findCandidatesByAnyLevel(ctx, sourceID, normalized)
+	if err != nil {
+		return nil, nil, nil, nil, 0, 0, 0, 0, err
+	}
+	bProvinceCandidates, bCityCandidates, bDistrictCandidates := svc.inferProvinceCandidates(bCityCandidates, bDistrictCandidates, bSubDistrictCandidates)
+	bWinnerProvinceID, bWinnerCityID, bWinnerDistrictID, bWinnerSubDistrictID, _ := resolveWinner(
+		bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates, svc.hierarchyCache,
+	)
+	return bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates,
+		bWinnerProvinceID, bWinnerCityID, bWinnerDistrictID, bWinnerSubDistrictID, nil
+}
+
 func (svc *Service) findCandidatesByAnyLevel(ctx context.Context, sourceID int64, normalized string) ([]model.Candidate, []model.Candidate, []model.Candidate, error) {
 	if err := ensureCitiesLoaded(svc, ctx); err != nil {
 		return nil, nil, nil, err

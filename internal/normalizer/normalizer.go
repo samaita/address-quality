@@ -9,19 +9,21 @@ import (
 )
 
 var adminSet = map[string]struct{}{
-	"kabupaten": {},
-	"kab.":      {},
-	"kab":       {},
-	"kota":      {},
-	"kecamatan": {},
-	"kec.":      {},
-	"kec":       {},
-	"kelurahan": {},
-	"kel.":      {},
-	"kel":       {},
-	"provinsi":  {},
-	"prov.":     {},
-	"prov":      {},
+	"kabupaten":    {},
+	"kab.":         {},
+	"kab":          {},
+	"kota":         {},
+	"kecamatan":    {},
+	"kec.":         {},
+	"kec":          {},
+	"kelurahan":    {},
+	"kel.":         {},
+	"kel":          {},
+	"provinsi":     {},
+	"prov.":        {},
+	"prov":         {},
+	"administrasi": {},
+	"kepulauan":    {},
 }
 
 var rePunctuation = regexp.MustCompile(`[^a-zA-Z\s]`)
