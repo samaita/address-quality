@@ -66,13 +66,17 @@ type Conflict struct {
 	Message string `json:"message"`
 }
 
+type Reason string
+
 type CandidateEvaluation struct {
-	Confidence float64
-	Status     QualityStatus
-	Matched    []Component
-	Missing    []Component
-	Conflicts  []Conflict
-	Reasons    []string
+	Candidate     AdminCandidate
+	Confidence    float64
+	Status        QualityStatus
+	Matched       []Component
+	Missing       []Component
+	UnusedEvidence []Evidence
+	Conflicts     []Conflict
+	Reasons       []Reason
 }
 
 type Assessment struct {
@@ -83,8 +87,8 @@ type Assessment struct {
 }
 
 type Resolution struct {
-	Strategy       []string             `json:"strategy"`
-	CandidateCount int                  `json:"candidate_count"`
+	Strategy       []string              `json:"strategy"`
+	CandidateCount int                   `json:"candidate_count"`
 	Candidates     []ResolutionCandidate `json:"candidates"`
 }
 
@@ -116,4 +120,92 @@ type AddressResponse struct {
 	Timestamp string       `json:"timestamp"`
 	RequestID string       `json:"request_id"`
 	Data      ResponseData `json:"data"`
+}
+
+type EvidenceType string
+
+const (
+	EvidenceRoadName   EvidenceType = "road_name"
+	EvidencePlaceName  EvidenceType = "place_name"
+	EvidencePostalCode EvidenceType = "postal_code"
+)
+
+type Evidence struct {
+	Type  EvidenceType
+	Value string
+}
+
+type Entity struct {
+	ID         int64
+	Name       string
+	Level      string
+	PostalCode string
+}
+
+type ResolvedEvidence struct {
+	Evidence
+	Candidates []Entity
+}
+
+type DiscoveryStrategy string
+
+const (
+	DiscoveryTopDown  DiscoveryStrategy = "top_down"
+	DiscoveryAnyLevel DiscoveryStrategy = "any_level"
+	DiscoveryAlias    DiscoveryStrategy = "alias"
+	DiscoveryPostal   DiscoveryStrategy = "postal"
+)
+
+type MatchedEvidence struct {
+	Evidence
+	Resolved *Entity
+}
+
+type Province struct {
+	ID   int64
+	Name string
+}
+
+type City struct {
+	ID         int64
+	Name       string
+	PostalCode string
+}
+
+type District struct {
+	ID   int64
+	Name string
+}
+
+type SubDistrict struct {
+	ID         int64
+	Name       string
+	PostalCode string
+}
+
+type PostalCode struct {
+	ID    int64
+	Code  string
+	Name  string
+}
+
+type Road struct {
+	ID   int64
+	Name string
+}
+
+type AdminLocation struct {
+	Province    *Province
+	City        *City
+	District    *District
+	SubDistrict *SubDistrict
+	PostalCode  *PostalCode
+	Road        *Road
+	Conflicts   []Conflict
+}
+
+type AdminCandidate struct {
+	Location AdminLocation
+	Evidence []MatchedEvidence
+	DiscoveryStrategies []DiscoveryStrategy
 }

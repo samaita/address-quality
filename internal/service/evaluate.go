@@ -10,147 +10,227 @@ import (
 	"address-quality/internal/model"
 )
 
-type EvaluationContext struct {
-	WinnerProvinceID    int64
-	WinnerCityID        int64
-	WinnerDistrictID    int64
-	WinnerSubDistrictID int64
-	PostalCodeMatched   bool
-	InputPostalCode     string
-	ExactMatchFound     bool
-
-	HierarchyValid bool
-	Matched        []model.Component
-	Missing        []model.Component
-	Conflicts      []model.Conflict
-}
-
-type ConflictRule interface {
-	Evaluate(ctx *EvaluationContext, hierarchy *database.HierarchyMap) *model.Conflict
-}
-
-type hierarchyRule struct{}
-
-func (hierarchyRule) Evaluate(ctx *EvaluationContext, hierarchy *database.HierarchyMap) *model.Conflict {
-	if ctx.WinnerCityID > 0 && !ctx.HierarchyValid {
-		return &model.Conflict{
-			Type:    "hierarchy_conflict",
-			Message: "administrative hierarchy is invalid",
-		}
-	}
-	return nil
-}
-
-type postalCodeRule struct{}
-
-func (postalCodeRule) Evaluate(ctx *EvaluationContext, _ *database.HierarchyMap) *model.Conflict {
-	if ctx.InputPostalCode != "" && ctx.WinnerSubDistrictID > 0 && !ctx.PostalCodeMatched {
-		return &model.Conflict{
-			Type:    "postal_code_mismatch",
-			Message: "postal code does not match the resolved sub-district",
-		}
-	}
-	return nil
-}
-
-var defaultConflictRules = []ConflictRule{
-	hierarchyRule{},
-	postalCodeRule{},
-}
-
-func EvaluateCandidate(ctx *EvaluationContext, hierarchy *database.HierarchyMap) model.CandidateEvaluation {
-	evaluateHierarchy(ctx, hierarchy)
-	evaluateCompleteness(ctx)
-	detectConflicts(ctx, hierarchy, defaultConflictRules)
-	confidence := scoreConfidence(ctx)
-	status := assessQuality(ctx)
+func EvaluateCandidate(candidate *model.AdminCandidate, hierarchy *database.HierarchyMap, allEvidence []model.Evidence) model.CandidateEvaluation {
+	evaluateHierarchy(candidate, hierarchy)
+	evaluateCompleteness(candidate)
+	unused := evaluateEvidenceCoverage(candidate, allEvidence)
+	detectConflicts(candidate, hierarchy)
+	confidence := scoreConfidence(candidate)
+	status := assessQuality(candidate)
 
 	return model.CandidateEvaluation{
-		Confidence: confidence,
-		Status:     status,
-		Matched:    ctx.Matched,
-		Missing:    ctx.Missing,
-		Conflicts:  ctx.Conflicts,
+		Candidate:      *candidate,
+		Confidence:     confidence,
+		Status:         status,
+		Matched:        getMatchedComponents(candidate),
+		Missing:        getMissingComponents(candidate),
+		UnusedEvidence: unused,
+		Conflicts:      extractConflicts(candidate),
 	}
 }
 
-func evaluateHierarchy(ctx *EvaluationContext, hierarchy *database.HierarchyMap) {
+func getMatchedComponents(candidate *model.AdminCandidate) []model.Component {
+	var matched []model.Component
+	if candidate.Location.Province != nil {
+		matched = append(matched, model.ComponentProvince)
+	}
+	if candidate.Location.City != nil {
+		matched = append(matched, model.ComponentCity)
+	}
+	if candidate.Location.District != nil {
+		matched = append(matched, model.ComponentDistrict)
+	}
+	if candidate.Location.SubDistrict != nil {
+		matched = append(matched, model.ComponentSubDistrict)
+	}
+	if candidate.Location.PostalCode != nil {
+		matched = append(matched, model.ComponentPostalCode)
+	}
+	return matched
+}
+
+func getMissingComponents(candidate *model.AdminCandidate) []model.Component {
+	var missing []model.Component
+	if candidate.Location.Province == nil {
+		missing = append(missing, model.ComponentProvince)
+	}
+	if candidate.Location.City == nil {
+		missing = append(missing, model.ComponentCity)
+	}
+	if candidate.Location.District == nil {
+		missing = append(missing, model.ComponentDistrict)
+	}
+	if candidate.Location.SubDistrict == nil {
+		missing = append(missing, model.ComponentSubDistrict)
+	}
+	return missing
+}
+
+func extractConflicts(candidate *model.AdminCandidate) []model.Conflict {
+	return candidate.Location.Conflicts
+}
+
+func evaluateHierarchy(candidate *model.AdminCandidate, hierarchy *database.HierarchyMap) {
 	if hierarchy == nil {
-		ctx.HierarchyValid = ctx.WinnerCityID == 0 && ctx.WinnerDistrictID == 0 && ctx.WinnerSubDistrictID == 0
 		return
 	}
-	if ctx.WinnerCityID > 0 {
-		if hierarchy.CityToProvince[ctx.WinnerCityID] != ctx.WinnerProvinceID {
-			ctx.HierarchyValid = false
+
+	loc := &candidate.Location
+	if loc.City != nil && loc.Province != nil {
+		if hierarchy.CityToProvince[loc.City.ID] != loc.Province.ID {
+			addConflict(candidate, "hierarchy_conflict", "city does not belong to province")
 			return
 		}
 	}
-	if ctx.WinnerDistrictID > 0 {
-		if hierarchy.DistrictToCity[ctx.WinnerDistrictID] != ctx.WinnerCityID {
-			ctx.HierarchyValid = false
+	if loc.District != nil && loc.City != nil {
+		if hierarchy.DistrictToCity[loc.District.ID] != loc.City.ID {
+			addConflict(candidate, "hierarchy_conflict", "district does not belong to city")
 			return
 		}
 	}
-	if ctx.WinnerSubDistrictID > 0 {
-		if hierarchy.SubDistrictToDist[ctx.WinnerSubDistrictID] != ctx.WinnerDistrictID {
-			ctx.HierarchyValid = false
+	if loc.SubDistrict != nil && loc.District != nil {
+		if hierarchy.SubDistrictToDist[loc.SubDistrict.ID] != loc.District.ID {
+			addConflict(candidate, "hierarchy_conflict", "sub-district does not belong to district")
 			return
-		}
-	}
-	ctx.HierarchyValid = true
-}
-
-func evaluateCompleteness(ctx *EvaluationContext) {
-	ctx.Matched = nil
-	ctx.Missing = nil
-
-	check := func(id int64, comp model.Component) {
-		if id > 0 {
-			ctx.Matched = append(ctx.Matched, comp)
-		} else {
-			ctx.Missing = append(ctx.Missing, comp)
-		}
-	}
-
-	check(ctx.WinnerProvinceID, model.ComponentProvince)
-	check(ctx.WinnerCityID, model.ComponentCity)
-	check(ctx.WinnerDistrictID, model.ComponentDistrict)
-	check(ctx.WinnerSubDistrictID, model.ComponentSubDistrict)
-
-	if ctx.InputPostalCode != "" {
-		if ctx.PostalCodeMatched {
-			ctx.Matched = append(ctx.Matched, model.ComponentPostalCode)
-		} else {
-			ctx.Missing = append(ctx.Missing, model.ComponentPostalCode)
 		}
 	}
 }
 
-func detectConflicts(ctx *EvaluationContext, hierarchy *database.HierarchyMap, rules []ConflictRule) {
-	ctx.Conflicts = nil
-	for _, rule := range rules {
-		if c := rule.Evaluate(ctx, hierarchy); c != nil {
-			ctx.Conflicts = append(ctx.Conflicts, *c)
+func addConflict(candidate *model.AdminCandidate, conflictType, message string) {
+	candidate.Location.Conflicts = append(candidate.Location.Conflicts, model.Conflict{
+		Type:    conflictType,
+		Message: message,
+	})
+}
+
+func evaluateCompleteness(candidate *model.AdminCandidate) {
+}
+
+func evaluateEvidenceCoverage(candidate *model.AdminCandidate, allEvidence []model.Evidence) []model.Evidence {
+	var unused []model.Evidence
+	if len(allEvidence) == 0 {
+		return unused
+	}
+
+	matchedValues := make(map[string]bool)
+	for _, me := range candidate.Evidence {
+		matchedValues[me.Value] = true
+	}
+
+	for _, ev := range allEvidence {
+		if !matchedValues[ev.Value] {
+			unused = append(unused, ev)
+		}
+	}
+	return unused
+}
+
+func detectConflicts(candidate *model.AdminCandidate, hierarchy *database.HierarchyMap) {
+	loc := &candidate.Location
+
+	if loc.PostalCode != nil && loc.SubDistrict != nil {
+		if loc.PostalCode.ID != loc.SubDistrict.ID {
+			addConflict(candidate, "postal_code_mismatch", "postal code does not match sub-district")
+		}
+	}
+
+	levelCount := 0
+	if loc.Province != nil {
+		levelCount++
+	}
+	if loc.City != nil {
+		levelCount++
+	}
+	if loc.District != nil {
+		levelCount++
+	}
+	if loc.SubDistrict != nil {
+		levelCount++
+	}
+	if levelCount > 1 && loc.City != nil {
+		if loc.Province == nil {
+			addConflict(candidate, "orphan_city", "city resolved without province")
+		}
+	}
+
+	detectMultipleCities(candidate)
+	detectDuplicateLevel(candidate)
+}
+
+func detectMultipleCities(candidate *model.AdminCandidate) {
+	seen := make(map[int64]bool)
+	for _, me := range candidate.Evidence {
+		if me.Resolved == nil || me.Resolved.Level != "CITY" {
+			continue
+		}
+		if seen[me.Resolved.ID] {
+			continue
+		}
+		if candidate.Location.City != nil && me.Resolved.ID != candidate.Location.City.ID {
+			addConflict(candidate, "multiple_city", "multiple city candidates: "+me.Resolved.Name)
+		}
+		seen[me.Resolved.ID] = true
+	}
+}
+
+func detectDuplicateLevel(candidate *model.AdminCandidate) {
+	levels := make(map[string]int64)
+	if candidate.Location.Province != nil {
+		levels["PROVINCE"] = candidate.Location.Province.ID
+	}
+	if candidate.Location.District != nil {
+		levels["DISTRICT"] = candidate.Location.District.ID
+	}
+	if candidate.Location.SubDistrict != nil {
+		levels["SUBDISTRICT"] = candidate.Location.SubDistrict.ID
+	}
+
+	for _, me := range candidate.Evidence {
+		if me.Resolved == nil {
+			continue
+		}
+		if me.Resolved.Level == "CITY" {
+			continue
+		}
+		if existingID, ok := levels[me.Resolved.Level]; ok {
+			if existingID != me.Resolved.ID {
+				addConflict(candidate, "duplicate_level", "duplicate "+me.Resolved.Level+": "+me.Resolved.Name)
+			}
 		}
 	}
 }
 
-func scoreConfidence(ctx *EvaluationContext) float64 {
+func scoreConfidence(candidate *model.AdminCandidate) float64 {
 	var score float64
 
-	if ctx.ExactMatchFound {
+	hasExactMatch := false
+	for _, me := range candidate.Evidence {
+		if me.Resolved != nil {
+			hasExactMatch = true
+			break
+		}
+	}
+	if hasExactMatch {
 		score += WeightExactMatch
 	}
 
-	if ctx.HierarchyValid && ctx.WinnerCityID > 0 {
+	hasHierarchyConflict := false
+	for _, c := range candidate.Location.Conflicts {
+		if c.Type == "hierarchy_conflict" {
+			hasHierarchyConflict = true
+			break
+		}
+	}
+
+	if !hasHierarchyConflict && candidate.Location.City != nil {
 		score += WeightHierarchy
 	}
 
-	if ctx.PostalCodeMatched {
+	if candidate.Location.PostalCode != nil {
 		score += WeightPostalCode
 	}
 
-	if ctx.WinnerProvinceID > 0 {
+	if candidate.Location.Province != nil {
 		score += WeightProvince
 	}
 
@@ -160,33 +240,56 @@ func scoreConfidence(ctx *EvaluationContext) float64 {
 	return math.Round(score*10000) / 10000
 }
 
-func assessQuality(ctx *EvaluationContext) model.QualityStatus {
-	if len(ctx.Conflicts) > 0 {
+func assessQuality(candidate *model.AdminCandidate) model.QualityStatus {
+	if len(candidate.Location.Conflicts) > 0 {
 		return model.StatusConflict
 	}
 
-	if ctx.WinnerProvinceID == 0 {
+	hasAny := candidate.Location.Province != nil ||
+		candidate.Location.City != nil ||
+		candidate.Location.District != nil ||
+		candidate.Location.SubDistrict != nil
+
+	if !hasAny {
 		return model.StatusUnknown
 	}
 
-	for _, m := range ctx.Missing {
-		if m != model.ComponentPostalCode {
-			return model.StatusIncomplete
-		}
+	if candidate.Location.Province == nil ||
+		candidate.Location.City == nil ||
+		candidate.Location.District == nil {
+		return model.StatusIncomplete
 	}
 
 	return model.StatusValid
 }
 
-func BuildExplainability(ctx *EvaluationContext) []string {
-	var reasons []string
+func BuildReasons(candidate *model.AdminCandidate) []model.Reason {
+	var reasons []model.Reason
 
-	if ctx.ExactMatchFound {
-		reasons = append(reasons, "exact_match")
+	hasExactMatch := false
+	for _, me := range candidate.Evidence {
+		if me.Resolved != nil {
+			hasExactMatch = true
+			break
+		}
+	}
+	if hasExactMatch {
+		reasons = append(reasons, model.Reason("exact_match"))
 	}
 
-	if ctx.HierarchyValid {
-		reasons = append(reasons, "hierarchy_validation")
+	hasHierarchyConflict := false
+	for _, c := range candidate.Location.Conflicts {
+		if c.Type == "hierarchy_conflict" {
+			hasHierarchyConflict = true
+			break
+		}
+	}
+	if !hasHierarchyConflict {
+		reasons = append(reasons, model.Reason("hierarchy_validation"))
+	}
+
+	for _, strategy := range candidate.DiscoveryStrategies {
+		reasons = append(reasons, model.Reason("strategy_"+string(strategy)))
 	}
 
 	return reasons
