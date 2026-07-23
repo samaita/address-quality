@@ -54,10 +54,30 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	inputPostalCode := extractPostalCode(normalized)
 
 	postalA := postalCodeMatches(subCands, subID, inputPostalCode)
-	evalA := EvaluateCandidate(provinceCands, cityCands, districtCands, subCands, provID, cityID, distID, subID, postalA, inputPostalCode, svc.hierarchyCache)
+	ctxA := &EvaluationContext{
+		WinnerProvinceID:    provID,
+		WinnerCityID:        cityID,
+		WinnerDistrictID:    distID,
+		WinnerSubDistrictID: subID,
+		PostalCodeMatched:   postalA,
+		InputPostalCode:     inputPostalCode,
+		ExactMatchFound:     hasExactMatch(provinceCands, cityCands, districtCands, subCands),
+	}
+	evalA := EvaluateCandidate(ctxA, svc.hierarchyCache)
+	evalA.Reasons = BuildExplainability(ctxA)
 
 	postalB := postalCodeMatches(bSubCands, bSubID, inputPostalCode)
-	evalB := EvaluateCandidate(bProvCands, bCityCands, bDistCands, bSubCands, bProvID, bCityID, bDistID, bSubID, postalB, inputPostalCode, svc.hierarchyCache)
+	ctxB := &EvaluationContext{
+		WinnerProvinceID:    bProvID,
+		WinnerCityID:        bCityID,
+		WinnerDistrictID:    bDistID,
+		WinnerSubDistrictID: bSubID,
+		PostalCodeMatched:   postalB,
+		InputPostalCode:     inputPostalCode,
+		ExactMatchFound:     hasExactMatch(bProvCands, bCityCands, bDistCands, bSubCands),
+	}
+	evalB := EvaluateCandidate(ctxB, svc.hierarchyCache)
+	evalB.Reasons = BuildExplainability(ctxB)
 
 	useB := evalB.Confidence > evalA.Confidence && len(bProvCands) > 0
 	if useB {
@@ -66,7 +86,17 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 
 	postalMatched := postalCodeMatches(subCands, subID, inputPostalCode)
-	eval := EvaluateCandidate(provinceCands, cityCands, districtCands, subCands, provID, cityID, distID, subID, postalMatched, inputPostalCode, svc.hierarchyCache)
+	evalCtx := &EvaluationContext{
+		WinnerProvinceID:    provID,
+		WinnerCityID:        cityID,
+		WinnerDistrictID:    distID,
+		WinnerSubDistrictID: subID,
+		PostalCodeMatched:   postalMatched,
+		InputPostalCode:     inputPostalCode,
+		ExactMatchFound:     hasExactMatch(provinceCands, cityCands, districtCands, subCands),
+	}
+	eval := EvaluateCandidate(evalCtx, svc.hierarchyCache)
+	eval.Reasons = BuildExplainability(evalCtx)
 
 	location := resolveLocation(provinceCands, cityCands, districtCands, subCands, provID, cityID, distID, subID)
 
