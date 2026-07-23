@@ -37,27 +37,9 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		return nil, err
 	}
 
-	provinceCandidates, err := svc.findProvinceCandidates(ctx, sourceID, normalized)
+	provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates, err := svc.findCandidatesByLevels(ctx, sourceID, normalized)
 	if err != nil {
-		log.Error().Err(err).Msg("find province candidates")
-		return nil, err
-	}
-
-	cityCandidates, err := svc.findCityCandidates(ctx, sourceID, normalized, provinceCandidates)
-	if err != nil {
-		log.Error().Err(err).Msg("find city candidates")
-		return nil, err
-	}
-
-	districtCandidates, err := svc.findDistrictCandidates(ctx, sourceID, normalized, cityCandidates)
-	if err != nil {
-		log.Error().Err(err).Msg("find district candidates")
-		return nil, err
-	}
-
-	subDistrictCandidates, err := svc.findSubDistrictCandidates(ctx, sourceID, normalized, districtCandidates)
-	if err != nil {
-		log.Error().Err(err).Msg("find subdistrict candidates")
+		log.Error().Err(err).Msg("find candidates by levels")
 		return nil, err
 	}
 
@@ -65,17 +47,12 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		provinceCandidates, cityCandidates, districtCandidates, subDistrictCandidates, svc.hierarchyCache,
 	)
 
-	bCityCandidates, bDistrictCandidates, bSubDistrictCandidates, err := svc.findCandidatesByAnyLevel(ctx, sourceID, normalized)
+	bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates,
+		bWinnerProvinceID, bWinnerCityID, bWinnerDistrictID, bWinnerSubDistrictID, err := svc.findBCandidates(ctx, sourceID, normalized)
 	if err != nil {
-		log.Error().Err(err).Msg("find candidates by any level")
+		log.Error().Err(err).Msg("find B candidates")
 		return nil, err
 	}
-
-	bProvinceCandidates, bCityCandidates, bDistrictCandidates := svc.inferProvinceCandidates(bCityCandidates, bDistrictCandidates, bSubDistrictCandidates)
-
-	bWinnerProvinceID, bWinnerCityID, bWinnerDistrictID, bWinnerSubDistrictID, _ := resolveWinner(
-		bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates, svc.hierarchyCache,
-	)
 
 	confB := calculateConfidence(
 		bProvinceCandidates, bCityCandidates, bDistrictCandidates, bSubDistrictCandidates,
