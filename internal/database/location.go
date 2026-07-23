@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Samaita
+// Copyright (c) 2026 Samaita
 
 package database
 
@@ -562,11 +562,11 @@ type HierarchyRow struct {
 }
 
 type HierarchyMap struct {
-	ProvinceChildren map[int64][]int64
-	CityChildren     map[int64][]int64
-	DistrictChildren map[int64][]int64
-	CityToProvince   map[int64]int64
-	DistrictToCity   map[int64]int64
+	ProvinceChildren  map[int64][]int64
+	CityChildren      map[int64][]int64
+	DistrictChildren  map[int64][]int64
+	CityToProvince    map[int64]int64
+	DistrictToCity    map[int64]int64
 	SubDistrictToDist map[int64]int64
 }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Samaita
+// Copyright (c) 2026 Samaita
 
 package logger
 
@@ -59,34 +59,34 @@ type EchoLogger struct{}
 
 func NewEchoLogger() EchoLogger { return EchoLogger{} }
 
-func (l EchoLogger) Output() io.Writer                   { return os.Stdout }
-func (l EchoLogger) SetOutput(w io.Writer)                 {}
-func (l EchoLogger) Prefix() string                        { return "" }
-func (l EchoLogger) SetPrefix(p string)                    {}
-func (l EchoLogger) Level() log.Lvl                { return 0 }
-func (l EchoLogger) SetLevel(v log.Lvl)            {}
-func (l EchoLogger) SetHeader(h string)                    {}
-func (l EchoLogger) Print(i ...interface{})                { L.Info().Msg(fmt.Sprint(i...)) }
+func (l EchoLogger) Output() io.Writer                         { return os.Stdout }
+func (l EchoLogger) SetOutput(w io.Writer)                     {}
+func (l EchoLogger) Prefix() string                            { return "" }
+func (l EchoLogger) SetPrefix(p string)                        {}
+func (l EchoLogger) Level() log.Lvl                            { return 0 }
+func (l EchoLogger) SetLevel(v log.Lvl)                        {}
+func (l EchoLogger) SetHeader(h string)                        {}
+func (l EchoLogger) Print(i ...interface{})                    { L.Info().Msg(fmt.Sprint(i...)) }
 func (l EchoLogger) Printf(format string, args ...interface{}) { L.Info().Msgf(format, args...) }
-func (l EchoLogger) Printj(j log.JSON)               { L.Info().Interface("json", j).Msg("") }
-func (l EchoLogger) Debug(i ...interface{})                { L.Debug().Msg(fmt.Sprint(i...)) }
+func (l EchoLogger) Printj(j log.JSON)                         { L.Info().Interface("json", j).Msg("") }
+func (l EchoLogger) Debug(i ...interface{})                    { L.Debug().Msg(fmt.Sprint(i...)) }
 func (l EchoLogger) Debugf(format string, args ...interface{}) { L.Debug().Msgf(format, args...) }
-func (l EchoLogger) Debugj(j log.JSON)               { L.Debug().Interface("json", j).Msg("") }
-func (l EchoLogger) Info(i ...interface{})                 { L.Info().Msg(fmt.Sprint(i...)) }
+func (l EchoLogger) Debugj(j log.JSON)                         { L.Debug().Interface("json", j).Msg("") }
+func (l EchoLogger) Info(i ...interface{})                     { L.Info().Msg(fmt.Sprint(i...)) }
 func (l EchoLogger) Infof(format string, args ...interface{})  { L.Info().Msgf(format, args...) }
-func (l EchoLogger) Infoj(j log.JSON)                { L.Info().Interface("json", j).Msg("") }
-func (l EchoLogger) Warn(i ...interface{})                 { L.Warn().Msg(fmt.Sprint(i...)) }
+func (l EchoLogger) Infoj(j log.JSON)                          { L.Info().Interface("json", j).Msg("") }
+func (l EchoLogger) Warn(i ...interface{})                     { L.Warn().Msg(fmt.Sprint(i...)) }
 func (l EchoLogger) Warnf(format string, args ...interface{})  { L.Warn().Msgf(format, args...) }
-func (l EchoLogger) Warnj(j log.JSON)                { L.Warn().Interface("json", j).Msg("") }
-func (l EchoLogger) Error(i ...interface{})                { L.Error().Msg(fmt.Sprint(i...)) }
+func (l EchoLogger) Warnj(j log.JSON)                          { L.Warn().Interface("json", j).Msg("") }
+func (l EchoLogger) Error(i ...interface{})                    { L.Error().Msg(fmt.Sprint(i...)) }
 func (l EchoLogger) Errorf(format string, args ...interface{}) { L.Error().Msgf(format, args...) }
-func (l EchoLogger) Errorj(j log.JSON)               { L.Error().Interface("json", j).Msg("") }
-func (l EchoLogger) Fatal(i ...interface{})                { L.Fatal().Msg(fmt.Sprint(i...)) }
+func (l EchoLogger) Errorj(j log.JSON)                         { L.Error().Interface("json", j).Msg("") }
+func (l EchoLogger) Fatal(i ...interface{})                    { L.Fatal().Msg(fmt.Sprint(i...)) }
 func (l EchoLogger) Fatalf(format string, args ...interface{}) { L.Fatal().Msgf(format, args...) }
-func (l EchoLogger) Fatalj(j log.JSON)               { L.Fatal().Interface("json", j).Msg("") }
-func (l EchoLogger) Panic(i ...interface{})                { L.Panic().Msg(fmt.Sprint(i...)) }
+func (l EchoLogger) Fatalj(j log.JSON)                         { L.Fatal().Interface("json", j).Msg("") }
+func (l EchoLogger) Panic(i ...interface{})                    { L.Panic().Msg(fmt.Sprint(i...)) }
 func (l EchoLogger) Panicf(format string, args ...interface{}) { L.Panic().Msgf(format, args...) }
-func (l EchoLogger) Panicj(j log.JSON)               { L.Panic().Interface("json", j).Msg("") }
+func (l EchoLogger) Panicj(j log.JSON)                         { L.Panic().Interface("json", j).Msg("") }
 
 func EchoMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {

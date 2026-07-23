@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Samaita
+// Copyright (c) 2026 Samaita
 
 package service
 
@@ -48,9 +48,9 @@ type cityEntry struct {
 }
 
 type districtEntry struct {
-	ID         int64
-	Name       string
-	Kode       string
+	ID   int64
+	Name string
+	Kode string
 }
 
 type subDistrictEntry struct {
@@ -67,9 +67,9 @@ type Service struct {
 	maxAddressLength int
 	sourceCode       string
 
-	provinceCache      map[string][]*provinceEntry
-	provinceOnce       sync.Once
-	provinceErr        error
+	provinceCache       map[string][]*provinceEntry
+	provinceOnce        sync.Once
+	provinceErr         error
 	provinceKodeToEntry map[string]*provinceEntry
 
 	cityCache        map[string][]*cityEntry
