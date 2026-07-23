@@ -16,6 +16,7 @@ func EvaluateCandidate(candidate *model.AdminCandidate, hierarchy *database.Hier
 	unused := evaluateEvidenceCoverage(candidate, allEvidence)
 	detectConflicts(candidate, hierarchy)
 	confidence := scoreConfidence(candidate)
+
 	status := assessQuality(candidate)
 
 	return model.CandidateEvaluation{
@@ -233,11 +234,60 @@ func scoreConfidence(candidate *model.AdminCandidate) float64 {
 	if candidate.Location.Province != nil {
 		score += WeightProvince
 	}
+	if candidate.Location.City != nil {
+		score += WeightCity
+	}
+	if candidate.Location.District != nil {
+		score += WeightDistrict
+	}
+	if candidate.Location.SubDistrict != nil {
+		score += WeightSubDistrict
+	}
+
+	score += multiEvidenceBonus(candidate)
 
 	if score > 1.0 {
 		score = 1.0
 	}
 	return math.Round(score*10000) / 10000
+}
+
+func multiEvidenceBonus(candidate *model.AdminCandidate) float64 {
+	counts := make(map[int64]int)
+	levelOfID := make(map[int64]string)
+	for _, me := range candidate.Evidence {
+		if me.Resolved == nil {
+			continue
+		}
+		counts[me.Resolved.ID]++
+		levelOfID[me.Resolved.ID] = me.Resolved.Level
+	}
+
+	var bonus float64
+	for id, cnt := range counts {
+		if cnt < 2 {
+			continue
+		}
+		var w float64
+		switch levelOfID[id] {
+		case "PROVINCE":
+			w = WeightMultiProvince
+		case "CITY":
+			w = WeightMultiCity
+		case "DISTRICT":
+			w = WeightMultiDistrict
+		case "SUBDISTRICT":
+			w = WeightMultiSubDistrict
+		default:
+			continue
+		}
+		bonus += w
+	}
+
+	if bonus > MaxMultiEvidenceBonus {
+		bonus = MaxMultiEvidenceBonus
+	}
+	return math.Round(bonus*10000) / 10000
 }
 
 func assessQuality(candidate *model.AdminCandidate) model.QualityStatus {

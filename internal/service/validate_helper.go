@@ -58,6 +58,7 @@ func (svc *Service) loadProvinces(ctx context.Context) {
 	}
 	cache := make(map[string][]*provinceEntry)
 	kodeToEntry := make(map[string]*provinceEntry)
+	idToEntry := make(map[int64]*provinceEntry)
 	for _, r := range rows {
 		entry := &provinceEntry{ID: r.ID, Name: r.Name, Kode: r.Kode}
 		normalizedKey := normalizer.Normalize(r.Name)
@@ -65,9 +66,11 @@ func (svc *Service) loadProvinces(ctx context.Context) {
 		cache[key] = append(cache[key], entry)
 		kodeKey := fmt.Sprintf("%d:%s", r.SourceID, r.Kode)
 		kodeToEntry[kodeKey] = entry
+		idToEntry[r.ID] = entry
 	}
 	svc.provinceCache = cache
 	svc.provinceKodeToEntry = kodeToEntry
+	svc.provinceByID = idToEntry
 }
 
 func (svc *Service) loadCities(ctx context.Context) {
@@ -77,17 +80,21 @@ func (svc *Service) loadCities(ctx context.Context) {
 		return
 	}
 	cache := make(map[string][]*cityEntry)
+	idToEntry := make(map[int64]*cityEntry)
 	for _, r := range rows {
-		normalizedKey := normalizer.Normalize(r.Name)
-		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
-		cache[key] = append(cache[key], &cityEntry{
+		entry := &cityEntry{
 			ID:         r.ID,
 			Name:       r.Name,
 			Kode:       r.Kode,
 			PostalCode: r.PostalCode,
-		})
+		}
+		normalizedKey := normalizer.Normalize(r.Name)
+		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
+		cache[key] = append(cache[key], entry)
+		idToEntry[r.ID] = entry
 	}
 	svc.cityCache = cache
+	svc.cityByID = idToEntry
 }
 
 func (svc *Service) loadCityProvinceMapping(ctx context.Context, sourceID int64) {
@@ -106,16 +113,20 @@ func (svc *Service) loadDistricts(ctx context.Context, sourceID int64) {
 		return
 	}
 	cache := make(map[string][]*districtEntry)
+	idToEntry := make(map[int64]*districtEntry)
 	for _, r := range rows {
-		normalizedKey := normalizer.Normalize(r.Name)
-		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
-		cache[key] = append(cache[key], &districtEntry{
+		entry := &districtEntry{
 			ID:   r.ID,
 			Name: r.Name,
 			Kode: r.Kode,
-		})
+		}
+		normalizedKey := normalizer.Normalize(r.Name)
+		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
+		cache[key] = append(cache[key], entry)
+		idToEntry[r.ID] = entry
 	}
 	svc.districtCache = cache
+	svc.districtByID = idToEntry
 }
 
 func (svc *Service) loadSubDistricts(ctx context.Context, sourceID int64) {
@@ -125,17 +136,21 @@ func (svc *Service) loadSubDistricts(ctx context.Context, sourceID int64) {
 		return
 	}
 	cache := make(map[string][]*subDistrictEntry)
+	idToEntry := make(map[int64]*subDistrictEntry)
 	for _, r := range rows {
-		normalizedKey := normalizer.Normalize(r.Name)
-		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
-		cache[key] = append(cache[key], &subDistrictEntry{
+		entry := &subDistrictEntry{
 			ID:         r.ID,
 			Name:       r.Name,
 			Kode:       r.Kode,
 			PostalCode: r.PostalCode,
-		})
+		}
+		normalizedKey := normalizer.Normalize(r.Name)
+		key := fmt.Sprintf("%d:%s", r.SourceID, normalizedKey)
+		cache[key] = append(cache[key], entry)
+		idToEntry[r.ID] = entry
 	}
 	svc.subDistrictCache = cache
+	svc.subDistrictByID = idToEntry
 }
 
 func (svc *Service) loadHierarchy(ctx context.Context, sourceID int64) {

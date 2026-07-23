@@ -267,31 +267,31 @@ func TestScoreConfidence(t *testing.T) {
 			provID: 1, cityID: 2, postalID: 3,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
 			conflicts: nil,
-			want:     1.0,
+			want:     0.92,
 		},
 		{
 			name:     "exact match only",
 			provID: 0, cityID: 0, postalID: 0,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
-			want:     0.40,
+			want:     0.25,
 		},
 		{
 			name:     "hierarchy only (city without conflict)",
 			provID: 0, cityID: 2, postalID: 0,
 			evidence: nil,
-			want:     0.30,
+			want:     0.27,
 		},
 		{
 			name:     "postal code only",
 			provID: 0, cityID: 0, postalID: 3,
 			evidence: nil,
-			want:     0.20,
+			want:     0.25,
 		},
 		{
 			name:     "province only",
 			provID: 1, cityID: 0, postalID: 0,
 			evidence: nil,
-			want:     0.10,
+			want:     0.15,
 		},
 		{
 			name:     "no signals",
@@ -303,20 +303,20 @@ func TestScoreConfidence(t *testing.T) {
 			name:     "exact + hierarchy",
 			provID: 0, cityID: 2, postalID: 0,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
-			want:     0.70,
+			want:     0.52,
 		},
 		{
 			name:     "exact + province",
 			provID: 1, cityID: 0, postalID: 0,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
-			want:     0.50,
+			want:     0.40,
 		},
 		{
 			name:     "hierarchy conflict blocks hierarchy weight",
 			provID: 1, cityID: 2, postalID: 0,
 			evidence: nil,
 			conflicts: []model.Conflict{{Type: "hierarchy_conflict"}},
-			want:     0.10,
+			want:     0.27,
 		},
 	}
 
@@ -607,5 +607,157 @@ func TestDuplicateLevelConflict(t *testing.T) {
 	}
 	if len(candidate.Location.Conflicts) > 0 && candidate.Location.Conflicts[0].Type != "duplicate_level" {
 		t.Errorf("expected type 'duplicate_level', got %q", candidate.Location.Conflicts[0].Type)
+	}
+}
+
+func TestMultiEvidenceBonus(t *testing.T) {
+	tests := []struct {
+		name     string
+		evidence []model.MatchedEvidence
+		want     float64
+	}{
+		{
+			name: "single city evidence no bonus",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+			},
+			want: 0,
+		},
+		{
+			name: "two city evidence same entity",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+			},
+			want: 0.15,
+		},
+		{
+			name: "three city evidence same entity capped",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+			},
+			want: 0.15,
+		},
+		{
+			name: "province + city both redundant",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
+				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+			},
+			want: 0.35,
+		},
+		{
+			name: "district redundant",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 789, Level: "DISTRICT"}},
+				{Resolved: &model.Entity{ID: 789, Level: "DISTRICT"}},
+			},
+			want: 0.10,
+		},
+		{
+			name: "subdistrict redundant",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 456, Level: "SUBDISTRICT"}},
+				{Resolved: &model.Entity{ID: 456, Level: "SUBDISTRICT"}},
+			},
+			want: 0.05,
+		},
+		{
+			name: "all levels redundant capped at max",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
+				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 789, Level: "DISTRICT"}},
+				{Resolved: &model.Entity{ID: 789, Level: "DISTRICT"}},
+			},
+			want: 0.40,
+		},
+		{
+			name: "different cities no bonus",
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 456, Level: "CITY"}},
+			},
+			want: 0,
+		},
+		{
+			name: "no resolved evidence",
+			evidence: []model.MatchedEvidence{
+				{Resolved: nil},
+				{Resolved: nil},
+			},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidate := &model.AdminCandidate{Evidence: tt.evidence}
+			got := multiEvidenceBonus(candidate)
+			if got != tt.want {
+				t.Errorf("multiEvidenceBonus = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestScoreConfidence_MultiEvidenceIntegration(t *testing.T) {
+	tests := []struct {
+		name      string
+		provID    int64
+		cityID    int64
+		postalID  int64
+		evidence  []model.MatchedEvidence
+		conflicts []model.Conflict
+		want      float64
+	}{
+		{
+			name:   "exact + hierarchy + province + city redundancy",
+			provID: 1, cityID: 123, postalID: 0,
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
+			},
+			want: 0.82,
+		},
+		{
+			name:   "province redundancy with other signals",
+			provID: 1, cityID: 123, postalID: 0,
+			evidence: []model.MatchedEvidence{
+				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
+				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
+			},
+			want: 0.87,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidate := &model.AdminCandidate{
+				Location: model.AdminLocation{},
+				Evidence: tt.evidence,
+			}
+			if tt.provID > 0 {
+				candidate.Location.Province = &model.Province{ID: tt.provID}
+			}
+			if tt.cityID > 0 {
+				candidate.Location.City = &model.City{ID: tt.cityID}
+			}
+			if tt.postalID > 0 {
+				candidate.Location.PostalCode = &model.PostalCode{ID: tt.postalID}
+			}
+			candidate.Location.Conflicts = tt.conflicts
+
+			got := scoreConfidence(candidate)
+			if got != tt.want {
+				t.Errorf("scoreConfidence = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

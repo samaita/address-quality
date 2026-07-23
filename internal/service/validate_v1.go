@@ -51,8 +51,12 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	log.Debug().Int("resolved_count", len(resolved)).Msg("entity resolution")
 
 	candidates := svc.DiscoverCandidates(resolved, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
+	candidates = BuildConclusions(candidates, svc.hierarchyCache)
 	candidates = DeduplicateCandidates(candidates)
-	log.Debug().Int("candidate_count", len(candidates)).Msg("candidate discovery")
+	candidates = svc.EnrichCandidates(candidates)
+	candidates = DeduplicateCandidates(candidates)
+
+	log.Debug().Int("candidate_count", len(candidates)).Msgf("candidate discovery: %+v", candidates)
 
 	var scored []scoredCandidate
 	for _, c := range candidates {
@@ -63,6 +67,11 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	sort.Slice(scored, func(i, j int) bool {
 		if scored[i].eval.Confidence != scored[j].eval.Confidence {
 			return scored[i].eval.Confidence > scored[j].eval.Confidence
+		}
+		iCount := countNonNil(scored[i].candidate.Location)
+		jCount := countNonNil(scored[j].candidate.Location)
+		if iCount != jCount {
+			return iCount > jCount
 		}
 		return len(scored[i].eval.Conflicts) < len(scored[j].eval.Conflicts)
 	})
