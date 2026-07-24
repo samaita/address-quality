@@ -182,8 +182,8 @@ async function main() {
     const escapedAddress = row.address.replace(/\n/g, ' ');
     const result = await postRequest(escapedAddress, SOURCE);
     if (result.ok) {
-      const q = result.data.quality;
-      const loc = q.location || {};
+      const q = result.data.data;
+      const loc = q.location;
       const outputProvince = (loc.province || '').trim();
       const outputCity = (loc.city || '').trim();
       const outputDistrict = (loc.district || '').trim();
@@ -197,7 +197,7 @@ async function main() {
       outRows.push({
         source: SOURCE,
         raw_address: row.address,
-        quality: result.data.quality,
+        quality: result.data.data,
         comparison: {
           actual_province: row.actualProvince,
           actual_city: row.actualCity,
