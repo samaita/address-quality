@@ -4,9 +4,9 @@
 package service
 
 const (
-	WeightExactMatch       = 0.25
+	WeightExactMatch       = 0.10
 	WeightHierarchy        = 0.15
-	WeightPostalCode       = 0.25
+	WeightPostalCode       = 0.05
 	WeightProvince         = 0.15
 	WeightCity             = 0.12
 	WeightDistrict         = 0.08

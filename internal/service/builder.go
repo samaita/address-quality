@@ -32,7 +32,6 @@ func (svc *Service) DiscoverCandidates(resolved []model.ResolvedEvidence, strate
 
 	for i := range candidates {
 		candidates[i].DiscoveryStrategies = strategies
-		candidates[i].Evidence = matchEvidenceToCandidate(&candidates[i], resolved)
 	}
 
 	return candidates
@@ -173,12 +172,10 @@ func countNonNil(loc model.AdminLocation) int {
 
 func matchEvidenceToCandidate(candidate *model.AdminCandidate, resolved []model.ResolvedEvidence) []model.MatchedEvidence {
 	var matched []model.MatchedEvidence
-	seenEntity := make(map[int64]bool)
 
 	for _, re := range resolved {
 		for _, entity := range re.Candidates {
-			if entityInCandidate(candidate, entity) && !seenEntity[entity.ID] {
-				seenEntity[entity.ID] = true
+			if entityInCandidate(candidate, entity) {
 				e := entity
 				matched = append(matched, model.MatchedEvidence{
 					Evidence: re.Evidence,
