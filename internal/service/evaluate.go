@@ -357,17 +357,6 @@ func BuildReasons(candidate *model.AdminCandidate) []model.Reason {
 		reasons = append(reasons, model.Reason("exact_match"))
 	}
 
-	hasHierarchyConflict := false
-	for _, c := range candidate.Location.Conflicts {
-		if c.Type == "hierarchy_conflict" {
-			hasHierarchyConflict = true
-			break
-		}
-	}
-	if !hasHierarchyConflict {
-		reasons = append(reasons, model.Reason("hierarchy_validation"))
-	}
-
 	matched := getMatchedLevels(candidate)
 	if matched["PROVINCE"] {
 		reasons = append(reasons, model.Reason("match_province"))
@@ -380,10 +369,6 @@ func BuildReasons(candidate *model.AdminCandidate) []model.Reason {
 	}
 	if matched["SUBDISTRICT"] {
 		reasons = append(reasons, model.Reason("match_subdistrict"))
-	}
-
-	for _, strategy := range candidate.DiscoveryStrategies {
-		reasons = append(reasons, model.Reason("strategy_"+string(strategy)))
 	}
 
 	return reasons
