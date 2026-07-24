@@ -43,18 +43,6 @@ func Warn() *zerolog.Event  { return L.Warn() }
 func Error() *zerolog.Event { return L.Error() }
 func Fatal() *zerolog.Event { return L.Fatal() }
 
-func Ctx(ctx interface{}) *zerolog.Logger {
-	var reqID string
-	switch c := ctx.(type) {
-	case echo.Context:
-		reqID = mw.GetRequestID(c.Request().Context())
-	default:
-		return &L
-	}
-	logger := L.With().Str("request_id", reqID).Logger()
-	return &logger
-}
-
 type EchoLogger struct{}
 
 func NewEchoLogger() EchoLogger { return EchoLogger{} }
