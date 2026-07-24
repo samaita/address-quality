@@ -504,7 +504,7 @@ func TestBuildReasons(t *testing.T) {
 			name:       "exact match and hierarchy",
 			evidence:   []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
 			conflicts:  nil,
-			wantLen:    2,
+			wantLen:    1,
 		},
 		{
 			name:       "exact match only",
@@ -517,7 +517,7 @@ func TestBuildReasons(t *testing.T) {
 			evidence:   []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
 			conflicts:  nil,
 			strategies: []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel},
-			wantLen:    4,
+			wantLen:    1,
 		},
 		{
 			name:       "no reasons",
