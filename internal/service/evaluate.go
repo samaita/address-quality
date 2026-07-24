@@ -27,6 +27,7 @@ func EvaluateCandidate(candidate *model.AdminCandidate, hierarchy *database.Hier
 		Missing:        getMissingComponents(candidate),
 		UnusedEvidence: unused,
 		Conflicts:      extractConflicts(candidate),
+		Reasons:        BuildReasons(candidate),
 	}
 }
 
