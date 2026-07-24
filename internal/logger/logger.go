@@ -104,6 +104,7 @@ func EchoMiddleware() echo.MiddlewareFunc {
 				Int64("bytes_in", req.ContentLength).
 				Int64("bytes_out", res.Size).
 				Dur("latency", stop.Sub(start)).
+				Str("latency_human", stop.Sub(start).Round(time.Millisecond).String()).
 				Msg("")
 
 			return err
