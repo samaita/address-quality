@@ -26,12 +26,35 @@ export default function () {
     const payload = JSON.stringify({ address: 'Jl. Merdeka No.1, Jakarta Pusat 10110' });
     const headers = { 'Content-Type': 'application/json' };
     const res = http.post(`${BASE_URL}/v1/validate`, payload, { headers });
+    const body = res.json();
     check(res, {
       'status is 200': (r) => r.status === 200,
-      'request_id is present': (r) => r.json().request_id !== '',
-      'address_id is present': (r) => r.json().quality.address_id !== '',
-      'confidence is 0.0': (r) => r.json().quality.confidence === 0.0,
-      'raw_input matches': (r) => r.json().quality.raw_input === 'Jl. Merdeka No.1, Jakarta Pusat 10110',
+      'request_id is present': (r) => body.request_id !== '',
+      'timestamp is present': (r) => body.timestamp !== '',
+      'data.address_id is present': (r) => body.data.address_id !== '',
+      'data.status is known': (r) => ['VALID','INCOMPLETE','AMBIGUOUS','CONFLICT','UNKNOWN'].includes(body.data.status),
+      'data.confidence is a number': (r) => typeof body.data.confidence === 'number',
+      'data.raw_input matches': (r) => body.data.raw_input === 'Jl. Merdeka No.1, Jakarta Pusat 10110',
+      'data.normalized_input is present': (r) => body.data.normalized_input !== '',
+      'data.formatted_address is present': (r) => body.data.formatted_address !== '',
+      'data.location has fields': (r) =>
+        'province' in body.data.location &&
+        'city' in body.data.location &&
+        'district' in body.data.location &&
+        'sub_district' in body.data.location &&
+        'postal_code' in body.data.location,
+      'data.assessment has matched/missing/conflicts/ambiguous': (r) =>
+        Array.isArray(body.data.assessment.matched) &&
+        Array.isArray(body.data.assessment.missing) &&
+        (body.data.assessment.conflicts === null || Array.isArray(body.data.assessment.conflicts)) &&
+        Array.isArray(body.data.assessment.ambiguous),
+      'data.resolution has strategy/candidate_count/candidates': (r) =>
+        Array.isArray(body.data.resolution.strategy) &&
+        typeof body.data.resolution.candidate_count === 'number' &&
+        Array.isArray(body.data.resolution.candidates),
+      'data.metadata has location_source and location_version': (r) =>
+        body.data.metadata.location_source !== '' &&
+        body.data.metadata.location_version !== '',
     });
   });
 
@@ -39,10 +62,12 @@ export default function () {
     const payload = JSON.stringify({ address: '<script>alert(1)</script>Jl. Sudirman' });
     const headers = { 'Content-Type': 'application/json' };
     const res = http.post(`${BASE_URL}/v1/validate`, payload, { headers });
+    const body = res.json();
     check(res, {
       'status is 200': (r) => r.status === 200,
-      'script tags stripped': (r) => !r.json().quality.normalized_input.includes('<script>'),
-      'text preserved': (r) => r.json().quality.normalized_input.toLowerCase().includes('sudirman'),
+      'script tags stripped': (r) => !body.data.normalized_input.includes('<script>'),
+      'text preserved': (r) => body.data.normalized_input.toLowerCase().includes('sudirman'),
+      'data.status is present': (r) => body.data.status !== '',
     });
   });
 
