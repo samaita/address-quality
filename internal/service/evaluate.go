@@ -201,6 +201,34 @@ func detectDuplicateLevel(candidate *model.AdminCandidate) {
 	}
 }
 
+func getMatchedLevels(candidate *model.AdminCandidate) map[string]bool {
+	levels := make(map[string]bool)
+	for _, me := range candidate.Evidence {
+		if me.Resolved == nil {
+			continue
+		}
+		switch me.Resolved.Level {
+		case "PROVINCE":
+			if candidate.Location.Province != nil && candidate.Location.Province.ID == me.Resolved.ID {
+				levels["PROVINCE"] = true
+			}
+		case "CITY":
+			if candidate.Location.City != nil && candidate.Location.City.ID == me.Resolved.ID {
+				levels["CITY"] = true
+			}
+		case "DISTRICT":
+			if candidate.Location.District != nil && candidate.Location.District.ID == me.Resolved.ID {
+				levels["DISTRICT"] = true
+			}
+		case "SUBDISTRICT":
+			if candidate.Location.SubDistrict != nil && candidate.Location.SubDistrict.ID == me.Resolved.ID {
+				levels["SUBDISTRICT"] = true
+			}
+		}
+	}
+	return levels
+}
+
 func scoreConfidence(candidate *model.AdminCandidate) float64 {
 	var score float64
 
@@ -231,16 +259,17 @@ func scoreConfidence(candidate *model.AdminCandidate) float64 {
 		score += WeightPostalCode
 	}
 
-	if candidate.Location.Province != nil {
+	matched := getMatchedLevels(candidate)
+	if matched["PROVINCE"] {
 		score += WeightProvince
 	}
-	if candidate.Location.City != nil {
+	if matched["CITY"] {
 		score += WeightCity
 	}
-	if candidate.Location.District != nil {
+	if matched["DISTRICT"] {
 		score += WeightDistrict
 	}
-	if candidate.Location.SubDistrict != nil {
+	if matched["SUBDISTRICT"] {
 		score += WeightSubDistrict
 	}
 
@@ -336,6 +365,20 @@ func BuildReasons(candidate *model.AdminCandidate) []model.Reason {
 	}
 	if !hasHierarchyConflict {
 		reasons = append(reasons, model.Reason("hierarchy_validation"))
+	}
+
+	matched := getMatchedLevels(candidate)
+	if matched["PROVINCE"] {
+		reasons = append(reasons, model.Reason("match_province"))
+	}
+	if matched["CITY"] {
+		reasons = append(reasons, model.Reason("match_city"))
+	}
+	if matched["DISTRICT"] {
+		reasons = append(reasons, model.Reason("match_district"))
+	}
+	if matched["SUBDISTRICT"] {
+		reasons = append(reasons, model.Reason("match_subdistrict"))
 	}
 
 	for _, strategy := range candidate.DiscoveryStrategies {

@@ -267,31 +267,31 @@ func TestScoreConfidence(t *testing.T) {
 			provID: 1, cityID: 2, postalID: 3,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
 			conflicts: nil,
-			want:     0.92,
+			want:     0.30,
 		},
 		{
 			name:     "exact match only",
 			provID: 0, cityID: 0, postalID: 0,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
-			want:     0.25,
+			want:     0.10,
 		},
 		{
 			name:     "hierarchy only (city without conflict)",
 			provID: 0, cityID: 2, postalID: 0,
 			evidence: nil,
-			want:     0.27,
+			want:     0.15,
 		},
 		{
 			name:     "postal code only",
 			provID: 0, cityID: 0, postalID: 3,
 			evidence: nil,
-			want:     0.25,
+			want:     0.05,
 		},
 		{
 			name:     "province only",
 			provID: 1, cityID: 0, postalID: 0,
 			evidence: nil,
-			want:     0.15,
+			want:     0.0,
 		},
 		{
 			name:     "no signals",
@@ -303,20 +303,20 @@ func TestScoreConfidence(t *testing.T) {
 			name:     "exact + hierarchy",
 			provID: 0, cityID: 2, postalID: 0,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
-			want:     0.52,
+			want:     0.25,
 		},
 		{
 			name:     "exact + province",
 			provID: 1, cityID: 0, postalID: 0,
 			evidence: []model.MatchedEvidence{{Resolved: &model.Entity{ID: 1}}},
-			want:     0.40,
+			want:     0.10,
 		},
 		{
 			name:     "hierarchy conflict blocks hierarchy weight",
 			provID: 1, cityID: 2, postalID: 0,
 			evidence: nil,
 			conflicts: []model.Conflict{{Type: "hierarchy_conflict"}},
-			want:     0.27,
+			want:     0.0,
 		},
 	}
 
@@ -438,15 +438,15 @@ func TestEvaluateCandidate_FullPipeline(t *testing.T) {
 				SubDistrict: &model.SubDistrict{ID: 4, Name: "SubDistrict"},
 			},
 			Evidence: []model.MatchedEvidence{
-				{Evidence: model.Evidence{Value: "bandung"}, Resolved: &model.Entity{ID: 2}},
+				{Evidence: model.Evidence{Value: "bandung"}, Resolved: &model.Entity{ID: 2, Level: "CITY"}},
 			},
 		}
 		eval := EvaluateCandidate(candidate, hier, []model.Evidence{{Value: "bandung"}})
 		if eval.Status != model.StatusValid {
 			t.Errorf("Status = %v, want VALID", eval.Status)
 		}
-		if eval.Confidence != 0.80 {
-			t.Errorf("Confidence = %v, want 0.80", eval.Confidence)
+		if eval.Confidence != 0.37 {
+			t.Errorf("Confidence = %v, want 0.37", eval.Confidence)
 		}
 	})
 
@@ -724,7 +724,7 @@ func TestScoreConfidence_MultiEvidenceIntegration(t *testing.T) {
 				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
 				{Resolved: &model.Entity{ID: 123, Level: "CITY"}},
 			},
-			want: 0.82,
+			want: 0.52,
 		},
 		{
 			name:   "province redundancy with other signals",
@@ -733,7 +733,7 @@ func TestScoreConfidence_MultiEvidenceIntegration(t *testing.T) {
 				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
 				{Resolved: &model.Entity{ID: 1, Level: "PROVINCE"}},
 			},
-			want: 0.87,
+			want: 0.60,
 		},
 	}
 
