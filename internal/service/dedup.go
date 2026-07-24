@@ -95,10 +95,10 @@ func mergeCandidates(a, b model.AdminCandidate) model.AdminCandidate {
 
 	evidenceSet := make(map[string]model.MatchedEvidence)
 	for _, me := range a.Evidence {
-		evidenceSet[me.Value] = me
+		evidenceSet[evidenceKey(me)] = me
 	}
 	for _, me := range b.Evidence {
-		evidenceSet[me.Value] = me
+		evidenceSet[evidenceKey(me)] = me
 	}
 	merged.Evidence = nil
 	for _, me := range evidenceSet {
@@ -106,4 +106,11 @@ func mergeCandidates(a, b model.AdminCandidate) model.AdminCandidate {
 	}
 
 	return merged
+}
+
+func evidenceKey(me model.MatchedEvidence) string {
+	if me.Resolved != nil {
+		return me.Value + ":" + me.Resolved.Level + ":" + itoa(me.Resolved.ID)
+	}
+	return me.Value
 }
