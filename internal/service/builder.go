@@ -102,45 +102,13 @@ func (b *pathBuilder) buildFromSubdistrict(entities []model.Entity) []model.Admi
 	return candidates
 }
 
-func BuildConclusions(flat []model.AdminCandidate, hierarchy *database.HierarchyMap) []model.AdminCandidate {
+func BuildConclusions(flat []model.AdminCandidate, hierarchy *database.HierarchyMap, resolved []model.ResolvedEvidence) []model.AdminCandidate {
 	if hierarchy == nil {
 		return flat
 	}
 
-	provinceSet := make(map[int64]model.Entity)
-	citySet := make(map[int64]model.Entity)
-	districtSet := make(map[int64]model.Entity)
-	subdistrictSet := make(map[int64]model.Entity)
-
-	for _, c := range flat {
-		if c.Location.Province != nil {
-			provinceSet[c.Location.Province.ID] = model.Entity{
-				ID: c.Location.Province.ID, Name: c.Location.Province.Name, Level: "PROVINCE",
-			}
-		}
-		if c.Location.City != nil {
-			citySet[c.Location.City.ID] = model.Entity{
-				ID: c.Location.City.ID, Name: c.Location.City.Name, Level: "CITY", PostalCode: c.Location.City.PostalCode,
-			}
-		}
-		if c.Location.District != nil {
-			districtSet[c.Location.District.ID] = model.Entity{
-				ID: c.Location.District.ID, Name: c.Location.District.Name, Level: "DISTRICT",
-			}
-		}
-		if c.Location.SubDistrict != nil {
-			subdistrictSet[c.Location.SubDistrict.ID] = model.Entity{
-				ID: c.Location.SubDistrict.ID, Name: c.Location.SubDistrict.Name, Level: "SUBDISTRICT", PostalCode: c.Location.SubDistrict.PostalCode,
-			}
-		}
-	}
-
 	var combined []model.AdminCandidate
 	seen := make(map[string]bool)
-
-	makeLoc := func(prov *model.Province, city *model.City, dist *model.District, sub *model.SubDistrict) model.AdminLocation {
-		return model.AdminLocation{Province: prov, City: city, District: dist, SubDistrict: sub}
-	}
 
 	key := func(loc model.AdminLocation) string {
 		var p, c, d, s int64
@@ -159,114 +127,18 @@ func BuildConclusions(flat []model.AdminCandidate, hierarchy *database.Hierarchy
 		return itoa(p) + ":" + itoa(c) + ":" + itoa(d) + ":" + itoa(s)
 	}
 
-	add := func(loc model.AdminLocation) {
-		k := key(loc)
+	for _, c := range flat {
+		k := key(c.Location)
 		if seen[k] {
-			return
+			continue
 		}
 		seen[k] = true
-		combined = append(combined, model.AdminCandidate{Location: loc})
+		combined = append(combined, c)
 	}
 
-	for _, s := range subdistrictSet {
-		sub := &model.SubDistrict{ID: s.ID, Name: s.Name, PostalCode: s.PostalCode, NormalizedName: normalizer.Normalize(s.Name)}
-		loc := makeLoc(nil, nil, nil, sub)
-
-		if distID, ok := hierarchy.SubDistrictToDist[s.ID]; ok {
-			if d, ok2 := districtSet[distID]; ok2 {
-				loc.District = &model.District{ID: d.ID, Name: d.Name, NormalizedName: normalizer.Normalize(d.Name)}
-				if cityID, ok3 := hierarchy.DistrictToCity[distID]; ok3 {
-					if c, ok4 := citySet[cityID]; ok4 {
-						loc.City = &model.City{ID: c.ID, Name: c.Name, PostalCode: c.PostalCode, NormalizedName: normalizer.Normalize(c.Name)}
-						if provID, ok5 := hierarchy.CityToProvince[cityID]; ok5 {
-							if p, ok6 := provinceSet[provID]; ok6 {
-								loc.Province = &model.Province{ID: p.ID, Name: p.Name, NormalizedName: normalizer.Normalize(p.Name)}
-							}
-						}
-					}
-				}
-			}
-		}
-		add(loc)
-	}
-
-	for _, d := range districtSet {
-		loc := makeLoc(nil, nil, &model.District{ID: d.ID, Name: d.Name, NormalizedName: normalizer.Normalize(d.Name)}, nil)
-
-		if cityID, ok := hierarchy.DistrictToCity[d.ID]; ok {
-			if c, ok2 := citySet[cityID]; ok2 {
-				loc.City = &model.City{ID: c.ID, Name: c.Name, PostalCode: c.PostalCode, NormalizedName: normalizer.Normalize(c.Name)}
-				if provID, ok3 := hierarchy.CityToProvince[cityID]; ok3 {
-					if p, ok4 := provinceSet[provID]; ok4 {
-						loc.Province = &model.Province{ID: p.ID, Name: p.Name, NormalizedName: normalizer.Normalize(p.Name)}
-					}
-				}
-			}
-		}
-		add(loc)
-
-		for _, s := range subdistrictSet {
-			if hierarchy.SubDistrictToDist[s.ID] == d.ID {
-				subLoc := loc
-				subLoc.SubDistrict = &model.SubDistrict{ID: s.ID, Name: s.Name, PostalCode: s.PostalCode, NormalizedName: normalizer.Normalize(s.Name)}
-				add(subLoc)
-			}
-		}
-	}
-
-	for _, c := range citySet {
-		loc := makeLoc(nil, &model.City{ID: c.ID, Name: c.Name, PostalCode: c.PostalCode, NormalizedName: normalizer.Normalize(c.Name)}, nil, nil)
-
-		if provID, ok := hierarchy.CityToProvince[c.ID]; ok {
-			if p, ok2 := provinceSet[provID]; ok2 {
-				loc.Province = &model.Province{ID: p.ID, Name: p.Name, NormalizedName: normalizer.Normalize(p.Name)}
-			}
-		}
-		add(loc)
-
-		for _, d := range districtSet {
-			if hierarchy.DistrictToCity[d.ID] == c.ID {
-				distLoc := loc
-				distLoc.District = &model.District{ID: d.ID, Name: d.Name, NormalizedName: normalizer.Normalize(d.Name)}
-				add(distLoc)
-
-				for _, s := range subdistrictSet {
-					if hierarchy.SubDistrictToDist[s.ID] == d.ID {
-						subLoc := distLoc
-						subLoc.SubDistrict = &model.SubDistrict{ID: s.ID, Name: s.Name, PostalCode: s.PostalCode, NormalizedName: normalizer.Normalize(s.Name)}
-						add(subLoc)
-					}
-				}
-			}
-		}
-	}
-
-	for _, p := range provinceSet {
-		loc := makeLoc(&model.Province{ID: p.ID, Name: p.Name, NormalizedName: normalizer.Normalize(p.Name)}, nil, nil, nil)
-		add(loc)
-
-		for _, c := range citySet {
-			if hierarchy.CityToProvince[c.ID] == p.ID {
-				cityLoc := loc
-				cityLoc.City = &model.City{ID: c.ID, Name: c.Name, PostalCode: c.PostalCode, NormalizedName: normalizer.Normalize(c.Name)}
-				add(cityLoc)
-
-				for _, d := range districtSet {
-					if hierarchy.DistrictToCity[d.ID] == c.ID {
-						distLoc := cityLoc
-						distLoc.District = &model.District{ID: d.ID, Name: d.Name, NormalizedName: normalizer.Normalize(d.Name)}
-						add(distLoc)
-
-						for _, s := range subdistrictSet {
-							if hierarchy.SubDistrictToDist[s.ID] == d.ID {
-								subLoc := distLoc
-								subLoc.SubDistrict = &model.SubDistrict{ID: s.ID, Name: s.Name, PostalCode: s.PostalCode, NormalizedName: normalizer.Normalize(s.Name)}
-								add(subLoc)
-							}
-						}
-					}
-				}
-			}
+	for i := range combined {
+		if resolved != nil {
+			combined[i].Evidence = matchEvidenceToCandidate(&combined[i], resolved)
 		}
 	}
 
@@ -301,16 +173,17 @@ func countNonNil(loc model.AdminLocation) int {
 
 func matchEvidenceToCandidate(candidate *model.AdminCandidate, resolved []model.ResolvedEvidence) []model.MatchedEvidence {
 	var matched []model.MatchedEvidence
+	seenEntity := make(map[int64]bool)
 
 	for _, re := range resolved {
 		for _, entity := range re.Candidates {
-			if entityInCandidate(candidate, entity) {
+			if entityInCandidate(candidate, entity) && !seenEntity[entity.ID] {
+				seenEntity[entity.ID] = true
 				e := entity
 				matched = append(matched, model.MatchedEvidence{
 					Evidence: re.Evidence,
 					Resolved: &e,
 				})
-				break
 			}
 		}
 	}

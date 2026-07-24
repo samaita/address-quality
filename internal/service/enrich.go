@@ -20,9 +20,9 @@ func (svc *Service) EnrichCandidates(candidates []model.AdminCandidate) []model.
 			if distID, ok := svc.hierarchyCache.SubDistrictToDist[c.Location.SubDistrict.ID]; ok {
 				if entry, ok2 := svc.districtByID[distID]; ok2 {
 					c.Location.District = &model.District{
-						ID:               entry.ID,
-						Name:             entry.Name,
-						NormalizedName:   normalizer.Normalize(entry.Name),
+						ID:             entry.ID,
+						Name:           entry.Name,
+						NormalizedName: normalizer.Normalize(entry.Name),
 					}
 				}
 			}
@@ -32,10 +32,10 @@ func (svc *Service) EnrichCandidates(candidates []model.AdminCandidate) []model.
 			if cityID, ok := svc.hierarchyCache.DistrictToCity[c.Location.District.ID]; ok {
 				if entry, ok2 := svc.cityByID[cityID]; ok2 {
 					c.Location.City = &model.City{
-						ID:               entry.ID,
-						Name:             entry.Name,
-						NormalizedName:   normalizer.Normalize(entry.Name),
-						PostalCode:       entry.PostalCode,
+						ID:             entry.ID,
+						Name:           entry.Name,
+						NormalizedName: normalizer.Normalize(entry.Name),
+						PostalCode:     entry.PostalCode,
 					}
 				}
 			}
@@ -45,9 +45,9 @@ func (svc *Service) EnrichCandidates(candidates []model.AdminCandidate) []model.
 			if provID, ok := svc.hierarchyCache.CityToProvince[c.Location.City.ID]; ok {
 				if entry, ok2 := svc.provinceByID[provID]; ok2 {
 					c.Location.Province = &model.Province{
-						ID:               entry.ID,
-						Name:             entry.Name,
-						NormalizedName:   normalizer.Normalize(entry.Name),
+						ID:             entry.ID,
+						Name:           entry.Name,
+						NormalizedName: normalizer.Normalize(entry.Name),
 					}
 				}
 			}

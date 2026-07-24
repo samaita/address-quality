@@ -51,12 +51,9 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	log.Debug().Int("resolved_count", len(resolved)).Msg("entity resolution")
 
 	candidates := svc.DiscoverCandidates(resolved, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
-	candidates = BuildConclusions(candidates, svc.hierarchyCache)
 	candidates = DeduplicateCandidates(candidates)
 	candidates = svc.EnrichCandidates(candidates)
-	candidates = DeduplicateCandidates(candidates)
-
-	log.Debug().Int("candidate_count", len(candidates)).Msgf("candidate discovery: %+v", candidates)
+	candidates = BuildConclusions(candidates, svc.hierarchyCache, resolved)
 
 	var scored []scoredCandidate
 	for _, c := range candidates {

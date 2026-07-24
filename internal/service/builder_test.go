@@ -8,6 +8,7 @@ import (
 
 	"address-quality/internal/database"
 	"address-quality/internal/model"
+	"address-quality/internal/normalizer"
 )
 
 func testBuildPathsHierarchy() *database.HierarchyMap {
@@ -199,13 +200,52 @@ func TestBuildFromSubdistrict(t *testing.T) {
 func TestBuildConclusions(t *testing.T) {
 	hierarchy := testBuildPathsHierarchy()
 
+	provByID := make(map[int64]model.Province)
+	for _, e := range provinces() {
+		provByID[e.ID] = model.Province{ID: e.ID, Name: e.Name, NormalizedName: normalizer.Normalize(e.Name)}
+	}
+	cityByID := make(map[int64]model.City)
+	for _, e := range cities() {
+		cityByID[e.ID] = model.City{ID: e.ID, Name: e.Name, PostalCode: e.PostalCode, NormalizedName: normalizer.Normalize(e.Name)}
+	}
+	distByID := make(map[int64]model.District)
+	for _, e := range districts() {
+		distByID[e.ID] = model.District{ID: e.ID, Name: e.Name, NormalizedName: normalizer.Normalize(e.Name)}
+	}
+
 	flat := []model.AdminCandidate{}
 	flat = append(flat, (&pathBuilder{}).buildFromProvince(provinces())...)
 	flat = append(flat, (&pathBuilder{}).buildFromCity(cities())...)
 	flat = append(flat, (&pathBuilder{}).buildFromDistrict(districts())...)
 	flat = append(flat, (&pathBuilder{}).buildFromSubdistrict(subdistricts())...)
 
-	combined := BuildConclusions(flat, hierarchy)
+	// Enrich flat candidates bottom-up (simulates EnrichCandidates)
+	for i := range flat {
+		c := &flat[i]
+		if c.Location.SubDistrict != nil && c.Location.District == nil {
+			if distID, ok := hierarchy.SubDistrictToDist[c.Location.SubDistrict.ID]; ok {
+				if d, ok2 := distByID[distID]; ok2 {
+					c.Location.District = &d
+				}
+			}
+		}
+		if c.Location.District != nil && c.Location.City == nil {
+			if cityID, ok := hierarchy.DistrictToCity[c.Location.District.ID]; ok {
+				if cty, ok2 := cityByID[cityID]; ok2 {
+					c.Location.City = &cty
+				}
+			}
+		}
+		if c.Location.City != nil && c.Location.Province == nil {
+			if provID, ok := hierarchy.CityToProvince[c.Location.City.ID]; ok {
+				if p, ok2 := provByID[provID]; ok2 {
+					c.Location.Province = &p
+				}
+			}
+		}
+	}
+
+	combined := BuildConclusions(flat, hierarchy, nil)
 
 	if len(combined) == 0 {
 		t.Fatal("BuildConclusions returned no candidates")
