@@ -97,15 +97,6 @@ func (svc *Service) loadCities(ctx context.Context) {
 	svc.cityByID = idToEntry
 }
 
-func (svc *Service) loadCityProvinceMapping(ctx context.Context, sourceID int64) {
-	mapping, err := svc.locationRepo.LoadCityProvinceMapping(ctx, sourceID)
-	if err != nil {
-		svc.cityErr = err
-		return
-	}
-	svc.cityProvinceMap = mapping
-}
-
 func (svc *Service) loadDistricts(ctx context.Context, sourceID int64) {
 	rows, err := svc.locationRepo.FindAllDistricts(ctx, sourceID)
 	if err != nil {
@@ -187,14 +178,6 @@ func ensureHierarchyLoaded(svc *Service, ctx context.Context, sourceID int64) er
 	return svc.hierarchyErr
 }
 
-func extractNgramFromKey(key string) string {
-	parts := strings.SplitN(key, ":", 2)
-	if len(parts) == 2 {
-		return parts[1]
-	}
-	return key
-}
-
 func matchCandidates[T any](cache map[string]T, sourceID int64, normalized string) []string {
 	var keys []string
 	words := strings.Fields(normalized)
@@ -212,165 +195,5 @@ func matchCandidates[T any](cache map[string]T, sourceID int64, normalized strin
 	return keys
 }
 
-func (svc *Service) findProvinceCandidates(ctx context.Context, sourceID int64, normalized string) ([]model.Candidate, error) {
-	if err := ensureProvincesLoaded(svc, ctx); err != nil {
-		return nil, err
-	}
-	matchedKeys := matchCandidates(svc.provinceCache, sourceID, normalized)
-	candidates := make([]model.Candidate, 0, len(matchedKeys))
-	for _, key := range matchedKeys {
-		for _, entry := range svc.provinceCache[key] {
-			matchedNgram := extractNgramFromKey(key)
-			matchType := "PARTIAL"
-			if strings.TrimSpace(normalized) == entry.Kode || matchedNgram == normalizer.Normalize(entry.Name) {
-				matchType = "EXACT"
-			}
-			candidates = append(candidates, model.Candidate{
-				LocationID: entry.ID,
-				Name:       entry.Name,
-				Level:      "PROVINCE",
-				Score:      1.0,
-				Source:     "cache",
-				MatchType:  matchType,
-			})
-		}
-	}
-	return candidates, nil
-}
 
-func (svc *Service) findCityCandidates(ctx context.Context, sourceID int64, normalized string, provinceCandidates []model.Candidate) ([]model.Candidate, error) {
-	if err := ensureCitiesLoaded(svc, ctx); err != nil {
-		return nil, err
-	}
-	if len(provinceCandidates) > 0 {
-		if err := ensureHierarchyLoaded(svc, ctx, sourceID); err != nil {
-			return nil, err
-		}
-	}
-	matchedKeys := matchCandidates(svc.cityCache, sourceID, normalized)
-	candidates := make([]model.Candidate, 0, len(matchedKeys))
-	for _, key := range matchedKeys {
-		for _, entry := range svc.cityCache[key] {
-			provinceOK := false
-			if len(provinceCandidates) == 0 {
-				provinceOK = true
-			} else {
-				for _, pc := range provinceCandidates {
-					if svc.hierarchyCache.CityToProvince[entry.ID] == pc.LocationID {
-						provinceOK = true
-						break
-					}
-				}
-			}
-			if !provinceOK {
-				continue
-			}
-			matchedNgram := extractNgramFromKey(key)
-			matchType := "PARTIAL"
-			if matchedNgram == normalizer.Normalize(entry.Name) {
-				matchType = "EXACT"
-			}
-			candidates = append(candidates, model.Candidate{
-				LocationID: entry.ID,
-				Name:       entry.Name,
-				Level:      "CITY",
-				Score:      1.0,
-				Source:     "cache",
-				MatchType:  matchType,
-			})
-		}
-	}
-	return candidates, nil
-}
-
-func (svc *Service) findDistrictCandidates(ctx context.Context, sourceID int64, normalized string, cityCandidates []model.Candidate) ([]model.Candidate, error) {
-	if err := ensureDistrictsLoaded(svc, ctx, sourceID); err != nil {
-		return nil, err
-	}
-	if len(cityCandidates) > 0 {
-		if err := ensureHierarchyLoaded(svc, ctx, sourceID); err != nil {
-			return nil, err
-		}
-	}
-	matchedKeys := matchCandidates(svc.districtCache, sourceID, normalized)
-	candidates := make([]model.Candidate, 0, len(matchedKeys))
-	for _, key := range matchedKeys {
-		for _, entry := range svc.districtCache[key] {
-			cityOK := false
-			if len(cityCandidates) == 0 {
-				cityOK = true
-			} else {
-				for _, cc := range cityCandidates {
-					if svc.hierarchyCache.DistrictToCity[entry.ID] == cc.LocationID {
-						cityOK = true
-						break
-					}
-				}
-			}
-			if !cityOK {
-				continue
-			}
-			matchedNgram := extractNgramFromKey(key)
-			matchType := "PARTIAL"
-			if matchedNgram == normalizer.Normalize(entry.Name) {
-				matchType = "EXACT"
-			}
-			candidates = append(candidates, model.Candidate{
-				LocationID: entry.ID,
-				Name:       entry.Name,
-				Level:      "DISTRICT",
-				Score:      1.0,
-				Source:     "cache",
-				MatchType:  matchType,
-			})
-		}
-	}
-	return candidates, nil
-}
-
-func (svc *Service) findSubDistrictCandidates(ctx context.Context, sourceID int64, normalized string, districtCandidates []model.Candidate) ([]model.Candidate, error) {
-	if err := ensureSubDistrictsLoaded(svc, ctx, sourceID); err != nil {
-		return nil, err
-	}
-	if len(districtCandidates) > 0 {
-		if err := ensureHierarchyLoaded(svc, ctx, sourceID); err != nil {
-			return nil, err
-		}
-	}
-	matchedKeys := matchCandidates(svc.subDistrictCache, sourceID, normalized)
-	candidates := make([]model.Candidate, 0, len(matchedKeys))
-	for _, key := range matchedKeys {
-		for _, entry := range svc.subDistrictCache[key] {
-			distOK := false
-			if len(districtCandidates) == 0 {
-				distOK = true
-			} else {
-				for _, dc := range districtCandidates {
-					if svc.hierarchyCache.SubDistrictToDist[entry.ID] == dc.LocationID {
-						distOK = true
-						break
-					}
-				}
-			}
-			if !distOK {
-				continue
-			}
-			matchedNgram := extractNgramFromKey(key)
-			matchType := "PARTIAL"
-			if matchedNgram == normalizer.Normalize(entry.Name) {
-				matchType = "EXACT"
-			}
-			candidates = append(candidates, model.Candidate{
-				LocationID: entry.ID,
-				Name:       entry.Name,
-				Level:      "SUBDISTRICT",
-				Score:      1.0,
-				Source:     "cache",
-				MatchType:  matchType,
-				PostalCode: entry.PostalCode,
-			})
-		}
-	}
-	return candidates, nil
-}
 

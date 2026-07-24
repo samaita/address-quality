@@ -64,36 +64,6 @@ func (r *LocationRepository) FindSourceByCode(ctx context.Context, code string) 
 	return id, version, nil
 }
 
-func (r *LocationRepository) FindByKode(ctx context.Context, kode string, sourceID int64) (*model.Location, error) {
-	loc := &model.Location{}
-
-	err := r.db.QueryRowContext(ctx, `
-		SELECT name, postal_code
-		FROM location_codes
-		WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL
-	`, kode, sourceID).Scan(&loc.SubDistrict, &loc.PostalCode)
-	if err != nil {
-		return nil, err
-	}
-
-	parts := strings.Split(kode, ".")
-	switch len(parts) {
-	case 4:
-		districtKode := parts[0] + "." + parts[1] + "." + parts[2]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, districtKode, sourceID).Scan(&loc.District)
-		fallthrough
-	case 3:
-		cityKode := parts[0] + "." + parts[1]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, cityKode, sourceID).Scan(&loc.City)
-		fallthrough
-	case 2:
-		provinceKode := parts[0]
-		r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, provinceKode, sourceID).Scan(&loc.Province)
-	}
-
-	return loc, nil
-}
-
 type ProvinceRow struct {
 	ID                  int64
 	SourceID            int64
@@ -110,31 +80,6 @@ func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRo
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("find all provinces: %w", err)
-	}
-	defer rows.Close()
-
-	var provinces []ProvinceRow
-	for rows.Next() {
-		var p ProvinceRow
-		if err := rows.Scan(&p.ID, &p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
-			return nil, fmt.Errorf("scan province: %w", err)
-		}
-		provinces = append(provinces, p)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows provinces: %w", err)
-	}
-	return provinces, nil
-}
-
-func (r *LocationRepository) FindProvincesBySourceID(ctx context.Context, sourceID int64) ([]ProvinceRow, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, location_source_id, kode, name, lowercase_normalized
-		FROM location_codes
-		WHERE level_id = 2 AND location_source_id = ? AND deleted_at IS NULL
-	`, sourceID)
-	if err != nil {
-		return nil, fmt.Errorf("find provinces: %w", err)
 	}
 	defer rows.Close()
 
@@ -184,16 +129,6 @@ func (r *LocationRepository) FindAllCities(ctx context.Context) ([]CityRow, erro
 		return nil, fmt.Errorf("rows cities: %w", err)
 	}
 	return cities, nil
-}
-
-func (r *LocationRepository) InsertLocationCode(ctx context.Context, sourceID int, kode, name string, levelID int, postalCode string) error {
-	normalized := normalizer.Normalize(name)
-	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO location_codes
-			(location_source_id, kode, name, lowercase_normalized, level_id, postal_code)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, sourceID, kode, name, normalized, levelID, postalCode)
-	return err
 }
 
 type LocationCodeRow struct {
@@ -562,9 +497,6 @@ type HierarchyRow struct {
 }
 
 type HierarchyMap struct {
-	ProvinceChildren  map[int64][]int64
-	CityChildren      map[int64][]int64
-	DistrictChildren  map[int64][]int64
 	CityToProvince    map[int64]int64
 	DistrictToCity    map[int64]int64
 	SubDistrictToDist map[int64]int64
@@ -582,9 +514,6 @@ func (r *LocationRepository) LoadFullHierarchy(ctx context.Context, sourceID int
 	defer rows.Close()
 
 	h := &HierarchyMap{
-		ProvinceChildren:  make(map[int64][]int64),
-		CityChildren:      make(map[int64][]int64),
-		DistrictChildren:  make(map[int64][]int64),
 		CityToProvince:    make(map[int64]int64),
 		DistrictToCity:    make(map[int64]int64),
 		SubDistrictToDist: make(map[int64]int64),
@@ -596,9 +525,6 @@ func (r *LocationRepository) LoadFullHierarchy(ctx context.Context, sourceID int
 			return nil, fmt.Errorf("scan hierarchy: %w", err)
 		}
 
-		h.ProvinceChildren[pID] = append(h.ProvinceChildren[pID], cID)
-		h.CityChildren[cID] = append(h.CityChildren[cID], dID)
-		h.DistrictChildren[dID] = append(h.DistrictChildren[dID], sID)
 		h.CityToProvince[cID] = pID
 		h.DistrictToCity[dID] = cID
 		h.SubDistrictToDist[sID] = dID
