@@ -761,3 +761,105 @@ func TestScoreConfidence_MultiEvidenceIntegration(t *testing.T) {
 		})
 	}
 }
+
+func TestScorePostalCodePrefix(t *testing.T) {
+	tests := []struct {
+		name       string
+		postalCode string
+		evidence   []model.MatchedEvidence
+		want       float64
+	}{
+		{
+			name:       "no postal code location",
+			postalCode: "",
+			evidence:   nil,
+			want:       0,
+		},
+		{
+			name:       "no postal code evidence",
+			postalCode: "40115",
+			evidence:   nil,
+			want:       0,
+		},
+		{
+			name:       "non-postal-code evidence ignored",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePlaceName, Value: "bandung"}},
+			},
+			want: 0,
+		},
+		{
+			name:       "5-digit exact match",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePostalCode, Value: "40115"}},
+			},
+			want: WeightPostalCodePrefix5,
+		},
+		{
+			name:       "4-digit prefix match",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePostalCode, Value: "40112"}},
+			},
+			want: WeightPostalCodePrefix4,
+		},
+		{
+			name:       "3-digit prefix match",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePostalCode, Value: "40199"}},
+			},
+			want: WeightPostalCodePrefix3,
+		},
+		{
+			name:       "no match at first char",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePostalCode, Value: "50115"}},
+			},
+			want: 0,
+		},
+		{
+			name:       "shorter evidence value",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePostalCode, Value: "40"}},
+			},
+			want: 0,
+		},
+		{
+			name:       "multiple evidence picks postal code",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePlaceName, Value: "bandung"}},
+				{Evidence: model.Evidence{Type: model.EvidencePostalCode, Value: "40115"}},
+			},
+			want: WeightPostalCodePrefix5,
+		},
+		{
+			name:       "2-digit match yields no bonus",
+			postalCode: "40115",
+			evidence: []model.MatchedEvidence{
+				{Evidence: model.Evidence{Type: model.EvidencePostalCode, Value: "40999"}},
+			},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidate := &model.AdminCandidate{
+				Evidence: tt.evidence,
+			}
+			if tt.postalCode != "" {
+				candidate.Location.PostalCode = &model.PostalCode{Code: tt.postalCode}
+			}
+			got := scorePostalCodePrefix(candidate)
+			if got != tt.want {
+				t.Errorf("scorePostalCodePrefix = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

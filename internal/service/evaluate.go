@@ -258,6 +258,7 @@ func scoreConfidence(candidate *model.AdminCandidate) float64 {
 
 	if candidate.Location.PostalCode != nil {
 		score += WeightPostalCode
+		score += scorePostalCodePrefix(candidate)
 	}
 
 	matched := getMatchedLevels(candidate)
@@ -280,6 +281,39 @@ func scoreConfidence(candidate *model.AdminCandidate) float64 {
 		score = 1.0
 	}
 	return math.Round(score*10000) / 10000
+}
+
+func scorePostalCodePrefix(candidate *model.AdminCandidate) float64 {
+	if candidate.Location.PostalCode == nil {
+		return 0
+	}
+	postalCode := candidate.Location.PostalCode.Code
+	for _, me := range candidate.Evidence {
+		if me.Type != model.EvidencePostalCode {
+			continue
+		}
+		matchLen := 0
+		ev := me.Value
+		minLen := len(ev)
+		if len(postalCode) < minLen {
+			minLen = len(postalCode)
+		}
+		for i := 0; i < minLen; i++ {
+			if ev[i] != postalCode[i] {
+				break
+			}
+			matchLen++
+		}
+		switch {
+		case matchLen >= 5:
+			return WeightPostalCodePrefix5
+		case matchLen >= 4:
+			return WeightPostalCodePrefix4
+		case matchLen >= 3:
+			return WeightPostalCodePrefix3
+		}
+	}
+	return 0
 }
 
 func multiEvidenceBonus(candidate *model.AdminCandidate) float64 {
