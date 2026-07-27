@@ -405,5 +405,16 @@ func BuildReasons(candidate *model.AdminCandidate) []model.Reason {
 		reasons = append(reasons, model.Reason("match_subdistrict"))
 	}
 
+	if prefixScore := scorePostalCodePrefix(candidate); prefixScore >= WeightPostalCodePrefix3 {
+		switch {
+		case prefixScore >= WeightPostalCodePrefix5:
+			reasons = append(reasons, model.Reason("match_postal_code_exact"))
+		case prefixScore >= WeightPostalCodePrefix4:
+			reasons = append(reasons, model.Reason("match_postal_code_prefix4"))
+		case prefixScore >= WeightPostalCodePrefix3:
+			reasons = append(reasons, model.Reason("match_postal_code_prefix3"))
+		}
+	}
+
 	return reasons
 }
