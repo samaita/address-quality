@@ -52,6 +52,13 @@ func (svc *Service) EnrichCandidates(candidates []model.AdminCandidate) []model.
 				}
 			}
 		}
+
+		if c.Location.SubDistrict != nil && c.Location.SubDistrict.PostalCode != "" && c.Location.PostalCode == nil {
+			c.Location.PostalCode = &model.PostalCode{
+				ID:   c.Location.SubDistrict.ID,
+				Code: c.Location.SubDistrict.PostalCode,
+			}
+		}
 	}
 
 	return candidates
