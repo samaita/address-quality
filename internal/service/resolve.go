@@ -5,13 +5,17 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"address-quality/internal/model"
-	"address-quality/internal/normalizer"
 )
 
-func (svc *Service) ResolveEvidence(ctx context.Context, sourceID int64, evidence []model.Evidence) []model.ResolvedEvidence {
+func (svc *Service) ResolveEvidence(ctx context.Context, sourceID int64, evidence []model.Evidence, normalizedText string) []model.ResolvedEvidence {
+	if err := ensurePhraseDictLoaded(svc, ctx); err != nil {
+		return nil
+	}
+
+	wordEntities := svc.matchPhrases(sourceID, normalizedText)
+
 	resolved := make([]model.ResolvedEvidence, 0, len(evidence))
 
 	for _, ev := range evidence {
@@ -21,7 +25,7 @@ func (svc *Service) ResolveEvidence(ctx context.Context, sourceID int64, evidenc
 		case model.EvidencePostalCode:
 			re.Candidates = svc.resolvePostalCodeEntity(ev)
 		case model.EvidencePlaceName:
-			re.Candidates = svc.resolvePlaceNameEntity(ctx, sourceID, ev)
+			re.Candidates = svc.resolvePlaceNameEntity(ev, wordEntities)
 		case model.EvidenceRoadName:
 			re.Candidates = svc.resolveRoadNameEntity(ev)
 		}
@@ -49,95 +53,22 @@ func (svc *Service) resolvePostalCodeEntity(ev model.Evidence) []model.Entity {
 	return entities
 }
 
-func (svc *Service) resolvePlaceNameEntity(ctx context.Context, sourceID int64, ev model.Evidence) []model.Entity {
-	var entities []model.Entity
-	normalized := normalizer.Normalize(ev.Value)
-
-	if err := ensureProvincesLoaded(svc, ctx); err != nil {
+func (svc *Service) resolvePlaceNameEntity(ev model.Evidence, wordEntities map[string][]model.Entity) []model.Entity {
+	entities, ok := wordEntities[ev.Value]
+	if !ok {
 		return nil
 	}
 
-	provKeys := matchCandidates(svc.provinceCache, sourceID, ev.Value)
-	for _, k := range provKeys {
-		for _, entry := range svc.provinceCache[k] {
-			entities = append(entities, model.Entity{
-				ID:    entry.ID,
-				Name:  entry.Name,
-				Level: "PROVINCE",
-			})
-		}
-	}
-
-	provinceKey := fmt.Sprintf("%d:%s", sourceID, normalized)
-	if entries, ok := svc.provinceCache[provinceKey]; ok {
-		for _, e := range entries {
-			if !entityIDExists(entities, e.ID) {
-				entities = append(entities, model.Entity{
-					ID:    e.ID,
-					Name:  e.Name,
-					Level: "PROVINCE",
-				})
-			}
-		}
-	}
-
-	if err := ensureCitiesLoaded(svc, ctx); err != nil {
-		return entities
-	}
-
-	cityKeys := matchCandidates(svc.cityCache, sourceID, ev.Value)
-	for _, k := range cityKeys {
-		for _, entry := range svc.cityCache[k] {
-			entities = append(entities, model.Entity{
-				ID:         entry.ID,
-				Name:       entry.Name,
-				Level:      "CITY",
-				PostalCode: entry.PostalCode,
-			})
-		}
-	}
-
-	if err := ensureDistrictsLoaded(svc, ctx, sourceID); err != nil {
-		return entities
-	}
-
-	distKeys := matchCandidates(svc.districtCache, sourceID, ev.Value)
-	for _, k := range distKeys {
-		for _, entry := range svc.districtCache[k] {
-			entities = append(entities, model.Entity{
-				ID:    entry.ID,
-				Name:  entry.Name,
-				Level: "DISTRICT",
-			})
-		}
-	}
-
-	if err := ensureSubDistrictsLoaded(svc, ctx, sourceID); err != nil {
-		return entities
-	}
-
-	subKeys := matchCandidates(svc.subDistrictCache, sourceID, ev.Value)
-	for _, k := range subKeys {
-		for _, entry := range svc.subDistrictCache[k] {
-			entities = append(entities, model.Entity{
-				ID:         entry.ID,
-				Name:       entry.Name,
-				Level:      "SUBDISTRICT",
-				PostalCode: entry.PostalCode,
-			})
-		}
-	}
-
-	return entities
-}
-
-func entityIDExists(entities []model.Entity, id int64) bool {
+	seen := make(map[int64]bool)
+	var unique []model.Entity
 	for _, e := range entities {
-		if e.ID == id {
-			return true
+		if seen[e.ID] {
+			continue
 		}
+		seen[e.ID] = true
+		unique = append(unique, e)
 	}
-	return false
+	return unique
 }
 
 func (svc *Service) resolveRoadNameEntity(ev model.Evidence) []model.Entity {

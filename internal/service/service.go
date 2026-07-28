@@ -89,6 +89,10 @@ type Service struct {
 	hierarchyCache *database.HierarchyMap
 	hierarchyOnce  sync.Once
 	hierarchyErr   error
+
+	phraseDict     map[string]map[string][]model.Entity
+	phraseDictOnce sync.Once
+	phraseDictErr  error
 }
 
 func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string) *Service {

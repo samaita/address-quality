@@ -47,7 +47,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	evidence := ExtractEvidence(normalized)
 	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
 
-	resolved := svc.ResolveEvidence(ctx, sourceID, evidence)
+	resolved := svc.ResolveEvidence(ctx, sourceID, evidence, normalized)
 	log.Debug().Int("resolved_count", len(resolved)).Msg("entity resolution")
 
 	candidates := svc.DiscoverCandidates(resolved, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
