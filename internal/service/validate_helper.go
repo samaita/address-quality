@@ -32,23 +32,16 @@ func (svc *Service) resolveLocationByPostalCode(ctx context.Context, location mo
 		return location, false, nil
 	}
 
-	needsLookup := false
-	if location == (model.Location{}) || location.PostalCode == "" && location.SubDistrict == "" {
-		needsLookup = true
-	}
-	if !needsLookup {
-		return location, false, nil
-	}
-
-	results, err := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
-	if err != nil {
-		return model.Location{}, false, err
-	}
-	if len(results) == 0 {
-		return location, false, nil
-	}
-
+	// No winner found — infer full location from postal code DB
 	if location == (model.Location{}) {
+		results, err := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
+		if err != nil {
+			return model.Location{}, false, err
+		}
+		if len(results) == 0 {
+			return location, false, nil
+		}
+
 		districtGroups := make(map[string][]model.Location)
 		for _, r := range results {
 			districtGroups[r.District] = append(districtGroups[r.District], r)
@@ -64,15 +57,10 @@ func (svc *Service) resolveLocationByPostalCode(ctx context.Context, location mo
 		return best[0], true, nil
 	}
 
-	for _, r := range results {
-		if r.District == location.District && r.City == location.City && r.Province == location.Province {
-			return r, true, nil
-		}
-	}
-	for _, r := range results {
-		if r.City == location.City {
-			return r, true, nil
-		}
+	// Winner exists but missing sub-district/postal code — only fill postal code
+	if location.PostalCode == "" && location.SubDistrict == "" {
+		location.PostalCode = inputPostalCode
+		return location, true, nil
 	}
 
 	return location, false, nil
