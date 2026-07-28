@@ -33,31 +33,49 @@ func (svc *Service) resolveLocationByPostalCode(ctx context.Context, location mo
 	}
 
 	needsLookup := false
-	if location == (model.Location{}) {
-		needsLookup = true
-	} else if location.PostalCode == "" && location.SubDistrict == "" {
+	if location == (model.Location{}) || location.PostalCode == "" && location.SubDistrict == "" {
 		needsLookup = true
 	}
-
 	if !needsLookup {
 		return location, false, nil
 	}
 
-	loc, err := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
+	results, err := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
 	if err != nil {
 		return model.Location{}, false, err
 	}
-	if loc == nil {
+	if len(results) == 0 {
 		return location, false, nil
 	}
 
-	if location != (model.Location{}) {
-		if location.District != loc.District || location.City != loc.City || location.Province != loc.Province {
-			return location, false, nil
+	if location == (model.Location{}) {
+		districtGroups := make(map[string][]model.Location)
+		for _, r := range results {
+			districtGroups[r.District] = append(districtGroups[r.District], r)
+		}
+		var best []model.Location
+		bestDistrict := ""
+		for district, locs := range districtGroups {
+			if len(locs) > len(best) || (len(locs) == len(best) && district < bestDistrict) {
+				best = locs
+				bestDistrict = district
+			}
+		}
+		return best[0], true, nil
+	}
+
+	for _, r := range results {
+		if r.District == location.District && r.City == location.City && r.Province == location.Province {
+			return r, true, nil
+		}
+	}
+	for _, r := range results {
+		if r.City == location.City {
+			return r, true, nil
 		}
 	}
 
-	return *loc, true, nil
+	return location, false, nil
 }
 
 func (svc *Service) sanitize(input string) string {
