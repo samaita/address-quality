@@ -85,23 +85,21 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		}
 	}
 
-	inputPostalCode := extractPostalCode(normalized)
-
 	var winner *scoredCandidate
 	if len(scored) > 0 {
 		winner = &scored[0]
 	}
-
 	location := resolveLocationFromCandidate(winner)
 
-	if location == (model.Location{}) && inputPostalCode != "" {
-		loc, locErr := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
-		if locErr != nil {
-			log.Error().Err(locErr).Msg("find by postal code")
-			return nil, locErr
-		}
-		if loc != nil {
-			location = *loc
+	loc, applied, err := svc.resolveLocationByPostalCode(ctx, location, normalized, sourceID)
+	if err != nil {
+		log.Error().Err(err).Msg("find by postal code")
+		return nil, err
+	}
+	if applied {
+		location = loc
+		if winner != nil {
+			winner.eval.Reasons = append(winner.eval.Reasons, "postal_code_lookup")
 		}
 	}
 

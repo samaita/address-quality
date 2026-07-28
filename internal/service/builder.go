@@ -37,7 +37,7 @@ func (svc *Service) DiscoverCandidates(resolved []model.ResolvedEvidence, strate
 		candidates[i].DiscoveryStrategies = strategies
 		candidates[i].UUID = uuid.Must(uuid.NewV7()).String()
 		if candidates[i].Location.SubDistrict != nil {
-			log.Printf("discover %+v %+v", candidates[i].UUID, candidates[i].Location.SubDistrict.Name)
+			log.Printf("discover %+v %+v %+v", candidates[i].UUID, candidates[i].Location.SubDistrict.Name, candidates[i].OriginLevel)
 		}
 	}
 
@@ -49,6 +49,12 @@ func (b *pathBuilder) collectUniqueEntities() map[string][]model.Entity {
 	entities := make(map[string][]model.Entity)
 
 	for _, re := range b.evidence {
+		// postal code is the least reliable evidence, so we skip it when collecting unique entities
+		// it only has reliable use at three first digit as people can easily mis-type, not remember, and/or knowing actual postal code
+		if re.Evidence.Type == model.EvidencePostalCode {
+			continue
+		}
+
 		for _, c := range re.Candidates {
 			if seen[c.ID] {
 				continue
