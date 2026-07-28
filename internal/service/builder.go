@@ -34,9 +34,11 @@ func (svc *Service) DiscoverCandidates(resolved []model.ResolvedEvidence, strate
 	candidates = append(candidates, b.buildFromSubdistrict(entities["SUBDISTRICT"])...)
 
 	for i := range candidates {
-		log.Printf("candidate %+v", candidates[i])
 		candidates[i].DiscoveryStrategies = strategies
 		candidates[i].UUID = uuid.Must(uuid.NewV7()).String()
+		if candidates[i].Location.SubDistrict != nil {
+			log.Printf("discover %+v %+v", candidates[i].UUID, candidates[i].Location.SubDistrict.Name)
+		}
 	}
 
 	return candidates
@@ -62,6 +64,7 @@ func (b *pathBuilder) buildFromProvince(entities []model.Entity) []model.AdminCa
 	var candidates []model.AdminCandidate
 	for _, e := range entities {
 		candidates = append(candidates, model.AdminCandidate{
+			OriginLevel: model.OriginProvince,
 			Location: model.AdminLocation{
 				Province: &model.Province{ID: e.ID, Name: e.Name, NormalizedName: normalizer.Normalize(e.Name)},
 			},
@@ -74,6 +77,7 @@ func (b *pathBuilder) buildFromCity(entities []model.Entity) []model.AdminCandid
 	var candidates []model.AdminCandidate
 	for _, e := range entities {
 		candidates = append(candidates, model.AdminCandidate{
+			OriginLevel: model.OriginCity,
 			Location: model.AdminLocation{
 				City: &model.City{ID: e.ID, Name: e.Name, PostalCode: e.PostalCode, NormalizedName: normalizer.Normalize(e.Name)},
 			},
@@ -86,6 +90,7 @@ func (b *pathBuilder) buildFromDistrict(entities []model.Entity) []model.AdminCa
 	var candidates []model.AdminCandidate
 	for _, e := range entities {
 		candidates = append(candidates, model.AdminCandidate{
+			OriginLevel: model.OriginDistrict,
 			Location: model.AdminLocation{
 				District: &model.District{ID: e.ID, Name: e.Name, NormalizedName: normalizer.Normalize(e.Name)},
 			},
@@ -98,6 +103,7 @@ func (b *pathBuilder) buildFromSubdistrict(entities []model.Entity) []model.Admi
 	var candidates []model.AdminCandidate
 	for _, e := range entities {
 		candidates = append(candidates, model.AdminCandidate{
+			OriginLevel: model.OriginSubDistrict,
 			Location: model.AdminLocation{
 				SubDistrict: &model.SubDistrict{ID: e.ID, Name: e.Name, PostalCode: e.PostalCode, NormalizedName: normalizer.Normalize(e.Name)},
 			},

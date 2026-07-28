@@ -6,6 +6,7 @@ package service
 import (
 	"address-quality/internal/model"
 	"address-quality/internal/normalizer"
+	"log"
 )
 
 func (svc *Service) EnrichCandidates(candidates []model.AdminCandidate) []model.AdminCandidate {
@@ -15,6 +16,10 @@ func (svc *Service) EnrichCandidates(candidates []model.AdminCandidate) []model.
 
 	for i := range candidates {
 		c := &candidates[i]
+
+		if c.Location.SubDistrict != nil {
+			log.Printf("enrich %+v %+v", c.UUID, c.Location.SubDistrict.Name)
+		}
 
 		if c.Location.SubDistrict != nil && c.Location.District == nil {
 			if distID, ok := svc.hierarchyCache.SubDistrictToDist[c.Location.SubDistrict.ID]; ok {
