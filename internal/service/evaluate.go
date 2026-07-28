@@ -390,31 +390,31 @@ func BuildReasons(candidate *model.AdminCandidate) []model.Reason {
 		}
 	}
 	if hasExactMatch {
-		reasons = append(reasons, model.Reason("exact_match"))
+		reasons = append(reasons, model.ReasonExactMatch)
 	}
 
 	matched := getMatchedLevels(candidate)
 	if matched["PROVINCE"] {
-		reasons = append(reasons, model.Reason("match_province"))
+		reasons = append(reasons, model.ReasonMatchProvince)
 	}
 	if matched["CITY"] {
-		reasons = append(reasons, model.Reason("match_city"))
+		reasons = append(reasons, model.ReasonMatchCity)
 	}
 	if matched["DISTRICT"] {
-		reasons = append(reasons, model.Reason("match_district"))
+		reasons = append(reasons, model.ReasonMatchDistrict)
 	}
 	if matched["SUBDISTRICT"] {
-		reasons = append(reasons, model.Reason("match_subdistrict"))
+		reasons = append(reasons, model.ReasonMatchSubDistrict)
 	}
 
 	if prefixScore := scorePostalCodePrefix(candidate); prefixScore >= WeightPostalCodePrefix3 {
 		switch {
 		case prefixScore >= WeightPostalCodePrefix5:
-			reasons = append(reasons, model.Reason("match_postal_code_exact"))
+			reasons = append(reasons, model.ReasonPostalCodeExact)
 		case prefixScore >= WeightPostalCodePrefix4:
-			reasons = append(reasons, model.Reason("match_postal_code_prefix4"))
+			reasons = append(reasons, model.ReasonPostalCodePrefix4)
 		case prefixScore >= WeightPostalCodePrefix3:
-			reasons = append(reasons, model.Reason("match_postal_code_prefix3"))
+			reasons = append(reasons, model.ReasonPostalCodePrefix3)
 		}
 	}
 

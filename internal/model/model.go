@@ -68,6 +68,19 @@ type Conflict struct {
 
 type Reason string
 
+const (
+	ReasonExactMatch         Reason = "exact_match"
+	ReasonMatchProvince      Reason = "match_province"
+	ReasonMatchCity          Reason = "match_city"
+	ReasonMatchDistrict      Reason = "match_district"
+	ReasonMatchSubDistrict   Reason = "match_subdistrict"
+	ReasonPostalCodeExact    Reason = "match_postal_code_exact"
+	ReasonPostalCodePrefix4  Reason = "match_postal_code_prefix4"
+	ReasonPostalCodePrefix3  Reason = "match_postal_code_prefix3"
+	ReasonPostalCodeLookup   Reason = "postal_code_lookup"
+	ReasonPostalCodeInferred Reason = "postal_code_inferred"
+)
+
 type CandidateEvaluation struct {
 	Candidate     AdminCandidate
 	Confidence    float64
