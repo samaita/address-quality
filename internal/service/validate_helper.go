@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -241,7 +240,6 @@ func (svc *Service) matchPhrases(sourceID int64, normalizedText string) map[stri
 	i := 0
 	for i < len(words) {
 
-		log.Printf(">> %+v\n", words)
 		longestEnd := -1
 		for j := len(words); j > i; j-- {
 			candidate := strings.Join(words[i:j], " ")
@@ -273,7 +271,7 @@ func (svc *Service) matchPhrases(sourceID int64, normalizedText string) map[stri
 		i = longestEnd
 	}
 
-	log.Printf(">> %+v\n", wordEntities)
+	// log.Printf(">> %+v\n", wordEntities)
 
 	return wordEntities
 }

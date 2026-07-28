@@ -4,7 +4,10 @@
 package service
 
 import (
+	"log"
 	"sort"
+
+	"github.com/google/uuid"
 
 	"address-quality/internal/database"
 	"address-quality/internal/model"
@@ -31,7 +34,9 @@ func (svc *Service) DiscoverCandidates(resolved []model.ResolvedEvidence, strate
 	candidates = append(candidates, b.buildFromSubdistrict(entities["SUBDISTRICT"])...)
 
 	for i := range candidates {
+		log.Printf("candidate %+v", candidates[i])
 		candidates[i].DiscoveryStrategies = strategies
+		candidates[i].UUID = uuid.Must(uuid.NewV7()).String()
 	}
 
 	return candidates
