@@ -5,6 +5,7 @@ package service
 
 import (
 	"address-quality/internal/model"
+	"log"
 )
 
 func DeduplicateCandidates(candidates []model.AdminCandidate) []model.AdminCandidate {
@@ -16,6 +17,9 @@ func DeduplicateCandidates(candidates []model.AdminCandidate) []model.AdminCandi
 	var deduped []model.AdminCandidate
 
 	for _, c := range candidates {
+		if c.Location.SubDistrict != nil {
+			log.Printf("dedup %+v %+v", c.UUID, c.Location.SubDistrict.Name)
+		}
 		key := candidateKey(c)
 		if idx, ok := seen[key]; ok {
 			deduped[idx] = mergeCandidates(deduped[idx], c)

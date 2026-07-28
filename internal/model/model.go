@@ -209,9 +209,19 @@ type AdminLocation struct {
 	Conflicts   []Conflict
 }
 
+type CandidateOriginLevel string
+
+const (
+	OriginProvince    CandidateOriginLevel = "PROVINCE"
+	OriginCity        CandidateOriginLevel = "CITY"
+	OriginDistrict    CandidateOriginLevel = "DISTRICT"
+	OriginSubDistrict CandidateOriginLevel = "SUBDISTRICT"
+)
+
 type AdminCandidate struct {
-	UUID               string
-	Location           AdminLocation
-	Evidence           []MatchedEvidence
+	UUID                string
+	OriginLevel         CandidateOriginLevel
+	Location            AdminLocation
+	Evidence            []MatchedEvidence
 	DiscoveryStrategies []DiscoveryStrategy
 }
