@@ -86,6 +86,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 
 	var winner *scoredCandidate
+	var eval model.CandidateEvaluation
 	if len(scored) > 0 {
 		winner = &scored[0]
 	}
@@ -99,7 +100,9 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	if applied {
 		location = loc
 		if winner != nil {
-			winner.eval.Reasons = append(winner.eval.Reasons, "postal_code_lookup")
+			winner.eval.Reasons = append(winner.eval.Reasons, model.ReasonPostalCodeLookup)
+		} else {
+			eval.Reasons = append(eval.Reasons, model.ReasonPostalCodeInferred)
 		}
 	}
 
@@ -122,7 +125,6 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 
 	formattedAddr := formatLocation(location)
 
-	var eval model.CandidateEvaluation
 	if winner != nil {
 		eval = winner.eval
 	}
