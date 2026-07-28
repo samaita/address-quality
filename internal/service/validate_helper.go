@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -178,22 +179,101 @@ func ensureHierarchyLoaded(svc *Service, ctx context.Context, sourceID int64) er
 	return svc.hierarchyErr
 }
 
-func matchCandidates[T any](cache map[string]T, sourceID int64, normalized string) []string {
-	var keys []string
-	words := strings.Fields(normalized)
-	seen := make(map[string]bool)
-	for n := len(words); n >= 1; n-- {
-		for i := 0; i <= len(words)-n; i++ {
-			ngram := strings.Join(words[i:i+n], " ")
-			key := fmt.Sprintf("%d:%s", sourceID, ngram)
-			if _, ok := cache[key]; ok && !seen[key] {
-				keys = append(keys, key)
-				seen[key] = true
-			}
+func (svc *Service) loadPhraseDict(ctx context.Context) {
+	dict := make(map[string]map[string][]model.Entity)
+
+	for cacheKey, entries := range svc.provinceCache {
+		m, ok := dict[cacheKey]
+		if !ok {
+			m = make(map[string][]model.Entity)
+			dict[cacheKey] = m
+		}
+		for _, e := range entries {
+			m["PROVINCE"] = append(m["PROVINCE"], model.Entity{ID: e.ID, Name: e.Name, Level: "PROVINCE"})
 		}
 	}
-	return keys
+
+	for cacheKey, entries := range svc.cityCache {
+		m, ok := dict[cacheKey]
+		if !ok {
+			m = make(map[string][]model.Entity)
+			dict[cacheKey] = m
+		}
+		for _, e := range entries {
+			m["CITY"] = append(m["CITY"], model.Entity{ID: e.ID, Name: e.Name, Level: "CITY", PostalCode: e.PostalCode})
+		}
+	}
+
+	for cacheKey, entries := range svc.districtCache {
+		m, ok := dict[cacheKey]
+		if !ok {
+			m = make(map[string][]model.Entity)
+			dict[cacheKey] = m
+		}
+		for _, e := range entries {
+			m["DISTRICT"] = append(m["DISTRICT"], model.Entity{ID: e.ID, Name: e.Name, Level: "DISTRICT"})
+		}
+	}
+
+	for cacheKey, entries := range svc.subDistrictCache {
+		m, ok := dict[cacheKey]
+		if !ok {
+			m = make(map[string][]model.Entity)
+			dict[cacheKey] = m
+		}
+		for _, e := range entries {
+			m["SUBDISTRICT"] = append(m["SUBDISTRICT"], model.Entity{ID: e.ID, Name: e.Name, Level: "SUBDISTRICT", PostalCode: e.PostalCode})
+		}
+	}
+
+	svc.phraseDict = dict
 }
 
+func ensurePhraseDictLoaded(svc *Service, ctx context.Context) error {
+	svc.phraseDictOnce.Do(func() { svc.loadPhraseDict(ctx) })
+	return svc.phraseDictErr
+}
 
+func (svc *Service) matchPhrases(sourceID int64, normalizedText string) map[string][]model.Entity {
+	words := strings.Fields(normalizedText)
+	wordEntities := make(map[string][]model.Entity)
 
+	i := 0
+	for i < len(words) {
+
+		log.Printf(">> %+v\n", words)
+		longestEnd := -1
+		for j := len(words); j > i; j-- {
+			candidate := strings.Join(words[i:j], " ")
+			key := fmt.Sprintf("%d:%s", sourceID, candidate)
+			if _, ok := svc.phraseDict[key]; ok {
+				longestEnd = j
+				break
+			}
+		}
+
+		if longestEnd == -1 {
+			i++
+			continue
+		}
+
+		phrase := strings.Join(words[i:longestEnd], " ")
+		key := fmt.Sprintf("%d:%s", sourceID, phrase)
+		var entities []model.Entity
+		if byLevel, ok := svc.phraseDict[key]; ok {
+			for _, levelEntities := range byLevel {
+				entities = append(entities, levelEntities...)
+			}
+		}
+
+		for k := i; k < longestEnd; k++ {
+			wordEntities[words[k]] = append(wordEntities[words[k]], entities...)
+		}
+
+		i = longestEnd
+	}
+
+	log.Printf(">> %+v\n", wordEntities)
+
+	return wordEntities
+}
