@@ -26,7 +26,7 @@ type LocationRepository interface {
 	FindAllCities(ctx context.Context) ([]database.CityRow, error)
 	FindAllDistricts(ctx context.Context, sourceID int64) ([]database.DistrictRow, error)
 	FindAllSubDistricts(ctx context.Context, sourceID int64) ([]database.SubDistrictRow, error)
-	FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) (*model.Location, error)
+	FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) ([]model.Location, error)
 	FindSourceByCode(ctx context.Context, code string) (int64, string, error)
 	LoadCityProvinceMapping(ctx context.Context, sourceID int64) (map[int64]int64, error)
 	LoadFullHierarchy(ctx context.Context, sourceID int64) (*database.HierarchyMap, error)
