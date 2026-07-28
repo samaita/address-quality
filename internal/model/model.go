@@ -93,6 +93,7 @@ type Resolution struct {
 }
 
 type ResolutionCandidate struct {
+	UUID     string   `json:"uuid"`
 	Score    float64  `json:"score"`
 	Location Location `json:"location"`
 	Reasons  []string `json:"reasons"`
@@ -209,7 +210,8 @@ type AdminLocation struct {
 }
 
 type AdminCandidate struct {
-	Location AdminLocation
-	Evidence []MatchedEvidence
+	UUID               string
+	Location           AdminLocation
+	Evidence           []MatchedEvidence
 	DiscoveryStrategies []DiscoveryStrategy
 }

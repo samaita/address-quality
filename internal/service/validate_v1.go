@@ -114,6 +114,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 				reasons[i] = string(r)
 			}
 			resolutionCands = append(resolutionCands, model.ResolutionCandidate{
+				UUID:     s.candidate.UUID,
 				Score:    s.eval.Confidence,
 				Location: loc,
 				Reasons:  reasons,
