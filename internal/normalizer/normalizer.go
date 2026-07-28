@@ -28,6 +28,7 @@ var adminSet = map[string]struct{}{
 
 var rePunctuation = regexp.MustCompile(`[^a-zA-Z\s]`)
 var reMultipleSpaces = regexp.MustCompile(`\s+`)
+var rePostalCode = regexp.MustCompile(`\b\d{5}\b`)
 
 func Normalize(name string) string {
 	name = strings.ReplaceAll(name, "\\n", " ")
@@ -40,7 +41,17 @@ func Normalize(name string) string {
 		}
 	}
 	joined := strings.Join(filtered, " ")
+
+	postalCodes := rePostalCode.FindAllString(joined, -1)
 	noPunct := rePunctuation.ReplaceAllString(joined, "")
 	result := reMultipleSpaces.ReplaceAllString(noPunct, " ")
-	return strings.TrimSpace(result)
+	result = strings.TrimSpace(result)
+
+	if len(postalCodes) > 0 {
+		if result != "" {
+			result += " "
+		}
+		result += strings.Join(postalCodes, " ")
+	}
+	return result
 }
