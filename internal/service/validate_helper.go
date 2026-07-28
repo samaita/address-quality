@@ -26,6 +26,40 @@ func extractPostalCode(s string) string {
 	return ""
 }
 
+func (svc *Service) resolveLocationByPostalCode(ctx context.Context, location model.Location, normalized string, sourceID int64) (model.Location, bool, error) {
+	inputPostalCode := extractPostalCode(normalized)
+	if inputPostalCode == "" {
+		return location, false, nil
+	}
+
+	needsLookup := false
+	if location == (model.Location{}) {
+		needsLookup = true
+	} else if location.PostalCode == "" && location.SubDistrict == "" {
+		needsLookup = true
+	}
+
+	if !needsLookup {
+		return location, false, nil
+	}
+
+	loc, err := svc.locationRepo.FindByPostalCode(ctx, inputPostalCode, sourceID)
+	if err != nil {
+		return model.Location{}, false, err
+	}
+	if loc == nil {
+		return location, false, nil
+	}
+
+	if location != (model.Location{}) {
+		if location.District != loc.District || location.City != loc.City || location.Province != loc.Province {
+			return location, false, nil
+		}
+	}
+
+	return *loc, true, nil
+}
+
 func (svc *Service) sanitize(input string) string {
 	return svc.s.Sanitize(input)
 }
