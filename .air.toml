@@ -8,7 +8,8 @@ tmp_dir = "tmp"
   exclude_dir = ["tmp", "vendor"]
   include_ext = ["go", "env"]
   exclude_regex = []
-  stop_on_error = true
+  stop_on_error = false
+  pre_cmd = ["swag init -g cmd/server/main.go -o docs"]
 
 [log]
   time = true

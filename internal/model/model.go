@@ -8,6 +8,17 @@ import (
 	"fmt"
 )
 
+type HealthResponse struct {
+	Status   string `json:"status"`
+	Database string `json:"database,omitempty"`
+}
+
+type ErrorResponse struct {
+	Timestamp string `json:"timestamp"`
+	RequestID string `json:"request_id"`
+	Error     string `json:"error"`
+}
+
 type AddressRequest struct {
 	Address    string `json:"address" validate:"required"`
 	SourceCode string `json:"source_code"`

@@ -23,24 +23,40 @@ func New(svc *service.Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// HandleHealthCheck checks database connectivity.
+// @Summary      Health check
+// @Description  Checks database connectivity and returns service status
+// @Success      200  {object}  model.HealthResponse
+// @Failure      503  {object}  model.HealthResponse
+// @Router       /health [get]
 func (h *Handler) HandleHealthCheck(c echo.Context) error {
 	ctx := c.Request().Context()
 	if err := h.svc.Ping(ctx); err != nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "error"})
+		return c.JSON(http.StatusServiceUnavailable, model.HealthResponse{Status: "error"})
 	}
-	return c.JSON(http.StatusOK, map[string]string{"status": "ok", "database": "ok"})
+	return c.JSON(http.StatusOK, model.HealthResponse{Status: "ok", Database: "ok"})
 }
 
 func errorResponse(c echo.Context, status int, msg string, requestID string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	resp := map[string]string{
-		"timestamp":  now,
-		"request_id": requestID,
-		"error":      msg,
+	resp := model.ErrorResponse{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		RequestID: requestID,
+		Error:     msg,
 	}
 	return c.JSON(status, resp)
 }
 
+// HandleAddressRequest validates and resolves an address.
+// @Summary      Validate an address
+// @Description  Validate and resolve a Thai address against the official location database
+// @Accept       json
+// @Produce      json
+// @Param        request  body  model.AddressRequest  true  "Address to validate"
+// @Success      200  {object}  model.AddressResponse
+// @Failure      400  {object}  model.ErrorResponse
+// @Failure      500  {object}  model.ErrorResponse
+// @Security     ApiKeyAuth
+// @Router       /v1/validate [post]
 func (h *Handler) HandleAddressRequest(c echo.Context) error {
 	requestID := mw.GetRequestID(c.Request().Context())
 
