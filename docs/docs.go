@@ -92,10 +92,12 @@ const docTemplate = `{
             ],
             "properties": {
                 "address": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "JL. Supratman No.72, Citarum, 40191"
                 },
                 "source_code": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "kemendagri"
                 }
             }
         },
@@ -106,10 +108,12 @@ const docTemplate = `{
                     "$ref": "#/definitions/model.ResponseData"
                 },
                 "request_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "019fac45-d6cb-7101-9159-76bd7c25867b"
                 },
                 "timestamp": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-07-29T05:08:05Z"
                 }
             }
         },
@@ -146,10 +150,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "message": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Postal code 40115 does not match district Citarum"
                 },
                 "type": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "postal_code_mismatch"
                 }
             }
         },
@@ -157,13 +163,16 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "error": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "invalid request body"
                 },
                 "request_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "019fac44-95c0-79cb-b1d4-649463403ea7"
                 },
                 "timestamp": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-07-29T05:06:43Z"
                 }
             }
         },
@@ -171,10 +180,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "database": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ok"
                 },
                 "status": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ok"
                 }
             }
         },
@@ -182,19 +193,24 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "city": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Kota Bandung"
                 },
                 "district": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Bandung Wetan"
                 },
                 "postal_code": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "40115"
                 },
                 "province": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Jawa Barat"
                 },
                 "sub_district": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Citarum"
                 }
             }
         },
@@ -202,10 +218,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "location_source": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "kemendagri"
                 },
                 "location_version": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2025"
                 }
             }
         },
@@ -230,7 +248,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "candidate_count": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 1
                 },
                 "candidates": {
                     "type": "array",
@@ -259,10 +278,12 @@ const docTemplate = `{
                     }
                 },
                 "score": {
-                    "type": "number"
+                    "type": "number",
+                    "example": 0.35
                 },
                 "uuid": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "019fac45-d6d0-7e53-8e0d-a44f30d72a53"
                 }
             }
         },
@@ -270,16 +291,19 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "address_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "019fac45-d6cb-7153-aeef-742c66db6d18"
                 },
                 "assessment": {
                     "$ref": "#/definitions/model.Assessment"
                 },
                 "confidence": {
-                    "type": "number"
+                    "type": "number",
+                    "example": 0.35
                 },
                 "formatted_address": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Citarum, Bandung Wetan, Kota Bandung, Jawa Barat 40115"
                 },
                 "location": {
                     "$ref": "#/definitions/model.Location"
@@ -288,16 +312,23 @@ const docTemplate = `{
                     "$ref": "#/definitions/model.Metadata"
                 },
                 "normalized_input": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "jl supratman no citarum 40191"
                 },
                 "raw_input": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "JL. Supratman No.72, Citarum, 40191"
                 },
                 "resolution": {
                     "$ref": "#/definitions/model.Resolution"
                 },
                 "status": {
-                    "$ref": "#/definitions/model.QualityStatus"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.QualityStatus"
+                        }
+                    ],
+                    "example": "VALID"
                 }
             }
         }

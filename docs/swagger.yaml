@@ -3,8 +3,10 @@ definitions:
   model.AddressRequest:
     properties:
       address:
+        example: JL. Supratman No.72, Citarum, 40191
         type: string
       source_code:
+        example: kemendagri
         type: string
     required:
     - address
@@ -14,8 +16,10 @@ definitions:
       data:
         $ref: '#/definitions/model.ResponseData'
       request_id:
+        example: 019fac45-d6cb-7101-9159-76bd7c25867b
         type: string
       timestamp:
+        example: "2026-07-29T05:08:05Z"
         type: string
     type: object
   model.Assessment:
@@ -40,44 +44,58 @@ definitions:
   model.Conflict:
     properties:
       message:
+        example: Postal code 40115 does not match district Citarum
         type: string
       type:
+        example: postal_code_mismatch
         type: string
     type: object
   model.ErrorResponse:
     properties:
       error:
+        example: invalid request body
         type: string
       request_id:
+        example: 019fac44-95c0-79cb-b1d4-649463403ea7
         type: string
       timestamp:
+        example: "2026-07-29T05:06:43Z"
         type: string
     type: object
   model.HealthResponse:
     properties:
       database:
+        example: ok
         type: string
       status:
+        example: ok
         type: string
     type: object
   model.Location:
     properties:
       city:
+        example: Kota Bandung
         type: string
       district:
+        example: Bandung Wetan
         type: string
       postal_code:
+        example: "40115"
         type: string
       province:
+        example: Jawa Barat
         type: string
       sub_district:
+        example: Citarum
         type: string
     type: object
   model.Metadata:
     properties:
       location_source:
+        example: kemendagri
         type: string
       location_version:
+        example: "2025"
         type: string
     type: object
   model.QualityStatus:
@@ -97,6 +115,7 @@ definitions:
   model.Resolution:
     properties:
       candidate_count:
+        example: 1
         type: integer
       candidates:
         items:
@@ -116,32 +135,41 @@ definitions:
           type: string
         type: array
       score:
+        example: 0.35
         type: number
       uuid:
+        example: 019fac45-d6d0-7e53-8e0d-a44f30d72a53
         type: string
     type: object
   model.ResponseData:
     properties:
       address_id:
+        example: 019fac45-d6cb-7153-aeef-742c66db6d18
         type: string
       assessment:
         $ref: '#/definitions/model.Assessment'
       confidence:
+        example: 0.35
         type: number
       formatted_address:
+        example: Citarum, Bandung Wetan, Kota Bandung, Jawa Barat 40115
         type: string
       location:
         $ref: '#/definitions/model.Location'
       metadata:
         $ref: '#/definitions/model.Metadata'
       normalized_input:
+        example: jl supratman no citarum 40191
         type: string
       raw_input:
+        example: JL. Supratman No.72, Citarum, 40191
         type: string
       resolution:
         $ref: '#/definitions/model.Resolution'
       status:
-        $ref: '#/definitions/model.QualityStatus'
+        allOf:
+        - $ref: '#/definitions/model.QualityStatus'
+        example: VALID
     type: object
 host: localhost:8080
 info:
