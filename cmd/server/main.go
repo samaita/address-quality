@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Copyright (c) 2026 Samaita
 
+// @title           Address Quality API
+// @version         1.0
+// @description     Thai address validation and resolution API
+// @host            localhost:8080
+// @BasePath        /
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in                         header
+// @name                       X-API-Key
+
 package main
 
 import (

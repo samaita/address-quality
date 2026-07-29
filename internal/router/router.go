@@ -8,11 +8,14 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	echoswagger "github.com/swaggo/echo-swagger"
 
 	"address-quality/internal/config"
 	"address-quality/internal/handler"
 	"address-quality/internal/logger"
 	mw "address-quality/internal/middleware"
+
+	_ "address-quality/docs"
 )
 
 func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
@@ -27,6 +30,7 @@ func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
 	e.Use(middleware.Recover())
 
 	e.GET("/health", h.HandleHealthCheck)
+	e.GET("/swagger/*", echoswagger.WrapHandler)
 
 	api := e.Group("")
 	api.Use(middleware.BodyLimit(cfg.MaxBodySize))

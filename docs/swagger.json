@@ -1,0 +1,306 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Thai address validation and resolution API",
+        "title": "Address Quality API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Checks database connectivity and returns service status",
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.HealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/model.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/validate": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Validate and resolve a Thai address against the official location database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Validate an address",
+                "parameters": [
+                    {
+                        "description": "Address to validate",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AddressRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AddressResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "model.AddressRequest": {
+            "type": "object",
+            "required": [
+                "address"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "source_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.AddressResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/model.ResponseData"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Assessment": {
+            "type": "object",
+            "properties": {
+                "ambiguous": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "conflicts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Conflict"
+                    }
+                },
+                "matched": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "missing": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "model.Conflict": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "database": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Location": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "postal_code": {
+                    "type": "string"
+                },
+                "province": {
+                    "type": "string"
+                },
+                "sub_district": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Metadata": {
+            "type": "object",
+            "properties": {
+                "location_source": {
+                    "type": "string"
+                },
+                "location_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.QualityStatus": {
+            "type": "string",
+            "enum": [
+                "VALID",
+                "INCOMPLETE",
+                "AMBIGUOUS",
+                "CONFLICT",
+                "UNKNOWN"
+            ],
+            "x-enum-varnames": [
+                "StatusValid",
+                "StatusIncomplete",
+                "StatusAmbiguous",
+                "StatusConflict",
+                "StatusUnknown"
+            ]
+        },
+        "model.Resolution": {
+            "type": "object",
+            "properties": {
+                "candidate_count": {
+                    "type": "integer"
+                },
+                "candidates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.ResolutionCandidate"
+                    }
+                },
+                "strategy": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "model.ResolutionCandidate": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "$ref": "#/definitions/model.Location"
+                },
+                "reasons": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "score": {
+                    "type": "number"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ResponseData": {
+            "type": "object",
+            "properties": {
+                "address_id": {
+                    "type": "string"
+                },
+                "assessment": {
+                    "$ref": "#/definitions/model.Assessment"
+                },
+                "confidence": {
+                    "type": "number"
+                },
+                "formatted_address": {
+                    "type": "string"
+                },
+                "location": {
+                    "$ref": "#/definitions/model.Location"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/model.Metadata"
+                },
+                "normalized_input": {
+                    "type": "string"
+                },
+                "raw_input": {
+                    "type": "string"
+                },
+                "resolution": {
+                    "$ref": "#/definitions/model.Resolution"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.QualityStatus"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "X-API-Key",
+            "in": "header"
+        }
+    }
+}

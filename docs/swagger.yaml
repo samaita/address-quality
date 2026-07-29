@@ -1,0 +1,202 @@
+basePath: /
+definitions:
+  model.AddressRequest:
+    properties:
+      address:
+        type: string
+      source_code:
+        type: string
+    required:
+    - address
+    type: object
+  model.AddressResponse:
+    properties:
+      data:
+        $ref: '#/definitions/model.ResponseData'
+      request_id:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  model.Assessment:
+    properties:
+      ambiguous:
+        items:
+          type: string
+        type: array
+      conflicts:
+        items:
+          $ref: '#/definitions/model.Conflict'
+        type: array
+      matched:
+        items:
+          type: string
+        type: array
+      missing:
+        items:
+          type: string
+        type: array
+    type: object
+  model.Conflict:
+    properties:
+      message:
+        type: string
+      type:
+        type: string
+    type: object
+  model.ErrorResponse:
+    properties:
+      error:
+        type: string
+      request_id:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  model.HealthResponse:
+    properties:
+      database:
+        type: string
+      status:
+        type: string
+    type: object
+  model.Location:
+    properties:
+      city:
+        type: string
+      district:
+        type: string
+      postal_code:
+        type: string
+      province:
+        type: string
+      sub_district:
+        type: string
+    type: object
+  model.Metadata:
+    properties:
+      location_source:
+        type: string
+      location_version:
+        type: string
+    type: object
+  model.QualityStatus:
+    enum:
+    - VALID
+    - INCOMPLETE
+    - AMBIGUOUS
+    - CONFLICT
+    - UNKNOWN
+    type: string
+    x-enum-varnames:
+    - StatusValid
+    - StatusIncomplete
+    - StatusAmbiguous
+    - StatusConflict
+    - StatusUnknown
+  model.Resolution:
+    properties:
+      candidate_count:
+        type: integer
+      candidates:
+        items:
+          $ref: '#/definitions/model.ResolutionCandidate'
+        type: array
+      strategy:
+        items:
+          type: string
+        type: array
+    type: object
+  model.ResolutionCandidate:
+    properties:
+      location:
+        $ref: '#/definitions/model.Location'
+      reasons:
+        items:
+          type: string
+        type: array
+      score:
+        type: number
+      uuid:
+        type: string
+    type: object
+  model.ResponseData:
+    properties:
+      address_id:
+        type: string
+      assessment:
+        $ref: '#/definitions/model.Assessment'
+      confidence:
+        type: number
+      formatted_address:
+        type: string
+      location:
+        $ref: '#/definitions/model.Location'
+      metadata:
+        $ref: '#/definitions/model.Metadata'
+      normalized_input:
+        type: string
+      raw_input:
+        type: string
+      resolution:
+        $ref: '#/definitions/model.Resolution'
+      status:
+        $ref: '#/definitions/model.QualityStatus'
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Thai address validation and resolution API
+  title: Address Quality API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Checks database connectivity and returns service status
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/model.HealthResponse'
+      summary: Health check
+  /v1/validate:
+    post:
+      consumes:
+      - application/json
+      description: Validate and resolve a Thai address against the official location
+        database
+      parameters:
+      - description: Address to validate
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.AddressRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AddressResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Validate an address
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: X-API-Key
+    type: apiKey
+swagger: "2.0"
