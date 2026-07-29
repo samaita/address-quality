@@ -9,19 +9,19 @@ import (
 )
 
 type HealthResponse struct {
-	Status   string `json:"status"`
-	Database string `json:"database,omitempty"`
+	Status   string `json:"status" example:"ok"`
+	Database string `json:"database,omitempty" example:"ok"`
 }
 
 type ErrorResponse struct {
-	Timestamp string `json:"timestamp"`
-	RequestID string `json:"request_id"`
-	Error     string `json:"error"`
+	Timestamp string `json:"timestamp" example:"2026-07-29T05:06:43Z"`
+	RequestID string `json:"request_id" example:"019fac44-95c0-79cb-b1d4-649463403ea7"`
+	Error     string `json:"error" example:"invalid request body"`
 }
 
 type AddressRequest struct {
-	Address    string `json:"address" validate:"required"`
-	SourceCode string `json:"source_code"`
+	Address    string `json:"address" validate:"required" example:"JL. Supratman No.72, Citarum, 40191"`
+	SourceCode string `json:"source_code" example:"kemendagri"`
 }
 
 func (r *AddressRequest) Validate(maxLength int) error {
@@ -35,11 +35,11 @@ func (r *AddressRequest) Validate(maxLength int) error {
 }
 
 type Location struct {
-	PostalCode  string `json:"postal_code"`
-	SubDistrict string `json:"sub_district"`
-	District    string `json:"district"`
-	City        string `json:"city"`
-	Province    string `json:"province"`
+	PostalCode  string `json:"postal_code" example:"40115"`
+	SubDistrict string `json:"sub_district" example:"Citarum"`
+	District    string `json:"district" example:"Bandung Wetan"`
+	City        string `json:"city" example:"Kota Bandung"`
+	Province    string `json:"province" example:"Jawa Barat"`
 }
 
 type Candidate struct {
@@ -73,8 +73,8 @@ const (
 )
 
 type Conflict struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
+	Type    string `json:"type" example:"postal_code_mismatch"`
+	Message string `json:"message" example:"Postal code 40115 does not match district Citarum"`
 }
 
 type Reason string
@@ -112,29 +112,29 @@ type Assessment struct {
 
 type Resolution struct {
 	Strategy       []string              `json:"strategy"`
-	CandidateCount int                   `json:"candidate_count"`
+	CandidateCount int                   `json:"candidate_count" example:"1"`
 	Candidates     []ResolutionCandidate `json:"candidates"`
 }
 
 type ResolutionCandidate struct {
-	UUID     string   `json:"uuid"`
-	Score    float64  `json:"score"`
+	UUID     string   `json:"uuid" example:"019fac45-d6d0-7e53-8e0d-a44f30d72a53"`
+	Score    float64  `json:"score" example:"0.35"`
 	Location Location `json:"location"`
 	Reasons  []string `json:"reasons"`
 }
 
 type Metadata struct {
-	LocationSource  string `json:"location_source"`
-	LocationVersion string `json:"location_version"`
+	LocationSource  string `json:"location_source" example:"kemendagri"`
+	LocationVersion string `json:"location_version" example:"2025"`
 }
 
 type ResponseData struct {
-	AddressID       string        `json:"address_id"`
-	Status          QualityStatus `json:"status"`
-	Confidence      float64       `json:"confidence"`
-	RawInput        string        `json:"raw_input"`
-	NormalizedInput string        `json:"normalized_input"`
-	FormattedAddr   string        `json:"formatted_address"`
+	AddressID       string        `json:"address_id" example:"019fac45-d6cb-7153-aeef-742c66db6d18"`
+	Status          QualityStatus `json:"status" example:"VALID"`
+	Confidence      float64       `json:"confidence" example:"0.35"`
+	RawInput        string        `json:"raw_input" example:"JL. Supratman No.72, Citarum, 40191"`
+	NormalizedInput string        `json:"normalized_input" example:"jl supratman no citarum 40191"`
+	FormattedAddr   string        `json:"formatted_address" example:"Citarum, Bandung Wetan, Kota Bandung, Jawa Barat 40115"`
 	Location        Location      `json:"location"`
 	Assessment      Assessment    `json:"assessment"`
 	Resolution      Resolution    `json:"resolution"`
@@ -142,8 +142,8 @@ type ResponseData struct {
 }
 
 type AddressResponse struct {
-	Timestamp string       `json:"timestamp"`
-	RequestID string       `json:"request_id"`
+	Timestamp string       `json:"timestamp" example:"2026-07-29T05:08:05Z"`
+	RequestID string       `json:"request_id" example:"019fac45-d6cb-7101-9159-76bd7c25867b"`
 	Data      ResponseData `json:"data"`
 }
 
