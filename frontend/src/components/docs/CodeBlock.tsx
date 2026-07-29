@@ -1,37 +1,84 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import Prism from "prismjs"
 import "prismjs/components/prism-json"
+import "prismjs/components/prism-bash"
+import "prismjs/components/prism-python"
+import "prismjs/components/prism-javascript"
 import "prismjs/themes/prism-tomorrow.css"
 import useCopyToClipboard from "@/hooks/useCopyToClipboard"
 
-type CodeBlockProps = {
+type CodeTab = {
+  label: string
   code: string
   language?: string
-  title?: string
 }
 
-export default function CodeBlock({ code, language = "json", title }: CodeBlockProps) {
+type CodeBlockProps = {
+  code?: string
+  language?: string
+  title?: string
+  tabs?: CodeTab[]
+  collapsible?: boolean
+}
+
+export default function CodeBlock({
+  code = "",
+  language = "json",
+  title,
+  tabs,
+  collapsible = false,
+}: CodeBlockProps) {
   const ref = useRef<HTMLElement>(null)
   const { copied, copy } = useCopyToClipboard()
+  const [activeTab, setActiveTab] = useState(0)
+  const [expanded, setExpanded] = useState(false)
+
+  const effectiveTabs = tabs ?? [{ label: title ?? "", code, language }]
+  const active = effectiveTabs[activeTab]
+  const activeCode = active.code
+  const activeLanguage = active.language ?? language
+  const hasMultipleTabs = effectiveTabs.length > 1
 
   useEffect(() => {
     if (ref.current) {
       Prism.highlightElement(ref.current)
     }
-  }, [code, language])
+  }, [activeCode, activeLanguage])
 
   return (
     <div className="group relative overflow-hidden rounded-xl border border-surface-700 bg-[#2d2d2d]">
-      {title && (
+      {hasMultipleTabs && (
+        <div className="flex border-b border-surface-700">
+          {effectiveTabs.map((tab, i) => (
+            <button
+              key={tab.label}
+              type="button"
+              onClick={() => setActiveTab(i)}
+              className={`px-4 py-2 text-xs font-medium transition-colors ${
+                i === activeTab
+                  ? "bg-surface-800 text-white"
+                  : "text-surface-400 hover:text-surface-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {!hasMultipleTabs && title && (
         <div className="flex items-center justify-between border-b border-surface-700 px-4 py-2">
           <span className="text-xs font-medium text-surface-400">{title}</span>
         </div>
       )}
-      <div className="relative">
+      <div
+        className={`relative ${
+          collapsible && !expanded ? "max-h-48 overflow-hidden" : ""
+        }`}
+      >
         <button
           type="button"
-          onClick={() => copy(code)}
-          className="absolute right-3 top-3 z-10 rounded-md p-1.5 text-surface-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/30"
+          onClick={() => copy(activeCode)}
+          className="absolute right-3 top-3 z-10 rounded-md p-1.5 text-surface-500 transition-opacity hover:text-white max-sm:opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/30"
           aria-label="Copy code"
         >
           {copied ? (
@@ -41,11 +88,27 @@ export default function CodeBlock({ code, language = "json", title }: CodeBlockP
           )}
         </button>
         <pre className="overflow-x-auto p-4 text-sm leading-relaxed">
-          <code ref={ref} className={`language-${language}`}>
-            {code}
+          <code ref={ref} className={`language-${activeLanguage}`}>
+            {activeCode}
           </code>
         </pre>
       </div>
+      {collapsible && (
+        <div
+          className={`pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#2d2d2d] to-transparent transition-opacity ${
+            expanded ? "opacity-0" : "opacity-100"
+          }`}
+        />
+      )}
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="block w-full border-t border-surface-700 py-2 text-center text-xs font-medium text-surface-400 transition-colors hover:text-surface-200"
+        >
+          {expanded ? "Show less" : "Show full response"}
+        </button>
+      )}
     </div>
   )
 }

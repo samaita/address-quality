@@ -31,6 +31,7 @@ export default function Navbar() {
                 <Link
                   key={link.to}
                   to={link.to}
+                  aria-current={isActive ? "page" : undefined}
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? "text-surface-900"
@@ -57,6 +58,8 @@ export default function Navbar() {
             onClick={() => setMobileOpen(!mobileOpen)}
             className="inline-flex items-center justify-center rounded-lg p-2 text-surface-500 hover:text-surface-900 hover:bg-surface-100 md:hidden"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-menu"
           >
             {mobileOpen ? (
               <XMarkIcon className="h-5 w-5" />
@@ -67,7 +70,12 @@ export default function Navbar() {
         </nav>
 
         {mobileOpen && (
-          <div className="border-t border-surface-200 pb-4 pt-2 md:hidden">
+          <div
+            id="mobile-menu"
+            role="region"
+            aria-label="Mobile navigation"
+            className="border-t border-surface-200 pb-4 pt-2 md:hidden"
+          >
             {navLinks.map((link) => {
               const isActive = pathname === link.to
               return (
@@ -75,6 +83,7 @@ export default function Navbar() {
                   key={link.to}
                   to={link.to}
                   onClick={() => setMobileOpen(false)}
+                  aria-current={isActive ? "page" : undefined}
                   className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? "text-surface-900"
