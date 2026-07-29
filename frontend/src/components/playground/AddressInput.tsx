@@ -33,15 +33,14 @@ export default function AddressInput({ onValidate, loading }: AddressInputProps)
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <div className="relative flex-1">
+      <div className="relative min-h-[160px] flex-1">
         <textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={EXAMPLE_ADDRESS}
-          className="h-full w-full resize-none rounded-xl border border-surface-200 bg-white p-4 text-sm leading-relaxed text-surface-900 placeholder:text-surface-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
+          className="h-full min-h-[160px] w-full resize-none rounded-xl border border-surface-200 bg-white p-4 text-sm leading-relaxed text-surface-900 placeholder:text-surface-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:opacity-50"
           disabled={loading}
-          rows={6}
         />
       </div>
       <div className="flex gap-3">
