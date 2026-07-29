@@ -1,5 +1,12 @@
+import { Link } from "react-router-dom"
 import Section from "@/components/kumo-ui/Section"
 import CodeBlock from "@/components/docs/CodeBlock"
+import { ChevronRightIcon } from "@/components/icons"
+
+const curlRequest = `curl -X POST https://app.samaita.com/address-quality/v1/validate \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: \\$AQ_API_KEY" \\
+  -d '{"address":"JL MERDEKA NO 56 CITARUM BANDUNG 40115"}'`
 
 const requestCode = JSON.stringify(
   { address: "JL MERDEKA NO 56 CITARUM BANDUNG 40115" },
@@ -62,18 +69,45 @@ const responseCode = JSON.stringify(
 export default function ExampleSection() {
   return (
     <Section
-      title="See it in action"
-      description="Send an address and receive structured validation results with confidence scoring and resolution details."
+      title="Request and response"
+      description="POST an address to /v1/validate. Get a structured result with confidence, matched fields, and ranked candidates."
     >
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div>
+      <div className="mb-4 flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">
+          Example
+        </span>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div className="flex flex-col">
           <p className="mb-3 text-sm font-medium text-surface-500">Request</p>
-          <CodeBlock code={requestCode} language="json" title="POST /v1/validate" />
+          <CodeBlock
+            tabs={[
+              { label: "curl", code: curlRequest, language: "bash" },
+              { label: "JSON", code: requestCode, language: "json" },
+            ]}
+            language="bash"
+          />
         </div>
-        <div>
+        <div className="flex flex-col">
           <p className="mb-3 text-sm font-medium text-surface-500">Response</p>
-          <CodeBlock code={responseCode} language="json" title="200 OK" />
+          <CodeBlock
+            code={responseCode}
+            language="json"
+            title="200 OK"
+            collapsible
+          />
         </div>
+      </div>
+
+      <div className="mt-8">
+        <Link
+          to="/playground"
+          className="inline-flex items-center gap-2 text-sm font-medium text-accent-600 transition-colors hover:text-accent-700"
+        >
+          Run this in the Playground
+          <ChevronRightIcon className="h-4 w-4" />
+        </Link>
       </div>
     </Section>
   )

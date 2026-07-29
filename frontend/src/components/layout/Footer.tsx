@@ -17,8 +17,11 @@ export default function Footer() {
               Indonesian address validation API.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:items-end">
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <div className="flex flex-row flex-wrap gap-x-8 gap-y-3 sm:items-end">
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-surface-400">
+                Product
+              </span>
               <Link
                 to="/playground"
                 className="text-sm text-surface-500 transition-colors hover:text-surface-900"
@@ -31,6 +34,11 @@ export default function Footer() {
               >
                 Docs
               </Link>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-surface-400">
+                Resources
+              </span>
               <a
                 href="https://github.com/samaita/address-quality"
                 target="_blank"
@@ -39,11 +47,29 @@ export default function Footer() {
               >
                 GitHub
               </a>
+              <a
+                href="/swagger.yaml"
+                download
+                className="text-sm text-surface-500 transition-colors hover:text-surface-900"
+              >
+                OpenAPI
+              </a>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-surface-400">
+                Legal
+              </span>
+              <span className="text-sm text-surface-500">
+                BSL 1.1
+              </span>
+              <span className="text-xs text-surface-400">
+                Converts to Apache 2.0 on 2030-03-01
+              </span>
             </div>
           </div>
         </div>
         <div className="mt-10 border-t border-surface-100 pt-6">
-          <p className="text-xs text-surface-400">
+          <p className="text-xs text-surface-500">
             &copy; {new Date().getFullYear()} Samaita. All rights reserved.
           </p>
         </div>
