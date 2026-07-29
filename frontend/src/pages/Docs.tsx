@@ -71,7 +71,7 @@ export default function Docs() {
 
         <div className="flex-1 min-w-0 max-w-3xl space-y-16">
           {/* Introduction */}
-          <section id="introduction">
+          <section id="introduction" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               Introduction
             </h2>
@@ -88,7 +88,7 @@ export default function Docs() {
           </section>
 
           {/* Quick Start */}
-          <section id="quickstart">
+          <section id="quickstart" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               Quick Start
             </h2>
@@ -112,7 +112,7 @@ export default function Docs() {
           </section>
 
           {/* Authentication */}
-          <section id="authentication">
+          <section id="authentication" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               Authentication
             </h2>
@@ -147,7 +147,7 @@ export default function Docs() {
           </section>
 
           {/* POST /v1/validate */}
-          <section id="validate">
+          <section id="validate" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               POST /v1/validate
             </h2>
@@ -168,7 +168,7 @@ export default function Docs() {
           </section>
 
           {/* Request Schema */}
-          <section id="request-schema">
+          <section id="request-schema" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               Request Schema
             </h2>
@@ -206,7 +206,7 @@ export default function Docs() {
           </section>
 
           {/* Response Schema */}
-          <section id="response-schema">
+          <section id="response-schema" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               Response Schema
             </h2>
@@ -289,7 +289,7 @@ export default function Docs() {
           </section>
 
           {/* Error Responses */}
-          <section id="errors">
+          <section id="errors" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               Error Responses
             </h2>
@@ -329,7 +329,7 @@ export default function Docs() {
           </section>
 
           {/* Rate Limits */}
-          <section id="rate-limits">
+          <section id="rate-limits" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               Rate Limits
             </h2>
@@ -365,7 +365,7 @@ export default function Docs() {
           </section>
 
           {/* FAQ */}
-          <section id="faq">
+          <section id="faq" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
               FAQ
             </h2>
