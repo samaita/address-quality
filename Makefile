@@ -1,4 +1,4 @@
-.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load build-seed seed benchmark
+.PHONY: run build test lint clean frontend frontend-install frontend-build air swagger test-api test-api-smoke test-api-load build-seed seed benchmark
 
 run:
 	go run ./cmd/server
@@ -14,6 +14,15 @@ lint:
 
 clean:
 	rm -rf bin/ tmp/ db/*.db
+
+frontend:
+	cd frontend && npm run dev
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-build:
+	cd frontend && npm run build
 
 air:
 	air
