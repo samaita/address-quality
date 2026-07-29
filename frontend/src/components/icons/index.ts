@@ -6,4 +6,12 @@ export {
   ClipboardDocumentIcon,
   CheckIcon,
   ExclamationTriangleIcon,
+  MagnifyingGlassIcon,
+  MapPinIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  QuestionMarkCircleIcon,
+  ArrowsRightLeftIcon,
+  LinkIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline"
