@@ -1,5 +1,5 @@
 import type { QualityStatus } from "@/types/api"
-import type { BadgeVariant } from "@/components/common/Badge"
+import type { BadgeVariant } from "@cloudflare/kumo/components/badge"
 
 export type ConfidenceTier = "green" | "yellow" | "red"
 
@@ -18,8 +18,8 @@ export function getStatusTone(status: QualityStatus): BadgeVariant {
     case "AMBIGUOUS":
       return "warning"
     case "CONFLICT":
-      return "danger"
+      return "error"
     case "UNKNOWN":
-      return "default"
+      return "neutral"
   }
 }

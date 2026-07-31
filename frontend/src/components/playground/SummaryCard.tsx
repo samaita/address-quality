@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import Card from "@/components/common/Card"
-import Badge from "@/components/common/Badge"
-import { Progress } from "@/components/kumo-ui"
+import { Badge } from "@cloudflare/kumo/components/badge"
+import ConfidenceBar from "./ConfidenceBar"
 import { getConfidenceTier, getStatusTone } from "@/lib/confidence"
 import type { ResponseData } from "@/types/api"
 
@@ -51,7 +51,7 @@ export default function SummaryCard({ data, requestId }: SummaryCardProps) {
         )}
       </div>
 
-      <Progress
+      <ConfidenceBar
         className="mt-4"
         value={data.confidence}
         tone={tier}
