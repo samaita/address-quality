@@ -8,6 +8,13 @@ import "prismjs/components/prism-http"
 
 const reqCode = JSON.stringify({ address: "JL MERDEKA NO 56 CITARUM BANDUNG 40115" }, null, 2)
 
+const reqCurl = `curl -X POST https://api.addressquality.dev/v1/validate \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: your-api-key" \\
+  -d '{
+    "address": "JL MERDEKA NO 56 CITARUM BANDUNG 40115"
+  }'`
+
 const reqHttp = `POST /v1/validate
 Content-Type: application/json
 
@@ -251,7 +258,12 @@ export default function Docs() {
             </p>
             <div className="mt-6 space-y-6">
               <SectionTitle>Request</SectionTitle>
-              <CodeBlock code={reqHttp} language="http" title="POST /v1/validate" />
+              <CodeBlock
+                tabs={[
+                  { label: "cURL", code: reqCurl, language: "bash" },
+                  { label: "HTTP", code: reqHttp, language: "http" },
+                ]}
+              />
               <SectionTitle>Request Fields</SectionTitle>
               <Table>
                 <thead>
