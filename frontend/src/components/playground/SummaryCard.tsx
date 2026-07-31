@@ -1,9 +1,7 @@
 import { useMemo } from "react"
 import Card from "@/components/common/Card"
 import Badge from "@/components/common/Badge"
-import CopyButton from "@/components/common/CopyButton"
 import { Progress } from "@/components/kumo-ui"
-import useCopyToClipboard from "@/hooks/useCopyToClipboard"
 import { getConfidenceTier, getStatusTone } from "@/lib/confidence"
 import type { ResponseData } from "@/types/api"
 
@@ -21,7 +19,6 @@ const hierarchyFields: { key: keyof ResponseData["location"]; label: string }[] 
 ]
 
 export default function SummaryCard({ data, requestId }: SummaryCardProps) {
-  const { copied, copy } = useCopyToClipboard()
   const tier = getConfidenceTier(data.confidence)
   const percentage = Math.round(data.confidence * 100)
 
@@ -72,18 +69,11 @@ export default function SummaryCard({ data, requestId }: SummaryCardProps) {
         ))}
       </dl>
 
-      <div className="mt-6 flex items-center justify-between border-t border-surface-100 pt-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="text-xs text-surface-400">request_id</span>
-          <code className="truncate font-mono text-xs text-surface-600">
-            {requestId}
-          </code>
-        </div>
-        <CopyButton
-          copied={copied}
-          onCopy={() => copy(requestId)}
-          className="flex-shrink-0 text-surface-400 hover:text-surface-700"
-        />
+      <div className="mt-6 flex items-center gap-2 border-t border-surface-100 pt-4">
+        <span className="text-xs text-surface-400">request_id</span>
+        <code className="truncate font-mono text-xs text-surface-600">
+          {requestId}
+        </code>
       </div>
     </Card>
   )
