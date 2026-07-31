@@ -1,4 +1,4 @@
-import Button from "@/components/common/Button"
+import { Button } from "@cloudflare/kumo/components/button"
 import { Alert } from "@/components/kumo-ui"
 import type { ApiError } from "@/types/api"
 
@@ -55,7 +55,7 @@ export default function ErrorState({ error, onRetry }: ErrorStateProps) {
       title={config.title}
       action={
         canRetry ? (
-          <Button size="sm" variant="ghost" onClick={onRetry}>
+          <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
             Try again
           </Button>
         ) : undefined

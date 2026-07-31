@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
-import Button from "@/components/common/Button"
+import { Button } from "@cloudflare/kumo/components/button"
 import { Alert } from "@/components/kumo-ui"
-import { ArrowPathIcon } from "@/components/icons"
 import { EXAMPLE_ADDRESSES } from "@/data/mock"
 import type { ApiError } from "@/types/api"
 
@@ -58,20 +57,18 @@ export default function PlaygroundInput({
 
       <div className="flex gap-3">
         <Button
+          type="button"
+          variant="primary"
+          size="lg"
+          loading={loading}
+          disabled={!trimmed}
           onClick={handleSubmit}
-          disabled={!trimmed || loading}
           className="flex-1"
         >
-          {loading ? (
-            <>
-              <ArrowPathIcon className="h-4 w-4 animate-spin" />
-              Validating...
-            </>
-          ) : (
-            "Validate Address"
-          )}
+          Validate Address
         </Button>
         <Button
+          type="button"
           variant="secondary"
           onClick={() => {
             setValue("")
@@ -83,26 +80,7 @@ export default function PlaygroundInput({
         </Button>
       </div>
 
-      {error && (
-        <Alert
-          variant="danger"
-          title="Validation failed"
-          action={
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleSubmit}
-              className="text-red-600 hover:bg-red-50 hover:text-red-700"
-            >
-              Try again
-            </Button>
-          }
-        >
-          {error.message}
-        </Alert>
-      )}
-
-      <div className="mt-auto pt-2">
+      <div className="pt-2">
         <p className="mb-2 text-sm font-semibold text-surface-900">
           Example addresses
         </p>
@@ -121,6 +99,25 @@ export default function PlaygroundInput({
           ))}
         </ul>
       </div>
+
+      {error && (
+        <Alert
+          variant="danger"
+          title="Validation failed"
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleSubmit}
+            >
+              Try again
+            </Button>
+          }
+        >
+          {error.message}
+        </Alert>
+      )}
     </div>
   )
 }
