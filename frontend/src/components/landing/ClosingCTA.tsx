@@ -1,11 +1,11 @@
-import { Link } from "react-router-dom"
 import Container from "@/components/layout/Container"
-import Badge from "@/components/common/Badge"
+import { Badge } from "@cloudflare/kumo/components/badge"
+import { LinkButton } from "@cloudflare/kumo/components/button"
 import { ChevronRightIcon } from "@/components/icons"
 
 export default function ClosingCTA() {
   return (
-    <section className="bg-surface-900 py-20">
+    <section data-mode="dark" className="bg-surface-900 py-20">
       <Container>
         <div className="mx-auto max-w-2xl text-center">
           <Badge variant="info" className="mb-4">
@@ -19,19 +19,17 @@ export default function ClosingCTA() {
             integrating in minutes.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              to="/playground"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-medium text-surface-900 shadow-sm transition-all duration-150 hover:bg-surface-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-surface-900"
-            >
+            <LinkButton href="/playground" variant="primary" size="lg">
               Try Playground
               <ChevronRightIcon className="h-4 w-4" />
-            </Link>
-            <a
+            </LinkButton>
+            <LinkButton
               href="mailto:garysamaita@gmail.com?subject=Address%20Quality%20API%20Key%20Request"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-surface-600 px-6 py-3 text-base font-medium text-surface-200 transition-all duration-150 hover:border-surface-400 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-surface-900"
+              variant="secondary"
+              size="lg"
             >
               Request an API key
-            </a>
+            </LinkButton>
           </div>
           <p className="mt-6 text-sm text-surface-500">
             BSL 1.1 · Converts to Apache 2.0 on 2030-03-01
