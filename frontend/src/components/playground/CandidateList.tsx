@@ -19,7 +19,7 @@ const fields: { key: keyof ResolutionCandidate["location"]; label: string }[] = 
 
 export default function CandidateList({ candidates }: CandidateListProps) {
   const sorted = useMemo(
-    () => [...candidates].sort((a, b) => b.score - a.score),
+    () => [...(candidates ?? [])].sort((a, b) => b.score - a.score),
     [candidates],
   )
 
