@@ -4,6 +4,7 @@
 package router
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -28,6 +29,22 @@ func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
 
 	e.Use(logger.EchoMiddleware())
 	e.Use(middleware.Recover())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: cfg.AllowedOrigins,
+		AllowMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowHeaders: []string{
+			echo.HeaderContentType,
+			"X-API-Key",
+			echo.HeaderAuthorization,
+		},
+		MaxAge: 3600,
+	}))
 
 	e.GET("/health", h.HandleHealthCheck)
 	e.GET("/swagger/*", echoswagger.WrapHandler)

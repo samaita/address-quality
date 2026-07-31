@@ -4,6 +4,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/spf13/viper"
 
 	"address-quality/internal/logger"
@@ -23,6 +25,7 @@ type Config struct {
 	DBMaxOpenConns     int
 	LocationSourceCode string
 	LogLevel           string
+	AllowedOrigins     []string
 }
 
 func Load() *Config {
@@ -44,6 +47,7 @@ func Load() *Config {
 	viper.SetDefault("DB_MAX_OPEN_CONNS", 10)
 	viper.SetDefault("LOCATION_SOURCE_CODE", "kemendagri")
 	viper.SetDefault("LOG_LEVEL", "info")
+	viper.SetDefault("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Warn().Err(err).Msg(".env not found, using defaults")
@@ -63,6 +67,7 @@ func Load() *Config {
 		DBMaxOpenConns:     viper.GetInt("DB_MAX_OPEN_CONNS"),
 		LocationSourceCode: viper.GetString("LOCATION_SOURCE_CODE"),
 		LogLevel:           viper.GetString("LOG_LEVEL"),
+		AllowedOrigins:     strings.Split(viper.GetString("CORS_ALLOWED_ORIGINS"), ","),
 	}
 
 	logger.Info().
