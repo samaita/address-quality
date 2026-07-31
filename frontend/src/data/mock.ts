@@ -48,4 +48,10 @@ export const MOCK_ADDRESS_RESPONSE: AddressResponse = {
   },
 }
 
-export const EXAMPLE_ADDRESS = "JL MERDEKA NO 56 CITARUM BANDUNG 40115"
+export const EXAMPLE_ADDRESSES: string[] = [
+  "Jl. Asia Afrika No.56, Braga, Sumur Bandung, Kota Bandung, Jawa Barat 40111",
+  "Perum Griya Asri Blok B2 No.7, Bekasi Timur, Bekasi",
+  "Dusun Karanganyar RT02 RW05, Tulungagung",
+  "Jl. Merdeka No.12, Citarum, Bandung",
+  "Jl. Malioboro No.15, Yogyakarta",
+]

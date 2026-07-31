@@ -1,3 +1,25 @@
+export type ApiErrorKind =
+  | "network"
+  | "timeout"
+  | "rate_limited"
+  | "unauthorized"
+  | "server"
+  | "client"
+  | "unknown"
+
+export interface ApiError extends Error {
+  kind: ApiErrorKind
+  status?: number
+}
+
+export interface EvidenceRow {
+  field: string
+  label: string
+  value: string | null
+  confidence: number | null
+  status: "matched" | "partial" | "missing"
+}
+
 export interface AddressRequest {
   address: string
   source_code?: string
