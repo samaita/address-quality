@@ -1,6 +1,7 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Card from "@/components/common/Card"
 import Badge from "@/components/common/Badge"
+import Button from "@/components/common/Button"
 import { Progress } from "@/components/kumo-ui"
 import { getConfidenceTier } from "@/lib/confidence"
 import type { ResolutionCandidate } from "@/types/api"
@@ -8,6 +9,8 @@ import type { ResolutionCandidate } from "@/types/api"
 type CandidateListProps = {
   candidates: ResolutionCandidate[]
 }
+
+const PAGE_SIZE = 5
 
 const fields: { key: keyof ResolutionCandidate["location"]; label: string }[] = [
   { key: "province", label: "Province" },
@@ -18,6 +21,12 @@ const fields: { key: keyof ResolutionCandidate["location"]; label: string }[] = 
 ]
 
 export default function CandidateList({ candidates }: CandidateListProps) {
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [candidates])
+
   const sorted = useMemo(
     () => [...(candidates ?? [])].sort((a, b) => b.score - a.score),
     [candidates],
@@ -26,6 +35,9 @@ export default function CandidateList({ candidates }: CandidateListProps) {
   if (sorted.length === 0) return null
 
   const bestScore = sorted[0].score
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pageItems = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   return (
     <div className="space-y-4">
@@ -33,7 +45,7 @@ export default function CandidateList({ candidates }: CandidateListProps) {
         Candidate Matches ({sorted.length})
       </h3>
 
-      {sorted.map((candidate) => {
+      {pageItems.map((candidate) => {
         const isBest = candidate.score === bestScore
         return (
           <Card
@@ -84,6 +96,30 @@ export default function CandidateList({ candidates }: CandidateListProps) {
           </Card>
         )
       })}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-surface-100 pt-4">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={safePage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Prev
+          </Button>
+          <span className="text-sm text-surface-500">
+            Page {safePage} of {totalPages}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={safePage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
