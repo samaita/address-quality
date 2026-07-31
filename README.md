@@ -1,553 +1,250 @@
-# Address Quality API — Indonesia
+# Address Quality
 
-## 1. Overview
+> **Address Intelligence API for Indonesian addresses.**
 
-A lightweight Go HTTP server that accepts free-text Indonesian addresses, normalizes and validates them against Indonesia's administrative hierarchy, and returns structured quality metadata. Designed as an Address Intelligence layer, the API sits between raw user input and downstream systems such as geocoders, logistics platforms, KYC services, and customer databases.
+Address Quality is an API that helps applications understand, validate, and normalize Indonesian addresses before they are consumed by downstream systems. Rather than treating an address as a plain text string, the API validates administrative hierarchy, resolves ambiguous matches, and returns structured metadata with confidence scores and explainable evidence.
 
-**Status**: v0.1.0 · MVP  
-**License**: [BUSL-1.1](LICENSE) · [Commercial Use](COMMERCIAL_LICENSE.md)
+The project is intended for systems where address quality directly affects business operations, including logistics, e-commerce, fintech, insurance, KYC, CRM, and large-scale data cleaning pipelines.
 
----
-
-### 1.1 Problem: Indonesian Addresses Are Difficult for Machines
-
-Most software systems assume addresses are already clean and structured.
-
-In reality, Indonesian users submit addresses as free text containing abbreviations, aliases, landmarks, incomplete administrative information, inconsistent spelling, and ambiguous location names. These inputs are easy for humans to interpret but difficult for software systems to process consistently.
-
-Developers often forward raw addresses directly into downstream systems—including geocoders, logistics APIs, KYC platforms, and CRMs—where poor-quality address data propagates into operational workflows.
-
-Unlike countries with standardized street addressing, Indonesia presents unique challenges:
-
-- 17,000+ islands with diverse addressing conventions.
-- Frequent use of landmarks, RT/RW, gang names, and informal descriptions.
-- Multiple administrative locations sharing identical names.
-- Continuous administrative changes (pemekaran daerah).
-- Inconsistent abbreviations and unofficial aliases used by end users.
-
-These characteristics make Indonesian addresses significantly harder to process automatically.
-
-**Common address-quality problems include:**
-
-1. **Typographical errors and unofficial location names**
-
-   Input:
-
-   ```text
-   4 Koto, Kabupaten Agam, Sumatera Barat
-   ```
-
-   Official administrative name:
-
-   ```text
-   IV Koto
-   ```
-
-   Humans immediately understand the intended location, while many systems treat these as different places.
-
-2. **Administrative hierarchy inconsistencies**
-
-   Input:
-
-   ```text
-   Jl. Siliwangi No.1
-   Bogor
-   16119
-   ```
-
-   The postal code belongs to a different administrative region than the stated city, introducing ambiguity and increasing downstream validation effort.
-
-3. **Incomplete administrative hierarchy**
-
-   Input:
-
-   ```text
-   Kapuas Tengah, Kalimantan
-   ```
-
-   The province is incomplete ("Kalimantan Tengah"), making the address ambiguous because multiple regions share similar names.
-
-4. **Ambiguous location names**
-
-   Input:
-
-   ```text
-   Bogor
-   ```
-
-   The address may refer to either:
-
-   - Kota Bogor
-   - Kabupaten Bogor
-
-   Without additional context, downstream systems must guess.
-
-5. **Alias and abbreviation variations**
-
-   Examples:
-
-   ```text
-   Gg. Mawar
-   Gang Mawar
-
-   Kab. Bogor
-   Kabupaten Bogor
-
-   DIY
-   Daerah Istimewa Yogyakarta
-   ```
-
-   These refer to the same location but often appear as different strings.
+> 🚧 **Active Development**
+>
+> Address Quality is currently under active development. The validation algorithm, scoring model, and API responses will continue to evolve as additional datasets, edge cases, and validation strategies are incorporated. While the project is already usable, backward compatibility is not guaranteed until the first stable release.
 
 ---
 
-Poor address quality affects every downstream system consuming customer addresses.
+# Why Address Quality Exists
 
-Typical consequences include:
+Most software systems assume that addresses are already clean, structured, and internally consistent. In practice, this assumption rarely holds true for Indonesian addresses.
 
-- Ambiguous location resolution
-- Incorrect administrative mapping
-- Duplicate customer records
-- Manual customer verification
-- Failed or inconsistent geocoding
-- Increased operational overhead
-- Higher risk of delivery and fulfillment issues
+End users commonly submit addresses containing abbreviations, aliases, landmarks, RT/RW information, typographical errors, incomplete administrative hierarchy, or informal location descriptions. While these variations are usually understandable to humans, they introduce ambiguity for software systems that rely on deterministic matching.
 
-For logistics and e-commerce, address quality is a significant contributor to failed deliveries and customer support costs. For fintech, insurance, marketplaces, and CRM platforms, poor address quality reduces data reliability and increases operational complexity.
+As a result, applications often forward raw addresses directly into geocoders, logistics providers, KYC platforms, or customer databases. Once poor-quality address data enters these systems, it becomes significantly more expensive to correct, leading to failed deliveries, duplicate customer records, inaccurate administrative mapping, inconsistent analytics, and unnecessary manual verification.
+
+Address Quality is designed to solve this problem before the address reaches downstream systems.
 
 ---
 
-**Market gap.**
+# The Challenge of Indonesian Addresses
 
-Existing solutions address only part of the problem.
+Indonesian addresses are particularly difficult to process because they combine official administrative regions with informal conventions that vary between cities and communities. A single address may contain road names, RT/RW information, landmarks, local abbreviations, postal codes, or administrative names written with different spellings.
 
-- **Google Maps Geocoding** converts addresses into coordinates but is designed primarily for location lookup rather than administrative validation or address quality assessment.
-- **Logistics APIs** (Raja Ongkir, Biteship, courier integrations) generally assume address data has already been cleaned.
-- **In-house solutions** require maintaining Indonesian administrative datasets, alias mappings, parsing logic, and continuous updates as administrative boundaries evolve.
+For example, the following address appears simple:
 
-Existing APIs primarily focus on geocoding, shipping, or logistics workflows, leaving address quality and administrative consistency as responsibilities for application developers.
+```text
+Jl. Merdeka No. 1
+Bogor
+```
+
+However, the city name alone is ambiguous because it may refer to either **Kota Bogor** or **Kabupaten Bogor**.
+
+Likewise, all of the following examples describe the same administrative locations despite having different textual representations:
+
+```text
+Kab Bogor
+Kabupaten Bogor
+
+DIY
+Daerah Istimewa Yogyakarta
+
+IV Koto
+4 Koto
+
+Gg Mawar
+Gang Mawar
+```
+
+These variations are natural for humans but difficult for software systems that rely on exact string matching.
+
+Administrative changes introduce additional complexity. New regions are created, postal codes evolve, aliases emerge, and multiple administrative areas frequently share the same names. Without understanding the administrative hierarchy itself, software has very little context to determine whether an address is internally consistent.
 
 ---
 
-### 1.2 Solution
+# Where Address Quality Fits
 
-Address Quality API acts as an **Address Intelligence layer** between raw user input and downstream systems.
+Existing services solve different problems.
 
-Rather than replacing geocoding or logistics providers, it improves the quality of address data before those systems consume it.
+Geocoding APIs such as Google Maps or OpenStreetMap are designed to convert addresses into geographic coordinates. Logistics APIs generally assume that an address has already been validated before entering their systems. Neither is primarily responsible for evaluating whether an Indonesian address is complete, internally consistent, or administratively valid.
+
+Address Quality is intended to complement these systems rather than replace them.
 
 ```mermaid
 flowchart LR
-    A["Raw Address"] --> B["Address Quality API
+    A["Raw Indonesian Address"] --> B["Address Quality"]
 
-• Normalize
-• Parse
-• Resolve aliases
-• Validate hierarchy
-• Detect ambiguity
-• Score confidence"]
+    subgraph AI["Address Intelligence Layer"]
+        B --> C["Normalize"]
+        C --> D["Parse & Match"]
+        D --> E["Validate Hierarchy"]
+        E --> F["Resolve Ambiguity"]
+        F --> G["Confidence & Evidence"]
+    end
 
-    B --> C["Structured Address w Quality Metadata"]
+    G --> H["Structured Address"]
 
-    C --> D["Geocoder"]
-    C --> E["Logistics"]
-    C --> F["KYC"]
-    C --> G["CRM"]
+    H --> I["Geocoder"]
+    H --> J["Logistics Platform"]
+    H --> K["CRM / KYC"]
+    H --> L["Data Warehouse"]
 ```
 
-The API is a **classification signal, not a gate**.
-
-Given a free-text Indonesian address, it returns structured metadata describing the quality and consistency of the input. Integrators decide how to use that information—for example:
-
-- Accept the address.
-- Accept with warnings.
-- Request user correction.
-- Trigger manual review.
-- Enrich the address before forwarding it to downstream systems.
-
-Typical outputs include:
-
-- Normalized address
-- Parsed administrative components
-- Administrative consistency status
-- Confidence score
-- Ambiguity indicators
-- Candidate matches
-
-The goal is to help developers understand the quality of an address before it is used by other applications.
-
-Instead of treating addresses as a ready-to-use strings, Address Quality API transforms free-text input into structured, validated, and machine-readable location data.
+Instead of returning only coordinates, Address Quality provides structured information describing how well an address matches Indonesia's administrative hierarchy. Applications can then decide whether to accept the address, warn the user, request corrections, or trigger manual review.
 
 ---
 
-## 2. Quick Start
+# How It Works
 
-### 2.1 Local
+Every request follows the same validation pipeline.
+```mermaid
+flowchart TD
+    A["Raw Address"]
+    B["Normalization"]
+    C["Entity Extraction"]
+    D["Candidate Generation"]
+    E["Administrative Hierarchy Validation"]
 
-```bash
-git clone <repo-url> address-quality
-cd address-quality
+    E --> F1["Province"]
+    E --> F2["City / Regency"]
+    E --> F3["District"]
+    E --> F4["Subdistrict"]
+    E --> F5["Postal Code"]
 
-cp .env.example .env
-# edit .env as needed
+    F1 --> G["Evidence Aggregation"]
+    F2 --> G
+    F3 --> G
+    F4 --> G
+    F5 --> G
 
-make run
-# or with hot reload:
-# make air
+    G --> H["Confidence Scoring"]
+    H --> I["Structured Response"]
 ```
 
-```bash
-curl -X POST http://localhost:7300/v1/validate \
-  -H "Content-Type: application/json" \
-  -d '{"address":"Jl. Merdeka No.1, Jakarta Pusat 10110"}'
-```
-
-### 2.2 Local Container (Docker Compose)
-
-Multi-stage Dockerfile: Go 1.26 builder → Alpine 3.21 runtime. Non-root user, port 7300, SQLite persisted via volume.
-
-```bash
-cp .env.example .env
-docker compose up -d --build
-```
-
-Config is read from real environment variables (via `viper.AutomaticEnv()`), so the image is environment-agnostic — no `.env` baked in. Local dev mounts `.env` through compose.
+Rather than relying on a single string comparison, the validation process evaluates administrative consistency across multiple hierarchy levels. Every matched component contributes evidence that explains the resulting confidence score.
 
 ---
 
-### 2.3 Production Deployment (VPS + Podman)
+# Example
 
-**Flow:** GitHub Actions builds on push to `main` → pushes image to `ghcr.io/samaita/address-quality:latest` → VPS pulls and runs via Podman.
+### Input
 
-#### One-time VPS setup
-
-```bash
-# 1. Install podman + podman-compose on the VPS
-# 2. Copy deploy files from your machine
-scp deploy.sh docker-compose.prod.yml vps:~/address-quality/
-scp .env.prod vps:~/address-quality/   # create .env.prod locally first
-
-# 3. Authenticate to GHCR (only needed if the package is private)
-ssh vps
-podman login ghcr.io
+```text
+Jl Merdeka No.56
+Citarum
+Bandung
+40115
 ```
 
-`.env.prod` contains production config (API_KEY, rate limits, etc.):
+### Output
 
-```bash
-PORT=7300
-API_KEY=<your-secret-key>
-RATE_LIMIT=100
-RATE_WINDOW=60
-MAX_BODY_SIZE=1M
-MAX_ADDRESS_LENGTH=1000
+```text
+Province      ✔ Jawa Barat
+City          ✔ Kota Bandung
+District      ✔ Bandung Wetan
+Subdistrict   ✔ Citarum
+Postal Code   ✔ Match
+
+Confidence    97
+
+Evidence
+
+✔ Province matched
+✔ City matched
+✔ District matched
+✔ Subdistrict matched
+✔ Postal code matched
 ```
 
-#### Deploy / Update
-
-```bash
-ssh vps
-cd ~/address-quality
-./deploy.sh
-```
-
-`deploy.sh` pulls the latest image, recreates the container, runs a health check on `/health`, and prunes dangling images. SQLite data persists in the `address-data` volume across deploys.
-
-#### Rollback
-
-Every CI build is also tagged `sha-<short>`. To roll back:
-
-```bash
-# List available tags
-podman images ghcr.io/samaita/address-quality
-
-# Edit docker-compose.prod.yml: image: ghcr.io/samaita/address-quality:sha-<short>
-# Then:
-./deploy.sh
-```
-
-| Dependency | Purpose |
-|---|---|
-| `golang:1.26-alpine` | Build stage |
-| `alpine:3.21` | Runtime (~5 MB) + wget for healthcheck |
-| `.env.prod` | Production config (gitignored, never committed) |
+Instead of producing only a confidence value, Address Quality explains WHY the result reliable. This makes the output suitable for automated decision making as well as debugging and operational review.
 
 ---
 
-### 2.4 Reverse Proxy (Nginx)
+# Current Features
 
-When running behind an nginx reverse proxy under a path prefix, use the example config at `deploy/nginx.example.conf`. Place it inside your server's `http` block.
-
-This maps the external path `/address-quality/v1/validate` to the upstream application's `/v1/validate` endpoint on port 7300:
-
-```nginx
-location /address-quality/ {
-    proxy_pass http://127.0.0.1:7300/;
-    # The trailing / strips the /address-quality prefix,
-    # so /address-quality/v1/validate -> /v1/validate
-}
-```
-
-The `$connection_upgrade` variable (used in proxy headers) is defined by a `map` directive in the `http` block. See the example file for the complete setup.
+- Administrative hierarchy validation
+- Province, city, district, and subdistrict extraction
+- Alias and abbreviation normalization
+- Candidate ranking
+- Confidence scoring
+- Explainable validation evidence
+- Postal code verification
+- Indonesian-first parsing strategy
+- Offline administrative database
 
 ---
 
-## 3. Tech Stack
+# Data Sources
 
-| Component       | Technology                          | Version |
-|----------------|--------------------------------------|---------|
-| Language       | Go                                   | 1.26.5  |
-| Web Framework  | Echo                                 | v4      |
-| Config         | Viper (reads .env)                   | latest  |
-| Sanitization   | Bluemonday (UGCPolicy)               | latest  |
-| Database       | SQLite (via modernc.org/sqlite)      | latest  |
-| Rate Limiting  | samaita/go-http-ratelimit            | latest  |
-| Hot Reload     | Air (air-verse/air)                  | latest  |
-| UUID           | google/uuid (UUIDv7)                 | latest  |
+Address Quality validates addresses against authoritative administrative reference data instead of relying solely on string similarity.
+
+The primary administrative hierarchy is based on the latest datasets published by Kementrian Dalam Negeri, Keputusan Menteri Dalam Negeri No300.2.2-2430 2025. During development, the project also references several well-maintained community datasets to improve validation quality, verify consistency, and evaluate edge cases.
+
+One of the primary community references is **wilayah_ref** by cahyadsn: https://github.com/cahyadsn/wilayah_ref
+
+The project may incorporate additional authoritative datasets over time as administrative boundaries evolve. Every validation result is designed to remain explainable and traceable back to the supporting administrative entities.
 
 ---
 
-## 4. Configuration
+# Design Philosophy
 
-All configuration is via `.env` file (not committed — see `.env.example`). Restart required after changes.
+Address Quality is designed as an **address intelligence layer**, not a replacement for geocoders or logistics providers.
 
-| Key           | Default | Description                      |
-|---------------|---------|----------------------------------|
-| `PORT`        | `7300`  | HTTP listen port                 |
-| `API_KEY`     | `""`    | Reserved for future auth         |
-| `RATE_LIMIT`  | `100`   | Max requests per window          |
-| `RATE_WINDOW` | `60`    | Rate limit window in seconds     |
+Its responsibility is to evaluate address quality and provide structured signals that downstream systems can use when making decisions. These signals include normalized administrative components, confidence scores, ambiguity detection, candidate matches, and explainable validation evidence.
+
+Applications remain in control of how these signals are interpreted. Depending on business requirements, an application may automatically accept an address, request user correction, perform manual verification, or continue with downstream geocoding.
 
 ---
 
-## 5. API Reference
+# Use Cases
 
-### `POST /v1/validate`
+Address Quality is suitable for applications that require reliable Indonesian address data, including:
 
-#### Request
-
-```json
-{
-  "address": "Jl. Merdeka No.1, Jakarta Pusat 10110"
-}
-```
-
-| Field     | Type   | Required | Description                  |
-|-----------|--------|----------|------------------------------|
-| `address` | string | yes      | Free-text Indonesian address input |
-
-#### Response (200 OK)
-
-```json
-{
-  "timestamp": "2026-07-08T12:00:00Z",
-  "request_id": "01952e8e-1b40-7f47-8000-000000000001",
-  "quality": {
-    "address_id": "01952e8e-1b40-7f47-8000-000000000002",
-    "confidence": 0.0,
-    "location": {
-      "postal_code": "",
-      "sub_district": "",
-      "district": "",
-      "city": "",
-      "province": ""
-    },
-    "normalized_input": "Jl. Merdeka No.1, Jakarta Pusat 10110",
-    "output": "Jl. Merdeka No.1, Jakarta Pusat 10110",
-    "location_version": "",
-    "raw_input": "Jl. Merdeka No.1, Jakarta Pusat 10110"
-  }
-}
-```
-
-#### Error Responses
-
-| Status | Body                                                              | Description             |
-|--------|-------------------------------------------------------------------|-------------------------|
-| 400    | `{"timestamp":"...","request_id":"...","error":"address is required"}` | Missing address field   |
-| 429    | `{"error":"rate limit exceeded","retry_after":60}`                | Too many requests       |
-| 500    | `{"timestamp":"...","request_id":"...","error":"failed to store record"}` | Database error      |
-
-#### Rate Limit Headers
-
-```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 42
-X-RateLimit-Reset: 1718000000
-```
+- Logistics and last-mile delivery
+- E-commerce checkout validation
+- Customer onboarding
+- KYC workflows
+- CRM data quality improvement
+- Marketplace seller verification
+- Batch address normalization
+- Government and enterprise data migration
 
 ---
 
-## 6. Data Flow
+# Roadmap
 
-```
-Client → POST /v1/validate
-          │
-          ▼
-    Echo Router
-          │
-          ▼
-    Rate Limiter (samaita/go-http-ratelimit)
-          │
-          ▼
-    Handler
-      ├─ Validate address non-empty
-      ├─ Parse JSON → model.AddressRequest
-      ├─ Generate UUIDv7 (request_id) + UUIDv7 (address_id) + timestamp
-      ├─ Sanitize with bluemonday UGCPolicy
-      ├─ Build quality object
-      │   ├─ address_id = generated address UUID
-      │   ├─ normalized_input = sanitized text
-      │   ├─ output = sanitized text (placeholder)
-      │   ├─ location = empty (placeholder)
-      │   └─ confidence = 0.0
-      ├─ Persist to SQLite (address_requests table)
-      └─ Return model.AddressResponse (JSON)
-```
+- [x] Administrative hierarchy parser
+- [x] Candidate generation
+- [x] Confidence scoring
+- [x] Explainable evidence
+- [x] Postal code validation
+- [ ] Road-level validation
+- [ ] OpenStreetMap integration
+- [ ] Google Maps fallback
+- [ ] Batch validation API
+- [ ] Official SDKs
 
 ---
 
-## 7. Database
+# Documentation
 
-### Schema
+Additional documentation is available in the `docs/` directory.
 
-```sql
-CREATE TABLE IF NOT EXISTS address_requests (
-    id                 TEXT PRIMARY KEY,
-    address_id         TEXT NOT NULL,
-    raw_input          TEXT NOT NULL,
-    normalized_address TEXT DEFAULT '',
-    confidence         REAL DEFAULT 0,
-    postal_code        TEXT DEFAULT '',
-    sub_district       TEXT DEFAULT '',
-    district           TEXT DEFAULT '',
-    city               TEXT DEFAULT '',
-    province           TEXT DEFAULT '',
-    location_version   TEXT DEFAULT '',
-    output_json        TEXT DEFAULT '',
-    created_at         TEXT NOT NULL
-);
-```
-
-### Notes
-
-- SQLite file: `address.db` (git-ignored)
-- `id` = request UUID, `address_id` = address entity UUID (separate from request ID)
-- Single-writer mode (`MaxOpenConns = 1`) for SQLite safety
-- Auto-migrated on startup via `CREATE TABLE IF NOT EXISTS`
-- All location fields are empty in MVP — reserved for geocoding integration
-- `created_at` stored as ISO8601 UTC string
-
-### Location Database
-
-The `location.db` SQLite database powers the administrative tree parser (v1). It stores Indonesian administrative region codes (province → city → district → subdistrict), their names, normalized forms, and postal codes — sourced from Kepmendagri No 300.2.2-2138 Tahun 2025.
-
-**Schema** is defined in `db/location.sql`:
-- `location_levels` — hierarchy level lookup (province/city/district/subdistrict)
-- `location_sources` — upstream data source registry
-- `location_codes` — core table with 90k+ administrative region records
-- `location_hierarchy` — precomputed tree relation (subdistrict → district → city → province)
-- `location_alias` — alternative names/abbreviations for locations
-
-#### Seeding
-
-The `seeder` binary parses MySQL dumps (`db/source/wilayah.sql`, `db/source/wilayah_kodepos.sql`) and populates `location.db`:
-
-```bash
-# First-time: create schema + seed data
-make seed
-
-# Or directly:
-go run ./cmd/seeder --init
-
-# Recreate from scratch (destructive — prompts for confirmation):
-go run ./cmd/seeder --drop
-
-# Retry without recreating schema (truncate data only):
-go run ./cmd/seeder --truncate
-
-# Update data (tables must already exist):
-go run ./cmd/seeder
-
-# Show all options:
-go run ./cmd/seeder --help
-```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--source-code` | `kemendagri` | Source code identifier |
-| `--source-version` | `2025` | Dataset version tag |
-| `--source-name` | `Kepmendagri No 300.2.2-2138` | Human-readable source name |
-| `--source-date` | `""` | Effective date of the codes |
-| `--source-desc` | `""` | Description of the source dataset |
-| `--init` | `false` | Create schema from `db/location.sql` (only when no tables exist) |
-| `--drop` | `false` | Drop all tables and recreate (prompts for confirmation) |
-| `--truncate` | `false` | Truncate data rows (keep schema) before seeding |
-| `--db` | from `.env` | Path to `location.db` |
-
-`--init`, `--drop`, and `--truncate` are mutually exclusive.
+- Getting Started
+- API Reference
+- Validation Algorithm
+- Confidence Scoring
+- Deployment Guide
+- Architecture
+- Contributing
 
 ---
 
-## 8. Geocoding Strategy (v1 → v3 Evolution)
+# Contributing
 
-The algorithm evolves across major versions to balance accuracy, cost, and coverage for Indonesian addresses.
-
-### v1: Administrative Tree Parser
-Parse the free-text input and discard all non-administrative tokens (landmarks, gang, RT/RW, building names). Extract only the administrative hierarchy (province → city/kabupaten → kecamatan → kelurahan → postal code) and validate it against a known reference tree. Fast, zero-cost, works fully offline — but cannot resolve ambiguous or novel locations.
-
-### v2: OpenStreetMap Geocoding
-Supply the full address string to a self-hosted or API-based OSM Nominatim instance. OSM's Indonesia coverage is strong for major roads and administrative boundaries. No API key required — only infrastructure cost. Coverage gaps exist in rural/peri-urban areas and newly pemekaran regions.
-
-### v3: Google Maps Geocoding Fallback
-If OSM returns low confidence or no result, fall back to the Google Maps Geocoding API for the same query. Higher cost (~USD 0.005 / call) but better coverage for informal addresses, landmarks, and newly created subdivisions. Reserved for the subset of queries that OSM cannot resolve.
-
-### Summary
-
-| Version | Method              | Cost     | Coverage | Offline |
-|---------|---------------------|----------|----------|---------|
-| v1      | Admin tree parser   | Free     | Moderate | ✅      |
-| v2      | OSM Nominatim       | Free*    | Good     | ❌      |
-| v3      | Google Maps fallback| Paid     | Best     | ❌      |
-
-\* Self-hosted infrastructure cost only
+Contributions, discussions, bug reports, and suggestions are welcome. The project is still evolving, and real-world edge cases are invaluable for improving validation accuracy across the diverse addressing conventions found throughout Indonesia.
 
 ---
 
-## 9. Rate Limiting
+# License
 
-- **Library**: `github.com/samaita/go-http-ratelimit`
-- **Strategy**: Token bucket (in-memory, per IP per endpoint via `Rules` pattern matching on `* /v1/*`)
-- **Default**: 100 requests per 60-second window per IP per `/v1/*` endpoint
-- **Configurable** via `RATE_LIMIT` and `RATE_WINDOW` in `.env`
-- **Scope**: Only `/v1/*` is rate-limited; `/health` is exempt
-- **Headers**: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
-- **Error**: HTTP 429 with JSON body (includes dynamic `retry_after` matching configured window)
+Business Source License 1.1 (BUSL-1.1).
 
-Future: Redis-backed distributed rate limiting for multi-instance deployments.
-
----
-
-## 10. Architecture Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| Viper for config | Standard Go config library, supports .env, env vars, defaults |
-| Global config var | Simple startup-time binding; restart to reload (no hot-reload needed) |
-| Pure Go SQLite (modernc) | Zero CGO dependency, easy cross-compilation |
-| Rate limiter as Echo middleware | Clean separation, reusable, swappable |
-| bluemonday UGCPolicy | Safe default: allows basic formatting, strips XSS |
-| UUIDv7 | Time-ordered UUIDs, good for DB indexing |
-| Air for dev | File watching + auto-restart, minimal config |
-
----
-
-## 11. Future Features
-
-- [ ] **API authentication** (API key via `API_KEY` env var, header validation)
-- [x] **Health check endpoint** (`GET /health`)
-- [ ] **Graceful shutdown** (signal handling)
-- [x] **Dockerfile + docker-compose**
-- [ ] **CI/CD** (GitHub Actions: lint, test, build)
-- [ ] **Testing suite** (unit + integration tests)
-- [ ] **Structured logging** (zerolog or zap)
-- [ ] **Geocoding validation** (Indonesian postal code format, known city/district/sub-district lookup, reverse geocoding)
+Commercial licensing options will be available separately.

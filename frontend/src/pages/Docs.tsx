@@ -8,7 +8,7 @@ import "prismjs/components/prism-http"
 
 const reqCode = JSON.stringify({ address: "JL MERDEKA NO 56 CITARUM BANDUNG 40115" }, null, 2)
 
-const reqCurl = `curl -X POST https://api.addressquality.dev/v1/validate \\
+const reqCurl = `curl -X POST https://api.samaita.com/address-quality/v1/validate \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: your-api-key" \\
   -d '{
@@ -213,7 +213,7 @@ export default function Docs() {
               </p>
               <SectionTitle>2. Validate an Address</SectionTitle>
               <CodeBlock
-                code={`curl -X POST https://api.addressquality.dev/v1/validate \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: your-api-key" \\\n  -d '{\n    "address":"JL MERDEKA NO 56 CITARUM BANDUNG 40115"\n  }'`}
+                code={`curl -X POST https://api.samaita.com/address-quality/v1/validate \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: your-api-key" \\\n  -d '{\n    "address":"JL MERDEKA NO 56 CITARUM BANDUNG 40115"\n  }'`}
                 language="bash"
                 title="Terminal"
               />

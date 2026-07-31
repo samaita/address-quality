@@ -1,32 +1,77 @@
-# React + TypeScript + Vite
+# Address Quality Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This directory contains the frontend for the Address Quality project, including the landing page, documentation site, and interactive API playground.
 
-Currently, two official plugins are available:
+Unlike the backend, which contains the core address validation engine, this application focuses on providing a clean developer experience for exploring and integrating the API.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Development Philosophy
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The frontend is intentionally developed using an **AI-assisted ("vibe coding") workflow**.
 
-## Expanding the Oxlint configuration
+Address Quality is fundamentally a backend and infrastructure project. Instead of investing significant time building frontend components from scratch, the UI is rapidly prototyped using modern AI coding assistants and then manually reviewed, refined, and integrated into the project.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+Every generated change is reviewed before being committed. AI is used to accelerate implementation—not to replace engineering judgment.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+This allows development effort to remain focused on the parts of the project that provide the most value:
+
+- Indonesian address parsing
+- Administrative hierarchy validation
+- Candidate resolution
+- Confidence scoring
+- Explainable validation evidence
+
+If you're a frontend engineer and notice opportunities to improve the codebase, contributions are always welcome.
+
+---
+
+## Tech Stack
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- Kumo UI
+
+---
+
+## Getting Started
+
+Install dependencies:
+
+```bash
+npm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+---
+
+## Project Goals
+
+The frontend aims to provide:
+
+- A modern landing page
+- Comprehensive API documentation
+- Interactive API playground
+- Responsive developer experience
+- Clean and maintainable UI components
+
+It is intentionally lightweight so the majority of development effort can remain focused on the Address Quality API and its validation engine.
