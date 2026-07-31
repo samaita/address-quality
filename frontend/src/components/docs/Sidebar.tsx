@@ -3,13 +3,16 @@ import { Bars3Icon, XMarkIcon } from "@/components/icons"
 
 const sections = [
   { id: "introduction", label: "Introduction" },
+  { id: "how-it-works", label: "How It Works" },
   { id: "quickstart", label: "Quick Start" },
   { id: "authentication", label: "Authentication" },
   { id: "validate", label: "POST /v1/validate" },
-  { id: "request-schema", label: "Request Schema" },
-  { id: "response-schema", label: "Response Schema" },
+  { id: "request-schema", label: "Request Fields" },
+  { id: "successful-response", label: "Successful Response" },
+  { id: "response-schema", label: "Understanding the Response" },
   { id: "errors", label: "Error Responses" },
   { id: "rate-limits", label: "Rate Limits" },
+  { id: "data-source", label: "Data Source" },
   { id: "faq", label: "FAQ" },
 ]
 

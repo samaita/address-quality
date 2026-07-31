@@ -2,10 +2,16 @@ import Container from "@/components/layout/Container"
 import Badge from "@/components/common/Badge"
 import { PageHeader } from "@/components/kumo-ui"
 import Sidebar from "@/components/docs/Sidebar"
-import EndpointCard from "@/components/docs/EndpointCard"
 import CodeBlock from "@/components/docs/CodeBlock"
+import Mermaid from "@/components/docs/Mermaid"
+import "prismjs/components/prism-http"
 
 const reqCode = JSON.stringify({ address: "JL MERDEKA NO 56 CITARUM BANDUNG 40115" }, null, 2)
+
+const reqHttp = `POST /v1/validate
+Content-Type: application/json
+
+${reqCode}`
 
 const reqWithSource = JSON.stringify(
   { address: "JL MERDEKA NO 56 CITARUM BANDUNG 40115", source_code: "kemendagri" },
@@ -13,41 +19,84 @@ const reqWithSource = JSON.stringify(
   2,
 )
 
-const successCode = JSON.stringify(
+const successCode = `{
+  "timestamp": "2026-07-29T05:08:05Z",
+  "request_id": "019fac45-d6cb-7101-9159-76bd7c25867b",
+  "data": {
+    "address_id": "019fac45-d6cb-7153-aeef-742c66db6d18",
+    "status": "VALID",
+    "confidence": 0.97,
+    "raw_input": "JL MERDEKA NO 56 CITARUM BANDUNG 40115",
+    "normalized_input": "jl merdeka no citarum bandung 40115",
+    "formatted_address": "Citarum, Bandung Wetan, Kota Bandung, Jawa Barat 40115",
+    "location": { "province": "Jawa Barat", "city": "Kota Bandung", "district": "Bandung Wetan", "sub_district": "Citarum", "postal_code": "40115" },
+    "assessment": { "matched": ["province", "city", "district", "sub_district", "postal_code"], "missing": ["road_name"], "conflicts": [], "ambiguous": [] },
+    "resolution": { "strategy": ["top_down", "postal"], "candidate_count": 1, "candidates": [{ "score": 0.97, "reasons": ["exact_match", "match_postal_code_exact"] }] },
+    "metadata": { "location_source": "kemendagri", "location_version": "2025" }
+  }
+}`
+
+const errorCode = `{
+  "timestamp": "2026-07-29T05:06:43Z",
+  "request_id": "019fac44-95c0-79cb-b1d4-649463403ea7",
+  "error": "missing or invalid API key"
+}`
+
+const pipelineSteps = [
   {
-    timestamp: "2026-07-29T05:08:05Z",
-    request_id: "019fac45-d6cb-7101-9159-76bd7c25867b",
-    data: {
-      address_id: "019fac45-d6cb-7153-aeef-742c66db6d18",
-      status: "VALID",
-      confidence: 0.97,
-      raw_input: "JL MERDEKA NO 56 CITARUM BANDUNG 40115",
-      normalized_input: "jl merdeka no citarum bandung 40115",
-      formatted_address: "Citarum, Bandung Wetan, Kota Bandung, Jawa Barat 40115",
-      location: { province: "Jawa Barat", city: "Kota Bandung", district: "Bandung Wetan", sub_district: "Citarum", postal_code: "40115" },
-      assessment: { matched: ["province", "city", "district", "sub_district", "postal_code"], missing: ["road_name"], conflicts: [], ambiguous: [] },
-      resolution: { strategy: ["top_down", "postal"], candidate_count: 1, candidates: [{ uuid: "019fac45-...", score: 0.97, location: { province: "Jawa Barat", city: "Kota Bandung", district: "Bandung Wetan", sub_district: "Citarum", postal_code: "40115" }, reasons: ["exact_match", "match_postal_code_exact"] }] },
-      metadata: { location_source: "kemendagri", location_version: "2025" },
-    },
+    step: "Normalize Input",
+    description:
+      "Cleans and standardizes the input by handling casing, whitespace, abbreviations, and common variations.",
   },
-  null,
-  2,
-)
+  {
+    step: "Extract Address Components",
+    description:
+      "Identifies administrative components such as province, city, district, subdistrict, and postal code.",
+  },
+  {
+    step: "Validate Administrative Hierarchy",
+    description:
+      "Verifies that the extracted components form a valid administrative hierarchy using the selected location dataset.",
+  },
+  {
+    step: "Resolve Candidate Locations",
+    description:
+      "When multiple valid matches exist, ranks candidates and selects the most likely location.",
+  },
+  {
+    step: "Compute Confidence",
+    description: "Calculates a confidence score based on the available validation evidence.",
+  },
+  {
+    step: "Generate Structured Response",
+    description:
+      "Returns the resolved address, confidence score, assessment, candidate information, and metadata.",
+  },
+]
 
-const errorCode = JSON.stringify(
-  { timestamp: "2026-07-29T05:06:43Z", request_id: "019fac44-95c0-79cb-b1d4-649463403ea7", error: "invalid request body" },
-  null,
-  2,
-)
-
-const authErrorCode = JSON.stringify(
-  { timestamp: "2026-07-29T05:06:43Z", request_id: "019fac44-95c0-79cb-b1d4-649463403ea7", error: "missing or invalid API key" },
-  null,
-  2,
-)
+const pipelineFlow = `flowchart LR
+    A["Raw Address"]
+    --> B["Normalize Input"]
+    --> C["Extract Address Components"]
+    --> D["Validate Administrative Hierarchy"]
+    --> E["Resolve Candidate Locations"]
+    --> F["Compute Confidence"]
+    --> G["Generate Structured Response"]`
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h3 className="text-lg font-semibold text-surface-900">{children}</h3>
+}
+
+function Callout({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <div className="flex items-center gap-2">
+        <Badge variant="warning">Warning</Badge>
+        <span className="font-semibold">{title}</span>
+      </div>
+      <div className="mt-1 leading-relaxed">{children}</div>
+    </div>
+  )
 }
 
 function Table({ children }: { children: React.ReactNode }) {
@@ -56,6 +105,18 @@ function Table({ children }: { children: React.ReactNode }) {
       <table className="w-full text-left text-sm">{children}</table>
     </div>
   )
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">
+      {children}
+    </th>
+  )
+}
+
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-4 py-3 ${className}`}>{children}</td>
 }
 
 export default function Docs() {
@@ -72,39 +133,80 @@ export default function Docs() {
         <div className="flex-1 min-w-0 max-w-3xl space-y-16">
           {/* Introduction */}
           <section id="introduction" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
-              Introduction
-            </h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">Introduction</h2>
             <p className="mt-4 leading-relaxed text-surface-600">
-              Address Quality is a REST API that validates Indonesian addresses. Given a raw address
-              string, the API parses it, cross-references components against the official Kemendagri
-              administrative database, and returns structured results with confidence scores,
-              validation status, and explainable evidence.
+              Address Quality is an API for validating and resolving Indonesian addresses.
             </p>
             <p className="mt-3 leading-relaxed text-surface-600">
-              The API is designed for logistics platforms, KYC systems, geocoding pipelines, and any
-              application that needs reliable Indonesian address data.
+              Instead of simply parsing text, the API validates administrative hierarchy against
+              official location data, resolves ambiguous matches, and returns structured results
+              with confidence scores and explainable evidence.
             </p>
+            <p className="mt-3 leading-relaxed text-surface-600">
+              Whether you're building a logistics platform, KYC workflow, customer onboarding, or
+              data cleaning pipeline, Address Quality helps transform inconsistent address text into
+              reliable structured data.
+            </p>
+            <div className="mt-6">
+              <Callout title="Alpha Release">
+                Address Quality is currently in <strong>Alpha</strong> and is intended for
+                evaluation and testing. The API is not yet recommended for production workloads.
+              </Callout>
+            </div>
+          </section>
+
+          {/* How It Works */}
+          <section id="how-it-works" className="scroll-mt-20">
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">How It Works</h2>
+            <p className="mt-4 leading-relaxed text-surface-600">
+              Every request follows the same validation pipeline.
+            </p>
+            <div className="mt-6">
+              <Mermaid chart={pipelineFlow} />
+            </div>
+            <div className="mt-6 space-y-4">
+              <SectionTitle>Validation Pipeline</SectionTitle>
+              <Table>
+                <thead>
+                  <tr className="border-b border-surface-200 bg-surface-50">
+                    <Th>Step</Th>
+                    <Th>Description</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pipelineSteps.map(({ step, description }) => (
+                    <tr key={step} className="border-b border-surface-100 last:border-b-0">
+                      <Td className="text-sm font-medium text-surface-900">{step}</Td>
+                      <Td className="text-sm text-surface-600">{description}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
           </section>
 
           {/* Quick Start */}
           <section id="quickstart" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
-              Quick Start
-            </h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">Quick Start</h2>
             <p className="mt-4 leading-relaxed text-surface-600">
-              Get started in under a minute. Sign up for an API key, then make your first request.
+              Get started in less than a minute.
             </p>
             <div className="mt-6 space-y-4">
-              <SectionTitle>1. Get your API key</SectionTitle>
+              <SectionTitle>1. Get an API Key</SectionTitle>
+              <Callout title="Alpha Access">
+                Self-service account registration is not available yet.
+                <p className="mt-1">
+                  API keys are currently issued manually during the Alpha program.
+                </p>
+              </Callout>
               <p className="text-sm leading-relaxed text-surface-600">
-                Sign up at the developer dashboard to receive your API key. Include it in the
+                Include the API key in every request using the
                 <code className="mx-1 rounded bg-surface-100 px-1.5 py-0.5 font-mono text-xs text-surface-700">X-API-Key</code>
-                header of every request.
+                header.
               </p>
-              <SectionTitle>2. Make your first request</SectionTitle>
+              <SectionTitle>2. Validate an Address</SectionTitle>
               <CodeBlock
-                code={`curl -X POST https://api.addressquality.dev/v1/validate \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: your-api-key" \\\n  -d '{"address": "JL MERDEKA NO 56 CITARUM BANDUNG 40115"}'`}
+                code={`curl -X POST https://api.addressquality.dev/v1/validate \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: your-api-key" \\\n  -d '{\n    "address":"JL MERDEKA NO 56 CITARUM BANDUNG 40115"\n  }'`}
                 language="bash"
                 title="Terminal"
               />
@@ -113,35 +215,28 @@ export default function Docs() {
 
           {/* Authentication */}
           <section id="authentication" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
-              Authentication
-            </h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">Authentication</h2>
             <p className="mt-4 leading-relaxed text-surface-600">
-              All API requests require authentication via an API key. Pass your key in the
-              <code className="mx-1 rounded bg-surface-100 px-1.5 py-0.5 font-mono text-xs text-surface-700">X-API-Key</code>
-              HTTP header.
+              All API requests require authentication.
             </p>
             <div className="mt-6 space-y-4">
               <Table>
                 <thead>
                   <tr className="border-b border-surface-200 bg-surface-50">
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Header</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Value</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Required</th>
+                    <Th>Header</Th>
+                    <Th>Required</Th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs text-surface-900">X-API-Key</td>
-                    <td className="px-4 py-3 text-sm text-surface-700">Your API key</td>
-                    <td className="px-4 py-3"><Badge>Yes</Badge></td>
+                    <Td className="font-mono text-xs text-surface-900">X-API-Key</Td>
+                    <Td><Badge>Yes</Badge></Td>
                   </tr>
                 </tbody>
               </Table>
               <p className="text-sm leading-relaxed text-surface-600">
-                Requests without a valid API key return a
-                <code className="mx-1 rounded bg-surface-100 px-1.5 py-0.5 font-mono text-xs text-surface-700">401 Unauthorized</code>
-                status.
+                Requests without a valid API key return
+                <code className="mx-1 rounded bg-surface-100 px-1.5 py-0.5 font-mono text-xs text-surface-700">401 Unauthorized</code>.
               </p>
             </div>
           </section>
@@ -152,139 +247,168 @@ export default function Docs() {
               POST /v1/validate
             </h2>
             <p className="mt-4 leading-relaxed text-surface-600">
-              The primary endpoint for address validation. Accepts a raw address string and returns
-              structured validation results.
-            </p>
-            <div className="mt-6">
-              <EndpointCard
-                method="POST"
-                path="/v1/validate"
-                description="Validate and resolve an Indonesian address against the official location database."
-                requestCode={reqCode}
-                responseCode={successCode}
-                errorCode={errorCode}
-              />
-            </div>
-          </section>
-
-          {/* Request Schema */}
-          <section id="request-schema" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
-              Request Schema
-            </h2>
-            <p className="mt-4 leading-relaxed text-surface-600">
-              Send a JSON object with the address to validate. All other fields are optional.
+              Validates an Indonesian address and returns the most likely administrative hierarchy.
             </p>
             <div className="mt-6 space-y-6">
+              <SectionTitle>Request</SectionTitle>
+              <CodeBlock code={reqHttp} language="http" title="POST /v1/validate" />
+              <SectionTitle>Request Fields</SectionTitle>
               <Table>
                 <thead>
                   <tr className="border-b border-surface-200 bg-surface-50">
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Field</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Type</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Required</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Description</th>
+                    <Th>Field</Th>
+                    <Th>Type</Th>
+                    <Th>Required</Th>
+                    <Th>Description</Th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">address</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3"><Badge>Yes</Badge></td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Raw Indonesian address text</td>
+                    <Td className="font-mono text-xs font-medium text-surface-900">address</Td>
+                    <Td className="font-mono text-xs text-surface-600">string</Td>
+                    <Td><Badge>Yes</Badge></Td>
+                    <Td className="text-sm text-surface-600">Raw Indonesian address.</Td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">source_code</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3"><Badge variant="default">No</Badge></td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Location data source (default: kemendagri)</td>
+                    <Td className="font-mono text-xs font-medium text-surface-900">source_code</Td>
+                    <Td className="font-mono text-xs text-surface-600">string</Td>
+                    <Td><Badge variant="default">No</Badge></Td>
+                    <Td className="text-sm text-surface-600">
+                      Location dataset used for validation. Default: <code className="font-mono text-xs text-surface-700">kemendagri</code>.
+                    </Td>
                   </tr>
                 </tbody>
               </Table>
-              <SectionTitle>Example with source code</SectionTitle>
-              <CodeBlock code={reqWithSource} title="POST /v1/validate" />
+              <SectionTitle>Example</SectionTitle>
+              <CodeBlock code={reqWithSource} title="Request body" />
             </div>
           </section>
 
-          {/* Response Schema */}
+          {/* Successful Response */}
+          <section id="successful-response" className="scroll-mt-20">
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
+              Successful Response
+            </h2>
+            <div className="mt-6">
+              <CodeBlock code={successCode} title="200 OK" />
+            </div>
+          </section>
+
+          {/* Understanding the Response */}
           <section id="response-schema" className="scroll-mt-20">
             <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
-              Response Schema
+              Understanding the Response
             </h2>
-            <p className="mt-4 leading-relaxed text-surface-600">
-              A successful response returns the validation results wrapped in a standard envelope.
-            </p>
             <div className="mt-6 space-y-6">
-              <Table>
-                <thead>
-                  <tr className="border-b border-surface-200 bg-surface-50">
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Field</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Type</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">timestamp</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">ISO 8601 UTC timestamp</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">request_id</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Unique request identifier (UUIDv7)</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.address_id</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Unique address record identifier</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.status</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">VALID, INCOMPLETE, AMBIGUOUS, CONFLICT, or UNKNOWN</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.confidence</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">number</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Confidence score from 0.0 to 1.0</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.raw_input</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Original address as submitted</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.normalized_input</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Normalized version of the input</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.formatted_address</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">string</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Standardized formatted address</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.location</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">object</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Parsed administrative hierarchy</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.assessment</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">object</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Matched, missing, conflicts, ambiguous</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.resolution</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">object</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Resolution strategy and candidate matches</td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-surface-900">data.metadata</td>
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600">object</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Data source and version information</td>
-                  </tr>
-                </tbody>
-              </Table>
+              <div className="space-y-4">
+                <SectionTitle>Status</SectionTitle>
+                <Table>
+                  <thead>
+                    <tr className="border-b border-surface-200 bg-surface-50">
+                      <Th>Status</Th>
+                      <Th>Description</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["VALID", "A single confident match was found."],
+                      ["INCOMPLETE", "Some address components are missing."],
+                      ["AMBIGUOUS", "Multiple valid candidates were found."],
+                      ["CONFLICT", "The supplied components contradict each other."],
+                      ["UNKNOWN", "No valid administrative hierarchy could be resolved."],
+                    ].map(([status, description]) => (
+                      <tr key={status} className="border-b border-surface-100 last:border-b-0">
+                        <Td className="font-mono text-xs font-medium text-surface-900">{status}</Td>
+                        <Td className="text-sm text-surface-600">{description}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+
+              <div className="space-y-4">
+                <SectionTitle>Confidence</SectionTitle>
+                <p className="text-sm leading-relaxed text-surface-600">
+                  The confidence score ranges from <strong>0.0</strong> to <strong>1.0</strong>.
+                </p>
+                <p className="text-sm leading-relaxed text-surface-600">
+                  Higher scores indicate stronger evidence that the resolved location matches the
+                  supplied address.
+                </p>
+                <p className="text-sm leading-relaxed text-surface-600">
+                  The score is derived from multiple validation signals, including:
+                </p>
+                <ul className="list-disc space-y-1 pl-6 text-sm leading-relaxed text-surface-600">
+                  <li>Administrative hierarchy consistency</li>
+                  <li>Postal code validation</li>
+                  <li>Candidate comparison</li>
+                  <li>Validation evidence</li>
+                </ul>
+                <p className="text-sm leading-relaxed text-surface-600">
+                  The scoring algorithm may evolve over time without changing the API response
+                  format.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <SectionTitle>Assessment</SectionTitle>
+                <p className="text-sm leading-relaxed text-surface-600">
+                  The <code className="font-mono text-xs text-surface-700">assessment</code> object
+                  explains how the supplied address compares to the resolved location.
+                </p>
+                <Table>
+                  <thead>
+                    <tr className="border-b border-surface-200 bg-surface-50">
+                      <Th>Field</Th>
+                      <Th>Description</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["matched", "Components successfully validated."],
+                      ["missing", "Components that were not found."],
+                      ["conflicts", "Components that contradict the resolved hierarchy."],
+                      ["ambiguous", "Components with multiple possible matches."],
+                    ].map(([field, description]) => (
+                      <tr key={field} className="border-b border-surface-100 last:border-b-0">
+                        <Td className="font-mono text-xs font-medium text-surface-900">{field}</Td>
+                        <Td className="text-sm text-surface-600">{description}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+
+              <div className="space-y-4">
+                <SectionTitle>Resolution</SectionTitle>
+                <p className="text-sm leading-relaxed text-surface-600">
+                  The <code className="font-mono text-xs text-surface-700">resolution</code> object
+                  explains how the final location was selected.
+                </p>
+                <Table>
+                  <thead>
+                    <tr className="border-b border-surface-200 bg-surface-50">
+                      <Th>Field</Th>
+                      <Th>Description</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["strategy", "Validation strategies used during resolution."],
+                      ["candidate_count", "Number of valid candidate locations found."],
+                      [
+                        "candidates",
+                        "Ranked candidate locations with confidence scores and supporting evidence.",
+                      ],
+                    ].map(([field, description]) => (
+                      <tr key={field} className="border-b border-surface-100 last:border-b-0">
+                        <Td className="font-mono text-xs font-medium text-surface-900">{field}</Td>
+                        <Td className="text-sm text-surface-600">{description}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
             </div>
           </section>
 
@@ -300,121 +424,145 @@ export default function Docs() {
               <Table>
                 <thead>
                   <tr className="border-b border-surface-200 bg-surface-50">
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Status</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Description</th>
+                    <Th>Status</Th>
+                    <Th>Description</Th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3"><Badge variant="warning">400</Badge></td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Bad Request — invalid or missing address field</td>
+                    <Td><Badge variant="warning">400</Badge></Td>
+                    <Td className="text-sm text-surface-600">Invalid request body.</Td>
                   </tr>
                   <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3"><Badge variant="danger">401</Badge></td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Unauthorized — missing or invalid API key</td>
+                    <Td><Badge variant="danger">401</Badge></Td>
+                    <Td className="text-sm text-surface-600">Missing or invalid API key.</Td>
                   </tr>
                   <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3"><Badge variant="warning">429</Badge></td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Too Many Requests — rate limit exceeded</td>
+                    <Td><Badge variant="warning">429</Badge></Td>
+                    <Td className="text-sm text-surface-600">Rate limit exceeded.</Td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-3"><Badge variant="danger">500</Badge></td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Internal Server Error — unexpected server failure</td>
+                    <Td><Badge variant="danger">500</Badge></Td>
+                    <Td className="text-sm text-surface-600">Internal server error.</Td>
                   </tr>
                 </tbody>
               </Table>
-              <SectionTitle>Error response format</SectionTitle>
-              <CodeBlock code={authErrorCode} title="401 Unauthorized" />
+              <SectionTitle>Example</SectionTitle>
+              <CodeBlock code={errorCode} title="401 Unauthorized" />
             </div>
           </section>
 
           {/* Rate Limits */}
           <section id="rate-limits" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
-              Rate Limits
-            </h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">Rate Limits</h2>
             <p className="mt-4 leading-relaxed text-surface-600">
-              Rate limits are enforced per API key. Exceeding the limit returns a
-              <code className="mx-1 rounded bg-surface-100 px-1.5 py-0.5 font-mono text-xs text-surface-700">429 Too Many Requests</code>
-              response.
+              Rate limits are enforced per API key and IP address.
             </p>
             <div className="mt-6">
               <Table>
                 <thead>
                   <tr className="border-b border-surface-200 bg-surface-50">
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Tier</th>
-                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-surface-500">Requests / minute</th>
+                    <Th>Plan</Th>
+                    <Th>Requests / Hour</Th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 text-sm font-medium text-surface-900">Free</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">100</td>
-                  </tr>
-                  <tr className="border-b border-surface-100">
-                    <td className="px-4 py-3 text-sm font-medium text-surface-900">Pro</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">1,000</td>
+                    <Td className="text-sm font-medium text-surface-900">Free</Td>
+                    <Td className="text-sm text-surface-600">10</Td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-3 text-sm font-medium text-surface-900">Enterprise</td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Custom</td>
+                    <Td className="text-sm font-medium text-surface-900">Pro</Td>
+                    <Td className="text-sm text-surface-600">TBA</Td>
                   </tr>
                 </tbody>
               </Table>
             </div>
           </section>
 
+          {/* Data Source */}
+          <section id="data-source" className="scroll-mt-20">
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">Data Source</h2>
+            <p className="mt-4 leading-relaxed text-surface-600">
+              Address Quality validates addresses using official Indonesian administrative datasets.
+            </p>
+            <div className="mt-6 space-y-4">
+              <Table>
+                <thead>
+                  <tr className="border-b border-surface-200 bg-surface-50">
+                    <Th>Dataset</Th>
+                    <Th>Coverage</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <Td className="text-sm text-surface-900">
+                      Kepmendagri No. 300.2.2-2430 Tahun 2025
+                    </Td>
+                    <Td className="text-sm text-surface-600">
+                      Province, City/Regency, District, Subdistrict, Postal Code
+                    </Td>
+                  </tr>
+                </tbody>
+              </Table>
+              <p className="text-sm leading-relaxed text-surface-600">Reference dataset:</p>
+              <ul className="list-disc space-y-1 pl-6 text-sm leading-relaxed text-surface-600">
+                <li>
+                  <a
+                    href="https://github.com/cahyadsn/wilayah_ref"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent-700 underline underline-offset-2 hover:text-accent-900"
+                  >
+                    github.com/cahyadsn/wilayah_ref
+                  </a>
+                </li>
+              </ul>
+              <p className="text-sm leading-relaxed text-surface-600">
+                Datasets are updated periodically as new administrative data becomes available.
+              </p>
+            </div>
+          </section>
+
           {/* FAQ */}
           <section id="faq" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">
-              FAQ
-            </h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-surface-900">FAQ</h2>
             <div className="mt-6 space-y-6">
               <div>
-                <SectionTitle>What address formats does the API support?</SectionTitle>
+                <SectionTitle>What address formats are supported?</SectionTitle>
                 <p className="mt-2 text-sm leading-relaxed text-surface-600">
-                  The API handles most Indonesian address formats, including structured addresses with
-                  road names, landmarks, administrative areas, and postal codes. It normalizes input
-                  before parsing to handle variations in spelling and abbreviations.
+                  Most Indonesian address formats are supported, including multiline addresses,
+                  abbreviations, postal codes, and mixed administrative components.
                 </p>
               </div>
               <div>
-                <SectionTitle>How is the confidence score calculated?</SectionTitle>
+                <SectionTitle>Does the API return multiple candidates?</SectionTitle>
                 <p className="mt-2 text-sm leading-relaxed text-surface-600">
-                  The confidence score reflects the proportion of address components that were
-                  successfully matched against the official database. A score of 1.0 (100%) means all
-                  components matched. The score decreases when components are missing or conflicting.
+                  Yes. When an address cannot be resolved uniquely, the response contains ranked
+                  candidate locations together with confidence scores and supporting evidence.
                 </p>
               </div>
               <div>
-                <SectionTitle>What location data source is used?</SectionTitle>
+                <SectionTitle>How is confidence calculated?</SectionTitle>
                 <p className="mt-2 text-sm leading-relaxed text-surface-600">
-                  The API uses the official Kemendagri (Ministry of Home Affairs) administrative
-                  database, which includes all provinces, cities, districts, subdistricts, and
-                  postal codes in Indonesia.
+                  Confidence is derived from multiple validation signals rather than a simple
+                  component count. The scoring model may evolve as additional validation evidence is
+                  introduced.
                 </p>
               </div>
               <div>
-                <SectionTitle>What does the AMBIGUOUS status mean?</SectionTitle>
+                <SectionTitle>Is the API deterministic?</SectionTitle>
                 <p className="mt-2 text-sm leading-relaxed text-surface-600">
-                  AMBIGUOUS means the API identified multiple possible locations that match parts of
-                  the input. The response includes candidate matches with individual confidence
-                  scores to help disambiguate.
+                  Yes. Given the same input and dataset version, the API returns consistent results.
                 </p>
               </div>
               <div>
                 <SectionTitle>Can I use the API in production?</SectionTitle>
                 <p className="mt-2 text-sm leading-relaxed text-surface-600">
-                  Yes. The API is designed for production use with high availability, rate limiting,
-                  and comprehensive error handling. Contact us for enterprise SLAs and custom rate
-                  limits.
-                </p>
-              </div>
-              <div>
-                <SectionTitle>How do I report incorrect data?</SectionTitle>
-                <p className="mt-2 text-sm leading-relaxed text-surface-600">
-                  If you encounter incorrect or outdated administrative data, please open an issue on
-                  the GitHub repository. We regularly update our database from official sources.
+                  Not yet. The current Alpha release is intended for evaluation and integration
+                  testing. While the API already supports authentication, rate limiting, automated
+                  testing, and periodic evaluation, it is{" "}
+                  <strong>not yet recommended for production workloads</strong>.
                 </p>
               </div>
             </div>
