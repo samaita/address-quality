@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
 import { Button } from "@cloudflare/kumo/components/button"
-import { Alert } from "@/components/kumo-ui"
+import { Banner } from "@cloudflare/kumo/components/banner"
 import { EXAMPLE_ADDRESSES } from "@/data/mock"
 import type { ApiError } from "@/types/api"
 
@@ -101,22 +101,16 @@ export default function PlaygroundInput({
       </div>
 
       {error && (
-        <Alert
-          variant="danger"
+        <Banner
+          variant="error"
           title="Validation failed"
+          description={error.message}
           action={
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleSubmit}
-            >
+            <Banner.Action variant="secondary" onClick={handleSubmit}>
               Try again
-            </Button>
+            </Banner.Action>
           }
-        >
-          {error.message}
-        </Alert>
+        />
       )}
     </div>
   )

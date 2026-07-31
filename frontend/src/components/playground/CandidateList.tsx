@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import Card from "@/components/common/Card"
-import Badge from "@/components/common/Badge"
-import Button from "@/components/common/Button"
-import { Progress } from "@/components/kumo-ui"
+import { Badge } from "@cloudflare/kumo/components/badge"
+import { Button } from "@cloudflare/kumo/components/button"
+import ConfidenceBar from "./ConfidenceBar"
 import { getConfidenceTier } from "@/lib/confidence"
 import type { ResolutionCandidate } from "@/types/api"
 
@@ -62,7 +62,7 @@ export default function CandidateList({ candidates }: CandidateListProps) {
                 )}
               </div>
               <div className="w-32">
-                <Progress
+                <ConfidenceBar
                   value={candidate.score}
                   tone={getConfidenceTier(candidate.score)}
                   label={`Candidate confidence ${Math.round(candidate.score * 100)}%`}

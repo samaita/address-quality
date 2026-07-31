@@ -1,6 +1,7 @@
 import Card from "@/components/common/Card"
-import Badge from "@/components/common/Badge"
-import { Alert, Table, TBody, Td, Th, THead, Tr } from "@/components/kumo-ui"
+import { Badge } from "@cloudflare/kumo/components/badge"
+import { Banner } from "@cloudflare/kumo/components/banner"
+import { Table } from "@cloudflare/kumo/components/table"
 import { buildEvidenceRows } from "@/lib/evidence"
 import type { ResponseData } from "@/types/api"
 
@@ -10,11 +11,21 @@ type EvidenceTableProps = {
 
 const statusBadge: Record<
   "matched" | "partial" | "missing",
-  { variant: "default" | "success" | "warning" | "danger" | "info"; label: string }
+  {
+    variant:
+      | "primary"
+      | "secondary"
+      | "error"
+      | "warning"
+      | "success"
+      | "info"
+      | "neutral"
+    label: string
+  }
 > = {
   matched: { variant: "success", label: "Matched" },
   partial: { variant: "warning", label: "Partial" },
-  missing: { variant: "default", label: "Missing" },
+  missing: { variant: "neutral", label: "Missing" },
 }
 
 export default function EvidenceTable({ data }: EvidenceTableProps) {
@@ -31,46 +42,53 @@ export default function EvidenceTable({ data }: EvidenceTableProps) {
 
       {rows.length > 0 && (
         <Table>
-          <THead>
-            <Tr>
-              <Th>Evidence</Th>
-              <Th>Extracted Value</Th>
-              <Th>Confidence</Th>
-              <Th>Status</Th>
-            </Tr>
-          </THead>
-          <TBody>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>Evidence</Table.Head>
+              <Table.Head>Extracted Value</Table.Head>
+              <Table.Head>Confidence</Table.Head>
+              <Table.Head>Status</Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
             {rows.map((row) => {
               const badge = statusBadge[row.status]
               return (
-                <Tr key={row.field}>
-                  <Td className="font-medium text-surface-900">{row.label}</Td>
-                  <Td className={row.value ? "" : "text-surface-400"}>
+                <Table.Row key={row.field}>
+                  <Table.Cell className="font-medium text-surface-900">
+                    {row.label}
+                  </Table.Cell>
+                  <Table.Cell className={row.value ? "" : "text-surface-400"}>
                     {row.value ?? "—"}
-                  </Td>
-                  <Td className="font-mono">
+                  </Table.Cell>
+                  <Table.Cell className="font-mono">
                     {row.confidence != null ? row.confidence.toFixed(2) : "—"}
-                  </Td>
-                  <Td>
+                  </Table.Cell>
+                  <Table.Cell>
                     <Badge variant={badge.variant}>{badge.label}</Badge>
-                  </Td>
-                </Tr>
+                  </Table.Cell>
+                </Table.Row>
               )
             })}
-          </TBody>
+          </Table.Body>
         </Table>
       )}
 
       {conflicts.length > 0 && (
-        <Alert variant="danger" title="Conflicts" className="mt-4">
-          <ul className="space-y-1">
-            {conflicts.map((c) => (
-              <li key={c.type} className="text-sm">
-                {c.message}
-              </li>
-            ))}
-          </ul>
-        </Alert>
+        <Banner
+          variant="error"
+          title="Conflicts"
+          className="mt-4"
+          description={
+            <ul className="space-y-1">
+              {conflicts.map((c) => (
+                <li key={c.type} className="text-sm">
+                  {c.message}
+                </li>
+              ))}
+            </ul>
+          }
+        />
       )}
     </Card>
   )

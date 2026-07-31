@@ -1,5 +1,4 @@
-import { Button } from "@cloudflare/kumo/components/button"
-import { Alert } from "@/components/kumo-ui"
+import { Banner } from "@cloudflare/kumo/components/banner"
 import type { ApiError } from "@/types/api"
 
 type ErrorStateProps = {
@@ -7,39 +6,39 @@ type ErrorStateProps = {
   onRetry: () => void
 }
 
-const messages: Record<ApiError["kind"], { variant: "info" | "success" | "warning" | "danger"; title: string; text: string }> = {
+const messages: Record<ApiError["kind"], { variant: "default" | "alert" | "error" | "secondary"; title: string; text: string }> = {
   network: {
-    variant: "danger",
+    variant: "error",
     title: "Network error",
     text: "Could not reach the API. Check your connection and try again.",
   },
   timeout: {
-    variant: "warning",
+    variant: "alert",
     title: "Request timed out",
     text: "The request took too long to complete. Please try again.",
   },
   rate_limited: {
-    variant: "warning",
+    variant: "alert",
     title: "Rate limit reached",
     text: "You have reached the hourly request limit (10 requests/hour). Please try again later.",
   },
   unauthorized: {
-    variant: "danger",
+    variant: "error",
     title: "Invalid API key",
     text: "The API key configured for this playground is invalid.",
   },
   server: {
-    variant: "danger",
+    variant: "error",
     title: "API unavailable",
     text: "The API is temporarily unavailable. Please try again.",
   },
   client: {
-    variant: "danger",
+    variant: "error",
     title: "Request failed",
     text: "The request could not be processed.",
   },
   unknown: {
-    variant: "danger",
+    variant: "error",
     title: "Unexpected error",
     text: "An unexpected error occurred.",
   },
@@ -48,21 +47,21 @@ const messages: Record<ApiError["kind"], { variant: "info" | "success" | "warnin
 export default function ErrorState({ error, onRetry }: ErrorStateProps) {
   const config = messages[error.kind]
   const canRetry = error.kind !== "rate_limited"
+  const description =
+    error.kind === "client" && error.message ? `${config.text} ${error.message}` : config.text
 
   return (
-    <Alert
+    <Banner
       variant={config.variant}
       title={config.title}
+      description={description}
       action={
         canRetry ? (
-          <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+          <Banner.Action variant="secondary" onClick={onRetry}>
             Try again
-          </Button>
+          </Banner.Action>
         ) : undefined
       }
-    >
-      {config.text}
-      {error.kind === "client" && error.message ? ` ${error.message}` : ""}
-    </Alert>
+    />
   )
 }

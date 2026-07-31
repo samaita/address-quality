@@ -1,7 +1,2 @@
 export { default as Section } from "./Section"
 export { default as PageHeader } from "./PageHeader"
-export { default as Progress } from "./Progress"
-export { default as Alert } from "./Alert"
-export { default as Accordion } from "./Accordion"
-export { Table, THead, TBody, Tr, Th, Td } from "./Table"
-export { default as Skeleton, SkeletonLines } from "./Skeleton"
