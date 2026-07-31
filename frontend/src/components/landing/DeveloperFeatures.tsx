@@ -1,5 +1,5 @@
 import Section from "@/components/kumo-ui/Section"
-import Badge from "@/components/common/Badge"
+import { Badge } from "@cloudflare/kumo/components/badge"
 
 const rows = [
   { label: "Endpoint", value: "POST /v1/validate" },
@@ -79,13 +79,13 @@ export default function DeveloperFeatures() {
         ))}
       </div>
       <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-surface-400">
-        <Badge variant="danger">400</Badge>
+        <Badge variant="error">400</Badge>
         <span>Bad Request</span>
         <span className="text-surface-300">·</span>
-        <Badge variant="danger">401</Badge>
+        <Badge variant="error">401</Badge>
         <span>Unauthorized</span>
         <span className="text-surface-300">·</span>
-        <Badge variant="danger">404</Badge>
+        <Badge variant="error">404</Badge>
         <span>Not Found</span>
         <span className="text-surface-300">·</span>
         <Badge variant="warning">429</Badge>

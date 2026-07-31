@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom"
 import Container from "@/components/layout/Container"
-import Badge from "@/components/common/Badge"
+import { Badge } from "@cloudflare/kumo/components/badge"
+import { LinkButton } from "@cloudflare/kumo/components/button"
 import CodeBlock from "@/components/docs/CodeBlock"
 import { ChevronRightIcon } from "@/components/icons"
 
@@ -27,19 +27,13 @@ export default function Hero() {
               the evidence behind it.
             </p>
             <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row">
-              <Link
-                to="/playground"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-600 px-6 py-3 text-base font-medium text-white shadow-sm transition-all duration-150 hover:bg-accent-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2"
-              >
+              <LinkButton href="/playground" variant="primary" size="lg">
                 Try Playground
                 <ChevronRightIcon className="h-4 w-4" />
-              </Link>
-              <Link
-                to="/docs"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-surface-200 bg-white px-6 py-3 text-base font-medium text-surface-700 shadow-sm transition-all duration-150 hover:bg-surface-50 hover:text-surface-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2"
-              >
+              </LinkButton>
+              <LinkButton href="/docs" variant="secondary" size="lg">
                 Read the Docs
-              </Link>
+              </LinkButton>
             </div>
             <p className="mt-4 text-sm text-surface-400">
               Public Alpha.{" "}
