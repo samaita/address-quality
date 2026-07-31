@@ -4,7 +4,7 @@ const limitations = [
   {
     title: "Road-level data",
     description:
-      "Kemendagri covers subdistrict-level only. road_name in the response is best-effort from the input text and is not verified against a street database.",
+      "Kemendagri covers subdistrict-level only. `road_name` in the response is best-effort from the input text and is not verified against a street database.",
   },
   {
     title: "Geocoding",
@@ -37,7 +37,7 @@ export default function Limitations() {
   return (
     <Section
       title="Current limitations"
-      description="Public Alpha means the API is under active development. Here's what you should know before integrating."
+      description="Public Alpha means the API is under active development. Here's what you should know before trying it."
     >
       <div className="mb-4 flex items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">

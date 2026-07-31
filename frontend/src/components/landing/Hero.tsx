@@ -6,7 +6,7 @@ import { ChevronRightIcon } from "@/components/icons"
 
 const heroCurlSnippet = `curl -X POST https://app.samaita.com/address-quality/v1/validate \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: \\$AQ_API_KEY" \\
+  -H "X-API-Key: API_KEY" \\
   -d '{"address":"JL MERDEKA NO 56 CITARUM BANDUNG 40115"}'`
 
 export default function Hero() {
