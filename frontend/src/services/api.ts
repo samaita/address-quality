@@ -1,8 +1,8 @@
 import type { AddressRequest, AddressResponse, ApiError } from "@/types/api"
 import { MOCK_ADDRESS_RESPONSE } from "@/data/mock"
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ""
-const API_KEY = import.meta.env.VITE_API_KEY ?? ""
+const API_BASE_URL = import.meta.env.AQ_API_BASE_URL ?? ""
+const API_KEY = import.meta.env.AQ_API_KEY ?? ""
 const REQUEST_TIMEOUT_MS = 15_000
 
 export class RequestError extends Error implements ApiError {
