@@ -19,8 +19,9 @@ const statusBadge: Record<
 
 export default function EvidenceTable({ data }: EvidenceTableProps) {
   const rows = buildEvidenceRows(data)
+  const conflicts = data.assessment.conflicts ?? []
 
-  if (rows.length === 0 && data.assessment.conflicts.length === 0) return null
+  if (rows.length === 0 && conflicts.length === 0) return null
 
   return (
     <Card>
@@ -60,10 +61,10 @@ export default function EvidenceTable({ data }: EvidenceTableProps) {
         </Table>
       )}
 
-      {data.assessment.conflicts.length > 0 && (
+      {conflicts.length > 0 && (
         <Alert variant="danger" title="Conflicts" className="mt-4">
           <ul className="space-y-1">
-            {data.assessment.conflicts.map((c) => (
+            {conflicts.map((c) => (
               <li key={c.type} className="text-sm">
                 {c.message}
               </li>

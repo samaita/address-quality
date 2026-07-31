@@ -69,7 +69,11 @@ func getMissingComponents(candidate *model.AdminCandidate) []model.Component {
 }
 
 func extractConflicts(candidate *model.AdminCandidate) []model.Conflict {
-	return candidate.Location.Conflicts
+	conflicts := candidate.Location.Conflicts
+	if conflicts == nil {
+		conflicts = []model.Conflict{}
+	}
+	return conflicts
 }
 
 func evaluateHierarchy(candidate *model.AdminCandidate, hierarchy *database.HierarchyMap) {

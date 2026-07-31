@@ -106,7 +106,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		}
 	}
 
-	var resolutionCands []model.ResolutionCandidate
+	resolutionCands := make([]model.ResolutionCandidate, 0, len(scored))
 	for _, s := range scored {
 		if s.candidate.Location.Province != nil {
 			loc := resolveLocationFromCandidate(&s)
