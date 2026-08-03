@@ -29,7 +29,7 @@ services:
     env_file:
       - /etc/address-quality/frontend.env
     ports:
-      - "80:80"
+      - "7301:80"
     depends_on:
       - api
     security_opt:
