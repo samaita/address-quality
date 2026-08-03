@@ -48,7 +48,7 @@ func TestNormalize(t *testing.T) {
 }
 
 func TestNormalizeCSV(t *testing.T) {
-	f, err := os.Open("../../tests/api/cases/address.csv")
+	f, err := os.Open("../../tests/api/cases/example.csv")
 	if err != nil {
 		t.Fatalf("open csv: %v", err)
 	}
