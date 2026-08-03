@@ -5,7 +5,6 @@ package service
 
 import (
 	"context"
-	"log"
 
 	"address-quality/internal/model"
 )
@@ -63,7 +62,6 @@ func (svc *Service) resolvePlaceNameEntity(ev model.Evidence, wordEntities map[s
 	seen := make(map[int64]bool)
 	var unique []model.Entity
 	for _, e := range entities {
-		log.Printf("resolve %+v", e.Name)
 		if seen[e.ID] {
 			continue
 		}

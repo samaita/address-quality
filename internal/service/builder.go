@@ -4,7 +4,6 @@
 package service
 
 import (
-	"log"
 	"sort"
 
 	"github.com/google/uuid"
@@ -36,9 +35,6 @@ func (svc *Service) DiscoverCandidates(resolved []model.ResolvedEvidence, strate
 	for i := range candidates {
 		candidates[i].DiscoveryStrategies = strategies
 		candidates[i].UUID = uuid.Must(uuid.NewV7()).String()
-		if candidates[i].Location.SubDistrict != nil {
-			log.Printf("discover %+v %+v %+v", candidates[i].UUID, candidates[i].Location.SubDistrict.Name, candidates[i].OriginLevel)
-		}
 	}
 
 	return candidates
