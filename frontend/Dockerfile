@@ -16,7 +16,7 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Render the template and validate the config at build time (bad config fails the build).
 # The entrypoint re-renders with the real environment at container start.
 RUN set -eux; \
-    export SERVER_NAME="__ci__" API_UPSTREAM="api" TZ="UTC"; \
+    export SERVER_NAME="__ci__" API_UPSTREAM="127.0.0.1" TZ="UTC"; \
     /docker-entrypoint.d/20-envsubst-on-templates.sh; \
     nginx -t
 EXPOSE 80
