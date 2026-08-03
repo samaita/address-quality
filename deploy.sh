@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="$SELF_DIR/docker-compose.prod.yml"
+COMPOSE_FILE="$SELF_DIR/deploy/docker-compose.prod.yml"
 CONFIG_DIR="/etc/address-quality"
 ENV_FILE="$CONFIG_DIR/.env.prod"
 FE_ENV_FILE="$CONFIG_DIR/frontend.env"
