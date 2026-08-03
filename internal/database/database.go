@@ -11,7 +11,20 @@ import (
 	_ "modernc.org/sqlite"
 
 	"address-quality/internal/logger"
+	mw "address-quality/internal/middleware"
 )
+
+func logDBErr(ctx context.Context, op string, input any, err error) error {
+	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("request_id", mw.GetRequestID(ctx)).
+			Str("op", op).
+			Interface("input", input).
+			Msg("database query error")
+	}
+	return err
+}
 
 type Repository struct {
 	db *sql.DB
@@ -20,13 +33,13 @@ type Repository struct {
 func New(dbPath string, maxOpenConns int) (*Repository, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, logDBErr(context.Background(), "open", dbPath, err)
 	}
 
 	db.SetMaxOpenConns(maxOpenConns)
 
 	if err = db.Ping(); err != nil {
-		return nil, err
+		return nil, logDBErr(context.Background(), "ping", dbPath, err)
 	}
 
 	logger.Info().Str("db_path", dbPath).Msg("database initialized")
@@ -60,9 +73,9 @@ func (r *Repository) InsertAddressRequest(ctx context.Context, rec *AddressRecor
 		rec.Confidence, rec.PostalCode, rec.SubDistrict, rec.District, rec.City, rec.Province,
 		rec.LocationVersion, rec.OutputJSON, rec.CreatedAt.Format(time.RFC3339),
 	)
-	return err
+	return logDBErr(ctx, "insert_address_request", map[string]any{"id": rec.ID, "raw_input": rec.RawInput}, err)
 }
 
 func (r *Repository) Ping(ctx context.Context) error {
-	return r.db.PingContext(ctx)
+	return logDBErr(ctx, "ping", "", r.db.PingContext(ctx))
 }
