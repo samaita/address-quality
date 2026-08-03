@@ -226,8 +226,6 @@ func getMatchedLevels(candidate *model.AdminCandidate) map[string]bool {
 				levels["DISTRICT"] = true
 			}
 		case "SUBDISTRICT":
-			// log.Printf(">> %+v %+v", candidate.Location.SubDistrict.Name, candidate.Location.SubDistrict.ID)
-			// log.Printf(">> %+v %+v", me.Resolved.Name, me.Resolved.ID)
 			if candidate.Location.SubDistrict != nil && candidate.Location.SubDistrict.ID == me.Resolved.ID {
 				levels["SUBDISTRICT"] = true
 			}

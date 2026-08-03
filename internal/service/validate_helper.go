@@ -311,7 +311,5 @@ func (svc *Service) matchPhrases(sourceID int64, normalizedText string) map[stri
 		i = longestEnd
 	}
 
-	// log.Printf(">> %+v\n", wordEntities)
-
 	return wordEntities
 }
