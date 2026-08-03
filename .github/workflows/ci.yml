@@ -7,19 +7,25 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
 
 jobs:
-  lint-test:
+  backend-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.26"
+          go-version-file: go.mod
+          cache: true
 
       - name: Vet
         run: go vet ./...
@@ -27,10 +33,61 @@ jobs:
       - name: Test
         run: go test ./...
 
-  build-push:
-    needs: lint-test
+      - name: Build smoke
+        run: go build -o /dev/null ./cmd/server ./cmd/seeder
+
+  frontend-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck + build
+        run: npm run build
+
+      - name: Upload dist (debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+
+  build-push:
+    needs: [backend-checks, frontend-checks]
     if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            image: ghcr.io/samaita/address-quality
+            context: .
+            dockerfile: Dockerfile
+            build_args: ""
+          - name: frontend
+            image: ghcr.io/samaita/address-quality-frontend
+            context: ./frontend
+            dockerfile: frontend/Dockerfile
+            build_args: |
+              AQ_API_BASE_URL=${{ secrets.AQ_API_BASE_URL }}
+              AQ_API_KEY=${{ secrets.AQ_API_KEY }}
     steps:
       - uses: actions/checkout@v5
 
@@ -45,7 +102,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
@@ -54,10 +111,12 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build_args }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
