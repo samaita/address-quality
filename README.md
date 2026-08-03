@@ -245,12 +245,12 @@ Contributions, discussions, bug reports, and suggestions are welcome. The projec
 
 # Production Deployment
 
-The stack runs on a VPS with podman. CI (`.github/workflows/ci.yml`) builds and pushes two immutable images to GHCR:
+The stack runs on a VPS with podman. CI (`.github/workflows/ci.yml`) only builds and uploads two immutable images to GHCR; it never deploys:
 
 - `ghcr.io/samaita/address-quality` — backend API
 - `ghcr.io/samaita/address-quality-frontend` — nginx serving the built frontend and proxying `/address-quality/` to the API
 
-Deployment is performed by `deploy.sh` (invoked from `.github/workflows/deploy.yml`). Config and data live on the host:
+Deployment is a manual, operator-run step on the VPS: `deploy.sh` pulls the chosen images and updates the podman containers. Config and data live on the host:
 
 ```
 /etc/address-quality/
@@ -274,14 +274,16 @@ Deployment is performed by `deploy.sh` (invoked from `.github/workflows/deploy.y
    sudo chown -R 1000:1000 /etc/address-quality/db
    ```
 
-3. Create the env files from the committed examples, then edit and `chmod 0600`:
+3. Copy `deploy.sh`, `rollback.sh`, and `deploy/docker-compose.prod.yml` from the repo into `/etc/address-quality` (e.g. `scp deploy.sh rollback.sh deploy/docker-compose.prod.yml vps:/etc/address-quality/`).
+
+4. Create the env files from the committed examples, then edit and `chmod 0600`:
 
    ```bash
    sudo install -m 0600 -o "$(id -un)" -g "$(id -gn)" deploy/.env.prod.example /etc/address-quality/.env.prod
    sudo install -m 0600 -o "$(id -un)" -g "$(id -gn)" deploy/frontend.env.example /etc/address-quality/frontend.env
    ```
 
-4. Seed the databases on a dev machine and upload them. DBs are never stored in images and are not managed by CI:
+5. Seed the databases on a dev machine and upload them. DBs are never stored in images and are not managed by CI:
 
    ```bash
    go build -o bin/seeder ./cmd/seeder
@@ -290,7 +292,7 @@ Deployment is performed by `deploy.sh` (invoked from `.github/workflows/deploy.y
    sudo chown 1000:1000 /etc/address-quality/db/*
    ```
 
-5. Allow rootless podman to bind port 80:
+6. Allow rootless podman to bind port 80:
 
    ```bash
    sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
@@ -299,12 +301,12 @@ Deployment is performed by `deploy.sh` (invoked from `.github/workflows/deploy.y
 
 ## Deploy
 
-Trigger the `Deploy` workflow from the Actions UI (choose the ref), or push a `v*` tag. It uploads `deploy.sh` and the compose file to the VPS, then runs `deploy.sh` with pinned `sha-<ref>` image tags, waits for the API health check, and verifies the frontend and the nginx → API proxy.
-
-Manual equivalent:
+`deploy.sh` pulls the images and recreates the containers. It defaults to `latest`; pin an exact tag with `API_IMAGE_TAG` / `FE_IMAGE_TAG` (CI publishes `sha-<ref>` and `v*` tags). It waits for the API health check and verifies the frontend and the nginx → API proxy.
 
 ```bash
-API_IMAGE_TAG=sha-<short-sha> FE_IMAGE_TAG=sha-<short-sha> /etc/address-quality/deploy.sh
+/etc/address-quality/deploy.sh                                    # latest
+API_IMAGE_TAG=sha-<short-sha> FE_IMAGE_TAG=sha-<short-sha> \
+  /etc/address-quality/deploy.sh                                  # pinned tags
 ```
 
 Rollback to the last successfully deployed tags:
