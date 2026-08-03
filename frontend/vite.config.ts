@@ -4,8 +4,15 @@ import tailwindcss from "@tailwindcss/vite"
 import path from "node:path"
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  base: "/address-quality/",
+
+  plugins: [
+    react(),
+    tailwindcss(),
+  ],
+
   envPrefix: "AQ_",
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
