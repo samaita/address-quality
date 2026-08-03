@@ -80,14 +80,10 @@ jobs:
             image: ghcr.io/samaita/address-quality
             context: .
             dockerfile: Dockerfile
-            build_args: ""
           - name: frontend
             image: ghcr.io/samaita/address-quality-frontend
             context: ./frontend
             dockerfile: frontend/Dockerfile
-            build_args: |
-              AQ_API_BASE_URL=${{ secrets.AQ_API_BASE_URL }}
-              AQ_API_KEY=${{ secrets.AQ_API_KEY }}
     steps:
       - uses: actions/checkout@v5
 
@@ -117,6 +113,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: ${{ matrix.build_args }}
+          build-args: |
+            AQ_API_BASE_URL=${{ secrets.AQ_API_BASE_URL }}
+            AQ_API_KEY=${{ secrets.AQ_API_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
