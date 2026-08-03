@@ -23,13 +23,13 @@ type LocationRepository struct {
 func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, logDBErr(context.Background(), "open", dbPath, err)
 	}
 
 	db.SetMaxOpenConns(maxOpenConns)
 
 	if err = db.Ping(); err != nil {
-		return nil, err
+		return nil, logDBErr(context.Background(), "ping", dbPath, err)
 	}
 
 	logger.Info().Str("db_path", dbPath).Msg("location database initialized")
@@ -37,7 +37,7 @@ func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error)
 }
 
 func (r *LocationRepository) Ping(ctx context.Context) error {
-	return r.db.PingContext(ctx)
+	return logDBErr(ctx, "ping", "", r.db.PingContext(ctx))
 }
 
 func (r *LocationRepository) HasLocationTables(ctx context.Context) (bool, error) {
@@ -46,7 +46,7 @@ func (r *LocationRepository) HasLocationTables(ctx context.Context) (bool, error
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
-	return err == nil, err
+	return err == nil, logDBErr(ctx, "has_location_tables", "", err)
 }
 
 func (r *LocationRepository) FindSourceByCode(ctx context.Context, code string) (int64, string, error) {
@@ -59,7 +59,7 @@ func (r *LocationRepository) FindSourceByCode(ctx context.Context, code string) 
 		LIMIT 1
 	`, code).Scan(&id, &version)
 	if err != nil {
-		return 0, "", fmt.Errorf("find source by code %s: %w", code, err)
+		return 0, "", logDBErr(ctx, "find_source_by_code", code, fmt.Errorf("find source by code %s: %w", code, err))
 	}
 	return id, version, nil
 }
@@ -79,7 +79,7 @@ func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRo
 		WHERE level_id = 2 AND deleted_at IS NULL
 	`)
 	if err != nil {
-		return nil, fmt.Errorf("find all provinces: %w", err)
+		return nil, logDBErr(ctx, "find_all_provinces", "", fmt.Errorf("find all provinces: %w", err))
 	}
 	defer rows.Close()
 
@@ -87,12 +87,12 @@ func (r *LocationRepository) FindAllProvinces(ctx context.Context) ([]ProvinceRo
 	for rows.Next() {
 		var p ProvinceRow
 		if err := rows.Scan(&p.ID, &p.SourceID, &p.Kode, &p.Name, &p.LowercaseNormalized); err != nil {
-			return nil, fmt.Errorf("scan province: %w", err)
+			return nil, logDBErr(ctx, "find_all_provinces_scan", "", fmt.Errorf("scan province: %w", err))
 		}
 		provinces = append(provinces, p)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows provinces: %w", err)
+		return nil, logDBErr(ctx, "find_all_provinces_rows", "", fmt.Errorf("rows provinces: %w", err))
 	}
 	return provinces, nil
 }
@@ -113,7 +113,7 @@ func (r *LocationRepository) FindAllCities(ctx context.Context) ([]CityRow, erro
 		WHERE level_id = 3 AND deleted_at IS NULL
 	`)
 	if err != nil {
-		return nil, fmt.Errorf("find all cities: %w", err)
+		return nil, logDBErr(ctx, "find_all_cities", "", fmt.Errorf("find all cities: %w", err))
 	}
 	defer rows.Close()
 
@@ -121,12 +121,12 @@ func (r *LocationRepository) FindAllCities(ctx context.Context) ([]CityRow, erro
 	for rows.Next() {
 		var c CityRow
 		if err := rows.Scan(&c.ID, &c.SourceID, &c.Kode, &c.Name, &c.LowercaseNormalized, &c.PostalCode); err != nil {
-			return nil, fmt.Errorf("scan city: %w", err)
+			return nil, logDBErr(ctx, "find_all_cities_scan", "", fmt.Errorf("scan city: %w", err))
 		}
 		cities = append(cities, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows cities: %w", err)
+		return nil, logDBErr(ctx, "find_all_cities_rows", "", fmt.Errorf("rows cities: %w", err))
 	}
 	return cities, nil
 }
@@ -142,7 +142,7 @@ func (r *LocationRepository) DropAll(ctx context.Context) error {
 	tables := []string{"location_hierarchy", "location_alias", "location_codes", "location_sources", "location_levels"}
 	for _, t := range tables {
 		if _, err := r.db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", t)); err != nil {
-			return fmt.Errorf("drop %s: %w", t, err)
+			return logDBErr(ctx, "drop_all", t, fmt.Errorf("drop %s: %w", t, err))
 		}
 	}
 	return nil
@@ -166,7 +166,7 @@ func (r *LocationRepository) ExecSchema(ctx context.Context, sqlContent string) 
 			continue
 		}
 		if _, err := r.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("exec schema: %w", err)
+			return logDBErr(ctx, "exec_schema", stmt, fmt.Errorf("exec schema: %w", err))
 		}
 	}
 	return nil
@@ -182,7 +182,7 @@ func (r *LocationRepository) TruncateAll(ctx context.Context) error {
 	}
 	for _, q := range queries {
 		if _, err := r.db.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("truncate: %w", err)
+			return logDBErr(ctx, "truncate_all", q, fmt.Errorf("truncate: %w", err))
 		}
 	}
 	return nil
@@ -196,7 +196,7 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 		WHERE location_source_id = ? AND level_id IN (2, 3, 4) AND deleted_at IS NULL
 	`, sourceID)
 	if err != nil {
-		return fmt.Errorf("query parents: %w", err)
+		return logDBErr(ctx, "rebuild_hierarchy_query_parents", sourceID, fmt.Errorf("query parents: %w", err))
 	}
 	defer rows.Close()
 
@@ -205,12 +205,12 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 		var kode string
 		var id int64
 		if err := rows.Scan(&kode, &id); err != nil {
-			return fmt.Errorf("scan parent: %w", err)
+			return logDBErr(ctx, "rebuild_hierarchy_scan_parent", sourceID, fmt.Errorf("scan parent: %w", err))
 		}
 		kodeToID[kode] = id
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("rows parents: %w", err)
+		return logDBErr(ctx, "rebuild_hierarchy_rows_parents", sourceID, fmt.Errorf("rows parents: %w", err))
 	}
 	logger.Info().Int("count", len(kodeToID)).Msg("loaded parent kode->id mappings")
 
@@ -219,13 +219,13 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 		WHERE location_source_id = ? AND level_id = 5 AND deleted_at IS NULL
 	`, sourceID)
 	if err != nil {
-		return fmt.Errorf("query subdistricts: %w", err)
+		return logDBErr(ctx, "rebuild_hierarchy_query_subdistricts", sourceID, fmt.Errorf("query subdistricts: %w", err))
 	}
 	defer subRows.Close()
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return logDBErr(ctx, "rebuild_hierarchy_begin_tx", sourceID, fmt.Errorf("begin tx: %w", err))
 	}
 	defer tx.Rollback()
 
@@ -234,7 +234,7 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 		VALUES (?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return fmt.Errorf("prepare: %w", err)
+		return logDBErr(ctx, "rebuild_hierarchy_prepare", sourceID, fmt.Errorf("prepare: %w", err))
 	}
 	defer stmt.Close()
 
@@ -243,7 +243,7 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 		var id int64
 		var kode string
 		if err := subRows.Scan(&id, &kode); err != nil {
-			return fmt.Errorf("scan subdistrict: %w", err)
+			return logDBErr(ctx, "rebuild_hierarchy_scan_subdistrict", kode, fmt.Errorf("scan subdistrict: %w", err))
 		}
 
 		parts := strings.Split(kode, ".")
@@ -272,17 +272,17 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 		}
 
 		if _, err := stmt.ExecContext(ctx, sourceID, provinceID, cityID, districtID, id); err != nil {
-			return fmt.Errorf("insert hierarchy %s: %w", kode, err)
+			return logDBErr(ctx, "rebuild_hierarchy_insert", kode, fmt.Errorf("insert hierarchy %s: %w", kode, err))
 		}
 		count++
 	}
 
 	if err := subRows.Err(); err != nil {
-		return fmt.Errorf("rows subdistricts: %w", err)
+		return logDBErr(ctx, "rebuild_hierarchy_rows_subdistricts", sourceID, fmt.Errorf("rows subdistricts: %w", err))
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return logDBErr(ctx, "rebuild_hierarchy_commit", sourceID, fmt.Errorf("commit: %w", err))
 	}
 
 	logger.Info().Int("count", count).Msg("inserted hierarchy rows")
@@ -294,13 +294,13 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 		SELECT id, name FROM location_codes WHERE deleted_at IS NULL
 	`)
 	if err != nil {
-		return fmt.Errorf("rebuild normalized query: %w", err)
+		return logDBErr(ctx, "rebuild_normalized_query", "", fmt.Errorf("rebuild normalized query: %w", err))
 	}
 	defer rows.Close()
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return logDBErr(ctx, "rebuild_normalized_begin_tx", "", fmt.Errorf("begin tx: %w", err))
 	}
 	defer tx.Rollback()
 
@@ -308,7 +308,7 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 		UPDATE location_codes SET lowercase_normalized = ?, updated_at = datetime('now') WHERE id = ?
 	`)
 	if err != nil {
-		return fmt.Errorf("prepare: %w", err)
+		return logDBErr(ctx, "rebuild_normalized_prepare", "", fmt.Errorf("prepare: %w", err))
 	}
 	defer stmt.Close()
 
@@ -317,20 +317,20 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 		var id int64
 		var name string
 		if err := rows.Scan(&id, &name); err != nil {
-			return fmt.Errorf("scan: %w", err)
+			return logDBErr(ctx, "rebuild_normalized_scan", id, fmt.Errorf("scan: %w", err))
 		}
 		normalized := normalizer.Normalize(name)
 		if _, err := stmt.ExecContext(ctx, normalized, id); err != nil {
-			return fmt.Errorf("update %d: %w", id, err)
+			return logDBErr(ctx, "rebuild_normalized_update", id, fmt.Errorf("update %d: %w", id, err))
 		}
 		count++
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("rows: %w", err)
+		return logDBErr(ctx, "rebuild_normalized_rows", "", fmt.Errorf("rows: %w", err))
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return logDBErr(ctx, "rebuild_normalized_commit", "", fmt.Errorf("commit: %w", err))
 	}
 
 	logger.Info().Int("count", count).Msg("rebuilt lowercase_normalized")
@@ -343,12 +343,12 @@ func (r *LocationRepository) InsertLocationSource(ctx context.Context, code, ver
 		VALUES (?, ?, ?, ?, ?)
 	`, code, version, name, codeDate, desc)
 	if err != nil {
-		return 0, fmt.Errorf("insert source: %w", err)
+		return 0, logDBErr(ctx, "insert_source", map[string]any{"code": code, "version": version, "name": name}, fmt.Errorf("insert source: %w", err))
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return 0, fmt.Errorf("last insert id: %w", err)
+		return 0, logDBErr(ctx, "insert_source_last_insert_id", code, fmt.Errorf("last insert id: %w", err))
 	}
 
 	if id > 0 {
@@ -359,7 +359,7 @@ func (r *LocationRepository) InsertLocationSource(ctx context.Context, code, ver
 		SELECT id FROM location_sources WHERE code = ? AND version = ? AND deleted_at IS NULL
 	`, code, version).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("lookup source: %w", err)
+		return 0, logDBErr(ctx, "insert_source_lookup", map[string]any{"code": code, "version": version}, fmt.Errorf("lookup source: %w", err))
 	}
 	return id, nil
 }
@@ -367,7 +367,7 @@ func (r *LocationRepository) InsertLocationSource(ctx context.Context, code, ver
 func (r *LocationRepository) InsertLocationCodeBatch(ctx context.Context, sourceID int64, rows []LocationCodeRow) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return logDBErr(ctx, "insert_code_batch_begin_tx", sourceID, fmt.Errorf("begin tx: %w", err))
 	}
 	defer tx.Rollback()
 
@@ -376,18 +376,18 @@ func (r *LocationRepository) InsertLocationCodeBatch(ctx context.Context, source
 		VALUES (?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return fmt.Errorf("prepare: %w", err)
+		return logDBErr(ctx, "insert_code_batch_prepare", sourceID, fmt.Errorf("prepare: %w", err))
 	}
 	defer stmt.Close()
 
 	for _, row := range rows {
 		normalized := normalizer.Normalize(row.Name)
 		if _, err := stmt.ExecContext(ctx, sourceID, row.Kode, row.Name, normalized, row.LevelID, row.PostalCode); err != nil {
-			return fmt.Errorf("insert %s: %w", row.Kode, err)
+			return logDBErr(ctx, "insert_code_batch", map[string]any{"source_id": sourceID, "kode": row.Kode}, fmt.Errorf("insert %s: %w", row.Kode, err))
 		}
 	}
 
-	return tx.Commit()
+	return logDBErr(ctx, "insert_code_batch_commit", sourceID, tx.Commit())
 }
 
 func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode string, sourceID int64) ([]model.Location, error) {
@@ -397,7 +397,7 @@ func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode st
 		WHERE postal_code = ? AND location_source_id = ? AND deleted_at IS NULL
 	`, postalCode, sourceID)
 	if err != nil {
-		return nil, err
+		return nil, logDBErr(ctx, "find_by_postal_code", map[string]any{"postal_code": postalCode, "source_id": sourceID}, err)
 	}
 	defer rows.Close()
 
@@ -406,28 +406,34 @@ func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode st
 		var kode string
 		loc := model.Location{}
 		if err := rows.Scan(&kode, &loc.SubDistrict, &loc.PostalCode); err != nil {
-			return nil, err
+			return nil, logDBErr(ctx, "find_by_postal_code_scan", map[string]any{"postal_code": postalCode, "source_id": sourceID}, err)
 		}
 
 		parts := strings.Split(kode, ".")
 		switch len(parts) {
 		case 4:
 			districtKode := parts[0] + "." + parts[1] + "." + parts[2]
-			r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, districtKode, sourceID).Scan(&loc.District)
+			if err := r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, districtKode, sourceID).Scan(&loc.District); err != nil {
+				logDBErr(ctx, "find_by_postal_code_lookup_district", map[string]any{"kode": districtKode, "source_id": sourceID}, err)
+			}
 			fallthrough
 		case 3:
 			cityKode := parts[0] + "." + parts[1]
-			r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, cityKode, sourceID).Scan(&loc.City)
+			if err := r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, cityKode, sourceID).Scan(&loc.City); err != nil {
+				logDBErr(ctx, "find_by_postal_code_lookup_city", map[string]any{"kode": cityKode, "source_id": sourceID}, err)
+			}
 			fallthrough
 		case 2:
 			provinceKode := parts[0]
-			r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, provinceKode, sourceID).Scan(&loc.Province)
+			if err := r.db.QueryRowContext(ctx, `SELECT name FROM location_codes WHERE kode = ? AND location_source_id = ? AND deleted_at IS NULL`, provinceKode, sourceID).Scan(&loc.Province); err != nil {
+				logDBErr(ctx, "find_by_postal_code_lookup_province", map[string]any{"kode": provinceKode, "source_id": sourceID}, err)
+			}
 		}
 
 		results = append(results, loc)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, logDBErr(ctx, "find_by_postal_code_rows", map[string]any{"postal_code": postalCode, "source_id": sourceID}, err)
 	}
 
 	return results, nil
@@ -448,7 +454,7 @@ func (r *LocationRepository) FindAllDistricts(ctx context.Context, sourceID int6
 		WHERE level_id = 4 AND location_source_id = ? AND deleted_at IS NULL
 	`, sourceID)
 	if err != nil {
-		return nil, fmt.Errorf("find all districts: %w", err)
+		return nil, logDBErr(ctx, "find_all_districts", sourceID, fmt.Errorf("find all districts: %w", err))
 	}
 	defer rows.Close()
 
@@ -456,12 +462,12 @@ func (r *LocationRepository) FindAllDistricts(ctx context.Context, sourceID int6
 	for rows.Next() {
 		var d DistrictRow
 		if err := rows.Scan(&d.ID, &d.SourceID, &d.Kode, &d.Name, &d.LowercaseNormalized); err != nil {
-			return nil, fmt.Errorf("scan district: %w", err)
+			return nil, logDBErr(ctx, "find_all_districts_scan", sourceID, fmt.Errorf("scan district: %w", err))
 		}
 		districts = append(districts, d)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows districts: %w", err)
+		return nil, logDBErr(ctx, "find_all_districts_rows", sourceID, fmt.Errorf("rows districts: %w", err))
 	}
 	return districts, nil
 }
@@ -482,7 +488,7 @@ func (r *LocationRepository) FindAllSubDistricts(ctx context.Context, sourceID i
 		WHERE level_id = 5 AND location_source_id = ? AND deleted_at IS NULL
 	`, sourceID)
 	if err != nil {
-		return nil, fmt.Errorf("find all subdistricts: %w", err)
+		return nil, logDBErr(ctx, "find_all_subdistricts", sourceID, fmt.Errorf("find all subdistricts: %w", err))
 	}
 	defer rows.Close()
 
@@ -490,12 +496,12 @@ func (r *LocationRepository) FindAllSubDistricts(ctx context.Context, sourceID i
 	for rows.Next() {
 		var s SubDistrictRow
 		if err := rows.Scan(&s.ID, &s.SourceID, &s.Kode, &s.Name, &s.LowercaseNormalized, &s.PostalCode); err != nil {
-			return nil, fmt.Errorf("scan subdistrict: %w", err)
+			return nil, logDBErr(ctx, "find_all_subdistricts_scan", sourceID, fmt.Errorf("scan subdistrict: %w", err))
 		}
 		subdistricts = append(subdistricts, s)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows subdistricts: %w", err)
+		return nil, logDBErr(ctx, "find_all_subdistricts_rows", sourceID, fmt.Errorf("rows subdistricts: %w", err))
 	}
 	return subdistricts, nil
 }
@@ -520,7 +526,7 @@ func (r *LocationRepository) LoadFullHierarchy(ctx context.Context, sourceID int
 		WHERE location_source_id = ? AND deleted_at IS NULL
 	`, sourceID)
 	if err != nil {
-		return nil, fmt.Errorf("load full hierarchy: %w", err)
+		return nil, logDBErr(ctx, "load_full_hierarchy", sourceID, fmt.Errorf("load full hierarchy: %w", err))
 	}
 	defer rows.Close()
 
@@ -533,7 +539,7 @@ func (r *LocationRepository) LoadFullHierarchy(ctx context.Context, sourceID int
 	for rows.Next() {
 		var pID, cID, dID, sID int64
 		if err := rows.Scan(&pID, &cID, &dID, &sID); err != nil {
-			return nil, fmt.Errorf("scan hierarchy: %w", err)
+			return nil, logDBErr(ctx, "load_full_hierarchy_scan", sourceID, fmt.Errorf("scan hierarchy: %w", err))
 		}
 
 		h.CityToProvince[cID] = pID
@@ -542,7 +548,7 @@ func (r *LocationRepository) LoadFullHierarchy(ctx context.Context, sourceID int
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows hierarchy: %w", err)
+		return nil, logDBErr(ctx, "load_full_hierarchy_rows", sourceID, fmt.Errorf("rows hierarchy: %w", err))
 	}
 
 	return h, nil
@@ -555,7 +561,7 @@ func (r *LocationRepository) LoadCityProvinceMapping(ctx context.Context, source
 		WHERE location_source_id = ? AND deleted_at IS NULL
 	`, sourceID)
 	if err != nil {
-		return nil, fmt.Errorf("load city province mapping: %w", err)
+		return nil, logDBErr(ctx, "load_city_province_mapping", sourceID, fmt.Errorf("load city province mapping: %w", err))
 	}
 	defer rows.Close()
 
@@ -563,14 +569,14 @@ func (r *LocationRepository) LoadCityProvinceMapping(ctx context.Context, source
 	for rows.Next() {
 		var cityID, provinceID int64
 		if err := rows.Scan(&cityID, &provinceID); err != nil {
-			return nil, fmt.Errorf("scan city province mapping: %w", err)
+			return nil, logDBErr(ctx, "load_city_province_mapping_scan", sourceID, fmt.Errorf("scan city province mapping: %w", err))
 		}
 		if _, exists := mapping[cityID]; !exists {
 			mapping[cityID] = provinceID
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows city province mapping: %w", err)
+		return nil, logDBErr(ctx, "load_city_province_mapping_rows", sourceID, fmt.Errorf("rows city province mapping: %w", err))
 	}
 	return mapping, nil
 }
