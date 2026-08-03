@@ -1,0 +1,68 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (CI must have built sha-<ref> images)"
+        type: string
+        default: main
+      rollback:
+        description: "Redeploy the last recorded image tags"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+          fetch-depth: 1
+
+      - id: tags
+        run: |
+          sha="$(git rev-parse --short HEAD)"
+          echo "api_tag=sha-${sha}" >> "$GITHUB_OUTPUT"
+          echo "fe_tag=sha-${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload deploy files
+        uses: appleboy/scp-action@v0.1.8
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "deploy.sh,rollback.sh,deploy/docker-compose.prod.yml"
+          target: "/tmp/aq-deploy"
+          rm: true
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            sudo mkdir -p /etc/address-quality
+            sudo install -m 0755 -o "$USER" -g "$USER" /tmp/aq-deploy/deploy.sh /etc/address-quality/deploy.sh
+            sudo install -m 0755 -o "$USER" -g "$USER" /tmp/aq-deploy/rollback.sh /etc/address-quality/rollback.sh
+            sudo install -m 0644 -o "$USER" -g "$USER" /tmp/aq-deploy/deploy/docker-compose.prod.yml /etc/address-quality/docker-compose.prod.yml
+            sudo chown "$USER":"$USER" /etc/address-quality
+            if [ "${{ github.event.inputs.rollback }}" = "true" ]; then
+              /etc/address-quality/deploy.sh --rollback
+            else
+              API_IMAGE_TAG="${{ steps.tags.outputs.api_tag }}" \
+              FE_IMAGE_TAG="${{ steps.tags.outputs.fe_tag }}" \
+              /etc/address-quality/deploy.sh
+            fi

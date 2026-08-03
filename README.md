@@ -243,6 +243,78 @@ Contributions, discussions, bug reports, and suggestions are welcome. The projec
 
 ---
 
+# Production Deployment
+
+The stack runs on a VPS with podman. CI (`.github/workflows/ci.yml`) builds and pushes two immutable images to GHCR:
+
+- `ghcr.io/samaita/address-quality` — backend API
+- `ghcr.io/samaita/address-quality-frontend` — nginx serving the built frontend and proxying `/address-quality/` to the API
+
+Deployment is performed by `deploy.sh` (invoked from `.github/workflows/deploy.yml`). Config and data live on the host:
+
+```
+/etc/address-quality/
+├── .env.prod                  backend env (0600)
+├── frontend.env               frontend/nginx env (0600)
+├── deploy.sh / rollback.sh
+├── docker-compose.prod.yml
+└── db/
+    ├── address.db             (SQLite, created/uploaded manually)
+    └── location.db
+```
+
+## First-time setup (manual)
+
+1. Install podman and a compose provider (`podman-compose >= 1.0.4` or the `docker-compose` binary), plus `curl`.
+2. Run setup as the deploy user (the SSH user that runs deploys). Create the config dir owned by that user, and the DB dir owned by the container's `appuser` (UID 1000):
+
+   ```bash
+   sudo mkdir -p /etc/address-quality/db
+   sudo chown -R "$(id -un)" /etc/address-quality
+   sudo chown -R 1000:1000 /etc/address-quality/db
+   ```
+
+3. Create the env files from the committed examples, then edit and `chmod 0600`:
+
+   ```bash
+   sudo install -m 0600 -o "$(id -un)" -g "$(id -gn)" deploy/.env.prod.example /etc/address-quality/.env.prod
+   sudo install -m 0600 -o "$(id -un)" -g "$(id -gn)" deploy/frontend.env.example /etc/address-quality/frontend.env
+   ```
+
+4. Seed the databases on a dev machine and upload them. DBs are never stored in images and are not managed by CI:
+
+   ```bash
+   go build -o bin/seeder ./cmd/seeder
+   bin/seeder --init && bin/seeder
+   scp db/address.db db/location.db vps:/etc/address-quality/db/
+   sudo chown 1000:1000 /etc/address-quality/db/*
+   ```
+
+5. Allow rootless podman to bind port 80:
+
+   ```bash
+   sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
+   echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/90-unprivileged-ports.conf
+   ```
+
+## Deploy
+
+Trigger the `Deploy` workflow from the Actions UI (choose the ref), or push a `v*` tag. It uploads `deploy.sh` and the compose file to the VPS, then runs `deploy.sh` with pinned `sha-<ref>` image tags, waits for the API health check, and verifies the frontend and the nginx → API proxy.
+
+Manual equivalent:
+
+```bash
+API_IMAGE_TAG=sha-<short-sha> FE_IMAGE_TAG=sha-<short-sha> /etc/address-quality/deploy.sh
+```
+
+Rollback to the last successfully deployed tags:
+
+```bash
+/etc/address-quality/deploy.sh --rollback   # or ./rollback.sh
+```
+
+---
+
 # License
 
 Business Source License 1.1 (BUSL-1.1).

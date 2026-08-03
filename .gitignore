@@ -16,3 +16,5 @@ package-lock.json
 !frontend/package-lock.json
 SPECS.md
 frontend/src/content/api.md
+seeder
+server
