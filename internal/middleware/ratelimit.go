@@ -21,7 +21,7 @@ func RateLimiter(rate int, windowSec int) echo.MiddlewareFunc {
 			if idx := strings.LastIndex(ip, ":"); idx != -1 {
 				ip = ip[:idx]
 			}
-			return ip
+			return ip + ":" + r.Header.Get("X-API-Key")
 		},
 		Rules: []ratelimit.Rule{
 			{Key: "* /v1/*", Rate: rate, Window: window},
