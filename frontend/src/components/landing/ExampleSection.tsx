@@ -3,7 +3,7 @@ import Section from "@/components/kumo-ui/Section"
 import CodeBlock from "@/components/docs/CodeBlock"
 import { ChevronRightIcon } from "@/components/icons"
 
-const curlRequest = `curl -X POST https://app.samaita.com/address-quality/v1/validate \\
+const curlRequest = `curl -X POST https://api.samaita.com/address-quality/v1/validate \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: API_KEY" \\
   -d '{"address":"JL MERDEKA NO 56 CITARUM BANDUNG 40115"}'`
