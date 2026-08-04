@@ -3,7 +3,7 @@ import { Badge } from "@cloudflare/kumo/components/badge"
 
 const rows = [
   { label: "Endpoint", value: "POST /v1/validate" },
-  { label: "Base URL", value: "https://app.samaita.com/address-quality" },
+  { label: "Base URL", value: "https://api.samaita.com/address-quality" },
   { label: "Auth", value: "X-API-Key header" },
   { label: "Rate limit", value: "10 req / hour per key" },
   { label: "Content type", value: "application/json" },
