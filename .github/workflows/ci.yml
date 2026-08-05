@@ -36,39 +36,8 @@ jobs:
       - name: Build smoke
         run: go build -o /dev/null ./cmd/server ./cmd/seeder
 
-  frontend-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck + build
-        run: npm run build
-
-      - name: Upload dist (debug)
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-          if-no-files-found: error
-
   build-push:
-    needs: [backend-checks, frontend-checks]
+    needs: [backend-checks]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -80,10 +49,6 @@ jobs:
             image: ghcr.io/samaita/address-quality
             context: .
             dockerfile: Dockerfile
-          - name: frontend
-            image: ghcr.io/samaita/address-quality-frontend
-            context: ./frontend
-            dockerfile: frontend/Dockerfile
     steps:
       - uses: actions/checkout@v5
 
@@ -113,8 +78,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            AQ_API_BASE_URL=${{ secrets.AQ_API_BASE_URL }}
-            AQ_API_KEY=${{ secrets.AQ_API_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

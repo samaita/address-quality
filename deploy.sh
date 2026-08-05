@@ -5,38 +5,33 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$SELF_DIR/deploy/docker-compose.prod.yml"
 CONFIG_DIR="/etc/address-quality"
 ENV_FILE="$CONFIG_DIR/.env.prod"
-FE_ENV_FILE="$CONFIG_DIR/frontend.env"
 RELEASE_FILE="$CONFIG_DIR/.release"
 IMAGE="ghcr.io/samaita/address-quality"
-FRONTEND_IMAGE="ghcr.io/samaita/address-quality-frontend"
 
 API_IMAGE_TAG="${API_IMAGE_TAG:-latest}"
-FE_IMAGE_TAG="${FE_IMAGE_TAG:-latest}"
 
 usage() {
   cat <<EOF
 Usage: deploy.sh [--rollback]
 
-Deploys the Address Quality stack (api + frontend) with podman compose.
+Deploys the Address Quality stack (api) with podman compose.
 
   --rollback   Redeploy the last successfully recorded image tags.
 
 Environment:
-  API_IMAGE_TAG / FE_IMAGE_TAG   image tags to deploy (default: latest)
+  API_IMAGE_TAG   image tag to deploy (default: latest)
   GHCR_USERNAME / GHCR_TOKEN     optional, needed for private packages
 
 Prerequisites on the VPS:
   podman + a compose provider (podman-compose >= 1.0.4 or docker-compose)
   curl
   $ENV_FILE  (backend env, copied from deploy/.env.prod.example)
-  $FE_ENV_FILE (frontend/nginx env, copied from deploy/frontend.env.example)
   $CONFIG_DIR owned by the user running this script
   $CONFIG_DIR/db populated manually with address.db + location.db
 EOF
 }
 
 [ -f "$ENV_FILE" ] || { echo "FATAL: missing $ENV_FILE (see deploy/.env.prod.example)" >&2; exit 1; }
-[ -f "$FE_ENV_FILE" ] || { echo "FATAL: missing $FE_ENV_FILE (see deploy/frontend.env.example)" >&2; exit 1; }
 command -v podman >/dev/null || { echo "FATAL: podman not installed" >&2; exit 1; }
 command -v curl >/dev/null || { echo "FATAL: curl not installed" >&2; exit 1; }
 [ -w "$CONFIG_DIR" ] || { echo "FATAL: $CONFIG_DIR not writable by $(id -un) (chown it to the deploy user)" >&2; exit 1; }
@@ -62,14 +57,13 @@ fi
 if [ "$MODE" = "rollback" ]; then
   [ -f "$RELEASE_FILE" ] || { echo "FATAL: no previous release recorded ($RELEASE_FILE)" >&2; exit 1; }
   API_IMAGE_TAG="$(awk '$1=="api" {print $2}' "$RELEASE_FILE")"
-  FE_IMAGE_TAG="$(awk '$1=="fe" {print $2}' "$RELEASE_FILE")"
-  [ -n "$API_IMAGE_TAG" ] && [ -n "$FE_IMAGE_TAG" ] || { echo "FATAL: corrupt release file" >&2; exit 1; }
-  echo "==> Rollback to api:${API_IMAGE_TAG} frontend:${FE_IMAGE_TAG}"
+  [ -n "$API_IMAGE_TAG" ] || { echo "FATAL: corrupt release file" >&2; exit 1; }
+  echo "==> Rollback to api:${API_IMAGE_TAG}"
 fi
 
-export API_IMAGE_TAG FE_IMAGE_TAG
+export API_IMAGE_TAG
 
-echo "==> Pulling api:${API_IMAGE_TAG} frontend:${FE_IMAGE_TAG}"
+echo "==> Pulling api:${API_IMAGE_TAG}"
 podman compose -f "$COMPOSE_FILE" pull
 
 echo "==> (Re)creating containers..."
@@ -88,18 +82,15 @@ if [ "$status" != "healthy" ]; then
   exit 1
 fi
 
-echo "==> Verifying frontend..."
-code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/ || true)"
-[ "$code" = "200" ] || { echo "ERROR: frontend returned HTTP $code" >&2; exit 1; }
+echo "==> Verifying API reverse proxy..."
 curl -sf http://127.0.0.1/address-quality/health >/dev/null \
   || { echo "ERROR: nginx -> api proxy failed" >&2; exit 1; }
 
 echo "==> Recording release..."
-printf 'api %s\nfe %s\n' "$API_IMAGE_TAG" "$FE_IMAGE_TAG" > "$RELEASE_FILE"
+printf 'api %s\n' "$API_IMAGE_TAG" > "$RELEASE_FILE"
 
 echo "==> Pruning dangling images..."
 podman image prune -f >/dev/null || true
 
 echo "==> Deployed:"
 podman images "$IMAGE" --format '{{.Repository}}:{{.Tag}}  {{.ID}}  {{.CreatedSince}}'
-podman images "$FRONTEND_IMAGE" --format '{{.Repository}}:{{.Tag}}  {{.ID}}  {{.CreatedSince}}'

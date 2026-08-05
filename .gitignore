@@ -13,8 +13,6 @@ bin*.db
 .DS_Store
 node_modules/
 package-lock.json
-!frontend/package-lock.json
 SPECS.md
-frontend/src/content/api.md
 seeder
 server
