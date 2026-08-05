@@ -1,4 +1,4 @@
-.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load build-seed seed benchmark
+.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed benchmark
 
 run:
 	go run ./cmd/server
@@ -25,6 +25,9 @@ test-api-smoke:
 
 test-api-load:
 	./tests/api/run-k6.sh load-test tests/api/load-test.js
+
+test-api-load-prod:
+	K6_BASE_URL=https://api.samaita.com/address-quality ./tests/api/run-k6.sh load-test tests/api/load-test.js
 
 build-seed:
 	go build -o bin/seeder ./cmd/seeder
