@@ -59,11 +59,12 @@ type subDistrictEntry struct {
 }
 
 type Service struct {
-	repo             AddressRepository
-	locationRepo     LocationRepository
-	s                *sanitizer.Sanitizer
-	maxAddressLength int
-	sourceCode       string
+	repo               AddressRepository
+	locationRepo       LocationRepository
+	s                  *sanitizer.Sanitizer
+	maxAddressLength   int
+	sourceCode         string
+	enableStoreRequest bool
 
 	provinceCache       map[string][]*provinceEntry
 	provinceOnce        sync.Once
@@ -71,10 +72,10 @@ type Service struct {
 	provinceKodeToEntry map[string]*provinceEntry
 	provinceByID        map[int64]*provinceEntry
 
-	cityCache        map[string][]*cityEntry
-	cityOnce         sync.Once
-	cityErr          error
-	cityByID         map[int64]*cityEntry
+	cityCache map[string][]*cityEntry
+	cityOnce  sync.Once
+	cityErr   error
+	cityByID  map[int64]*cityEntry
 
 	districtCache map[string][]*districtEntry
 	districtOnce  sync.Once
@@ -95,8 +96,8 @@ type Service struct {
 	phraseDictErr  error
 }
 
-func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string) *Service {
-	return &Service{repo: repo, locationRepo: locationRepo, s: s, maxAddressLength: maxAddressLength, sourceCode: sourceCode}
+func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string, enableStoreRequest bool) *Service {
+	return &Service{repo: repo, locationRepo: locationRepo, s: s, maxAddressLength: maxAddressLength, sourceCode: sourceCode, enableStoreRequest: enableStoreRequest}
 }
 
 func (svc *Service) Ping(ctx context.Context) error {
