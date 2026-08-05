@@ -185,8 +185,10 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		Msg("address resolution")
 
 	record := buildAddressRecord(requestID, data, now)
-	if err := svc.repo.InsertAddressRequest(ctx, record); err != nil {
-		return nil, err
+	if svc.enableStoreRequest {
+		if err := svc.repo.InsertAddressRequest(ctx, record); err != nil {
+			return nil, err
+		}
 	}
 
 	resp := &model.AddressResponse{

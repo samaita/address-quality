@@ -26,6 +26,7 @@ type Config struct {
 	LocationSourceCode string
 	LogLevel           string
 	AllowedOrigins     []string
+	EnableStoreRequest bool
 }
 
 func Load() *Config {
@@ -48,6 +49,7 @@ func Load() *Config {
 	viper.SetDefault("LOCATION_SOURCE_CODE", "kemendagri")
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("CORS_ALLOWED_ORIGINS", "https://samaita.com")
+	viper.SetDefault("ENABLE_STORE_REQUEST", false)
 
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Warn().Err(err).Msg(".env not found, using defaults")
@@ -68,6 +70,7 @@ func Load() *Config {
 		LocationSourceCode: viper.GetString("LOCATION_SOURCE_CODE"),
 		LogLevel:           viper.GetString("LOG_LEVEL"),
 		AllowedOrigins:     strings.Split(viper.GetString("CORS_ALLOWED_ORIGINS"), ","),
+		EnableStoreRequest: viper.GetBool("ENABLE_STORE_REQUEST"),
 	}
 
 	logger.Info().
