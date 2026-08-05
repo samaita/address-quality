@@ -5,6 +5,7 @@ import { Trend } from 'k6/metrics';
 
 const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:7300';
 const TARGET_VUS = parseInt(__ENV.K6_VUS) || 10;
+const API_KEY = __ENV.API_KEY || '';
 
 const addresses = new SharedArray('addresses', function () {
   return [
@@ -34,6 +35,7 @@ export default function () {
   const idx = (__VU - 1 + __ITER) % addresses.length;
   const payload = JSON.stringify({ address: addresses[idx] });
   const headers = { 'Content-Type': 'application/json' };
+  if (API_KEY) headers['X-API-Key'] = API_KEY;
 
   const res = http.post(`${BASE_URL}/v1/validate`, payload, { headers });
 

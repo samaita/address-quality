@@ -13,6 +13,10 @@ spreads a fixed set of Indonesian addresses across them, and POSTs to
 `<base-url>/v1/validate`. Result CSVs are written to `tests/api/result/`
 (`YYYY-MM-DD_<test-name>_<serial>.csv`, auto-incrementing per day).
 
+The `X-API-Key` header is sent using the `API_KEY` value from the root `.env`
+(`run-k6.sh` loads it; an `API_KEY` already set in the environment wins).
+The header is omitted when the key is empty.
+
 ### Local (default base URL)
 
 ```bash
