@@ -20,19 +20,3 @@ services:
       - no-new-privileges:true
     mem_limit: 512m
     cpus: "1.0"
-
-  frontend:
-    image: ghcr.io/samaita/address-quality-frontend:${FE_IMAGE_TAG}
-    container_name: address-quality-frontend
-    restart: unless-stopped
-    pull_policy: always
-    env_file:
-      - /etc/address-quality/frontend.env
-    ports:
-      - "7301:80"
-    depends_on:
-      - api
-    security_opt:
-      - no-new-privileges:true
-    mem_limit: 128m
-    cpus: "0.5"

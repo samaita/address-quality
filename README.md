@@ -245,17 +245,15 @@ Contributions, discussions, bug reports, and suggestions are welcome. The projec
 
 # Production Deployment
 
-The stack runs on a VPS with podman. CI (`.github/workflows/ci.yml`) only builds and uploads two immutable images to GHCR; it never deploys:
+The stack runs on a VPS with podman. CI (`.github/workflows/ci.yml`) only builds and uploads one immutable image to GHCR; it never deploys:
 
 - `ghcr.io/samaita/address-quality` — backend API
-- `ghcr.io/samaita/address-quality-frontend` — nginx serving the built frontend and proxying `/address-quality/` to the API
 
-Deployment is a manual, operator-run step on the VPS: `deploy.sh` pulls the chosen images and updates the podman containers. Config and data live on the host:
+Deployment is a manual, operator-run step on the VPS: `deploy.sh` pulls the image and updates the podman container. Config and data live on the host:
 
 ```
 /etc/address-quality/
 ├── .env.prod                  backend env (0600)
-├── frontend.env               frontend/nginx env (0600)
 ├── deploy.sh / rollback.sh
 ├── docker-compose.prod.yml
 └── db/
@@ -280,7 +278,6 @@ Deployment is a manual, operator-run step on the VPS: `deploy.sh` pulls the chos
 
    ```bash
    sudo install -m 0600 -o "$(id -un)" -g "$(id -gn)" deploy/.env.prod.example /etc/address-quality/.env.prod
-   sudo install -m 0600 -o "$(id -un)" -g "$(id -gn)" deploy/frontend.env.example /etc/address-quality/frontend.env
    ```
 
 5. Seed the databases on a dev machine and upload them. DBs are never stored in images and are not managed by CI:
@@ -301,15 +298,15 @@ Deployment is a manual, operator-run step on the VPS: `deploy.sh` pulls the chos
 
 ## Deploy
 
-`deploy.sh` pulls the images and recreates the containers. It defaults to `latest`; pin an exact tag with `API_IMAGE_TAG` / `FE_IMAGE_TAG` (CI publishes `sha-<ref>` and `v*` tags). It waits for the API health check and verifies the frontend and the nginx → API proxy.
+`deploy.sh` pulls the image and recreates the container. It defaults to `latest`; pin an exact tag with `API_IMAGE_TAG` (CI publishes `sha-<ref>` and `v*` tags). It waits for the API health check and verifies the nginx → API proxy.
 
 ```bash
 /etc/address-quality/deploy.sh                                    # latest
-API_IMAGE_TAG=sha-<short-sha> FE_IMAGE_TAG=sha-<short-sha> \
-  /etc/address-quality/deploy.sh                                  # pinned tags
+API_IMAGE_TAG=sha-<short-sha> \
+  /etc/address-quality/deploy.sh                                  # pinned tag
 ```
 
-Rollback to the last successfully deployed tags:
+Rollback to the last successfully deployed tag:
 
 ```bash
 /etc/address-quality/deploy.sh --rollback   # or ./rollback.sh

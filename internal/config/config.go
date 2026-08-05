@@ -47,7 +47,7 @@ func Load() *Config {
 	viper.SetDefault("DB_MAX_OPEN_CONNS", 10)
 	viper.SetDefault("LOCATION_SOURCE_CODE", "kemendagri")
 	viper.SetDefault("LOG_LEVEL", "info")
-	viper.SetDefault("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+	viper.SetDefault("CORS_ALLOWED_ORIGINS", "https://samaita.com")
 
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Warn().Err(err).Msg(".env not found, using defaults")
