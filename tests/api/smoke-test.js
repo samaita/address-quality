@@ -1,7 +1,13 @@
 import http from 'k6/http';
 import { check, group } from 'k6';
 
-const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:7300';
+const { resolveBaseUrl, resolveApiKey } = require('./config.js');
+
+const BASE_URL = resolveBaseUrl();
+const API_KEY = resolveApiKey();
+
+console.log(`BASE_URL: ${BASE_URL.url} (from ${BASE_URL.source})`);
+console.log(`API_KEY: ${API_KEY.apiKey ? 'set' : 'blank'} (from ${API_KEY.source})`);
 
 export const options = {
   vus: 1,
@@ -13,7 +19,7 @@ export const options = {
 
 export default function () {
   group('GET /health', function () {
-    const res = http.get(`${BASE_URL}/health`);
+    const res = http.get(`${BASE_URL.url}/health`);
     check(res, {
       'status is 200': (r) => r.status === 200,
       'status field is ok': (r) => r.json().status === 'ok',
@@ -25,7 +31,8 @@ export default function () {
   group('POST /v1/validate - valid address', function () {
     const payload = JSON.stringify({ address: 'Jl. Merdeka No.1, Jakarta Pusat 10110' });
     const headers = { 'Content-Type': 'application/json' };
-    const res = http.post(`${BASE_URL}/v1/validate`, payload, { headers });
+    if (API_KEY.apiKey) headers['X-API-Key'] = API_KEY.apiKey;
+    const res = http.post(`${BASE_URL.url}/v1/validate`, payload, { headers });
     const body = res.json();
     check(res, {
       'status is 200': (r) => r.status === 200,
@@ -61,7 +68,8 @@ export default function () {
   group('POST /v1/validate - HTML sanitization', function () {
     const payload = JSON.stringify({ address: '<script>alert(1)</script>Jl. Sudirman' });
     const headers = { 'Content-Type': 'application/json' };
-    const res = http.post(`${BASE_URL}/v1/validate`, payload, { headers });
+    if (API_KEY.apiKey) headers['X-API-Key'] = API_KEY.apiKey;
+    const res = http.post(`${BASE_URL.url}/v1/validate`, payload, { headers });
     const body = res.json();
     check(res, {
       'status is 200': (r) => r.status === 200,
@@ -74,7 +82,8 @@ export default function () {
   group('POST /v1/validate - empty address', function () {
     const payload = JSON.stringify({ address: '' });
     const headers = { 'Content-Type': 'application/json' };
-    const res = http.post(`${BASE_URL}/v1/validate`, payload, { headers });
+    if (API_KEY.apiKey) headers['X-API-Key'] = API_KEY.apiKey;
+    const res = http.post(`${BASE_URL.url}/v1/validate`, payload, { headers });
     check(res, {
       'status is 400': (r) => r.status === 400,
       'error field is present': (r) => r.json().error !== '',
@@ -83,7 +92,8 @@ export default function () {
 
   group('POST /v1/validate - malformed body', function () {
     const headers = { 'Content-Type': 'application/json' };
-    const res = http.post(`${BASE_URL}/v1/validate`, 'not json', { headers });
+    if (API_KEY.apiKey) headers['X-API-Key'] = API_KEY.apiKey;
+    const res = http.post(`${BASE_URL.url}/v1/validate`, 'not json', { headers });
     check(res, {
       'status is 400': (r) => r.status === 400,
       'error field is present': (r) => r.json().error !== '',

@@ -6,6 +6,37 @@ Load and smoke tests written with [k6](https://grafana.com/docs/k6/latest/).
 
 - [k6](https://grafana.com/docs/k6/latest/get-started/installation/) installed and on `PATH`.
 
+## Configuration
+
+Both the k6 scripts (`load-test.js`, `smoke-test.js`) and `benchmark-test.js`
+resolve the API base URL and API key through a shared helper (`tests/api/config.js`)
+with a consistent precedence:
+
+**BASE_URL** (in order):
+
+1. `K6_BASE_URL` (or `BASE_URL`) environment variable / `-e` flag
+2. `K6_BASE_URL` / `BASE_URL` key in `/etc/address-quality/.env.prod`
+3. `K6_BASE_URL` / `BASE_URL` key in the project root `.env`
+4. Default `http://localhost:7300`
+
+**API_KEY** (in order):
+
+1. `API_KEY` environment variable / `-e` flag
+2. `API_KEY` key in `/etc/address-quality/.env.prod`
+3. `API_KEY` key in the project root `.env`
+4. Blank (no `X-API-Key` header sent)
+
+The scripts log the resolved BASE_URL and whether an API key was configured at
+startup, e.g.:
+
+```
+BASE_URL: http://localhost:7300 (from default)
+API_KEY: set (from .env)
+```
+
+The `X-API-Key` header is sent on `/v1/validate` requests when a key resolves;
+it is omitted when blank.
+
 ## Load Test
 
 The load test (`load-test.js`) ramps up to `K6_VUS` virtual users (default `10`),
@@ -13,9 +44,9 @@ spreads a fixed set of Indonesian addresses across them, and POSTs to
 `<base-url>/v1/validate`. Result CSVs are written to `tests/api/result/`
 (`YYYY-MM-DD_<test-name>_<serial>.csv`, auto-incrementing per day).
 
-The `X-API-Key` header is sent using the `API_KEY` value from the root `.env`
-(`run-k6.sh` loads it; an `API_KEY` already set in the environment wins).
-The header is omitted when the key is empty.
+The base URL and `X-API-Key` header follow the [configuration precedence](#configuration)
+above. `run-k6.sh` no longer injects `API_KEY`; the k6 scripts resolve it
+themselves (k6 exposes system env vars to `__ENV`).
 
 ### Local (default base URL)
 

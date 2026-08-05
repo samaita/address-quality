@@ -2,9 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:7300';
+const { resolveBaseUrl, resolveApiKey } = require('./config.js');
+
+const BASE_URL = resolveBaseUrl();
+const API_KEY = resolveApiKey();
 const API_VERSION = process.env.API_VERSION || 'v1';
 const OUTPUT_DIR = 'tests/api/benchmark';
+
+console.log(`BASE_URL: ${BASE_URL.url} (from ${BASE_URL.source})`);
+console.log(`API_KEY: ${API_KEY.apiKey ? 'set' : 'blank'} (from ${API_KEY.source})`);
 
 let INPUT_FILE = 'tests/api/cases/address-tagged.csv';
 if (process.env.INPUT_FILE) INPUT_FILE = process.env.INPUT_FILE;
@@ -125,17 +131,19 @@ function determineOutputFile() {
 
 function postRequest(address, source) {
   return new Promise((resolve) => {
-    const url = new URL(`/${API_VERSION}/validate`, BASE_URL);
+    const url = new URL(`/${API_VERSION}/validate`, BASE_URL.url);
     const body = JSON.stringify({ address, source_code: source });
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    };
+    if (API_KEY.apiKey) headers['X-API-Key'] = API_KEY.apiKey;
     const options = {
       hostname: url.hostname,
       port: url.port || 80,
       path: url.pathname,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
+      headers,
     };
 
     const req = http.request(options, (res) => {
