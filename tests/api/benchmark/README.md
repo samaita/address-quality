@@ -14,8 +14,19 @@ node tests/api/benchmark-test.js
 | Variable      | Default                          | Description                     |
 |---------------|----------------------------------|---------------------------------|
 | `INPUT_FILE`  | `tests/api/cases/address.csv`    | Path to input CSV               |
-| `BASE_URL`    | `http://localhost:7300`          | API base URL                    |
+| `K6_BASE_URL` | (see below)                      | API base URL                    |
 | `API_VERSION` | `v1`                             | API version (used in filename)  |
+
+The base URL and API key resolve through `tests/api/config.js` with this
+precedence (see [`tests/api/README.md`](../README.md#configuration)):
+
+- **BASE_URL**: `K6_BASE_URL` (or `BASE_URL`) env → `/etc/address-quality/.env.prod`
+  → root `.env` → `http://localhost:7300`
+- **API_KEY**: `API_KEY` env → `/etc/address-quality/.env.prod` → root `.env`
+  → blank
+
+The script logs the resolved BASE_URL and API key status at startup, and sends
+the `X-API-Key` header on each request when a key resolves.
 
 ### Examples
 
@@ -27,7 +38,7 @@ node tests/api/benchmark-test.js
 INPUT_FILE=tests/api/cases/example.csv node tests/api/benchmark-test.js
 
 # Different target
-BASE_URL=http://staging:7300 node tests/api/benchmark-test.js
+K6_BASE_URL=http://staging:7300 node tests/api/benchmark-test.js
 ```
 
 ## Input CSV Format

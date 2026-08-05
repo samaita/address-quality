@@ -3,9 +3,14 @@ import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Trend } from 'k6/metrics';
 
-const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:7300';
+const { resolveBaseUrl, resolveApiKey } = require('./config.js');
+
+const BASE_URL = resolveBaseUrl();
+const API_KEY = resolveApiKey();
 const TARGET_VUS = parseInt(__ENV.K6_VUS) || 10;
-const API_KEY = __ENV.API_KEY || '';
+
+console.log(`BASE_URL: ${BASE_URL.url} (from ${BASE_URL.source})`);
+console.log(`API_KEY: ${API_KEY.apiKey ? 'set' : 'blank'} (from ${API_KEY.source})`);
 
 const addresses = new SharedArray('addresses', function () {
   return [
@@ -35,9 +40,9 @@ export default function () {
   const idx = (__VU - 1 + __ITER) % addresses.length;
   const payload = JSON.stringify({ address: addresses[idx] });
   const headers = { 'Content-Type': 'application/json' };
-  if (API_KEY) headers['X-API-Key'] = API_KEY;
+  if (API_KEY.apiKey) headers['X-API-Key'] = API_KEY.apiKey;
 
-  const res = http.post(`${BASE_URL}/v1/validate`, payload, { headers });
+  const res = http.post(`${BASE_URL.url}/v1/validate`, payload, { headers });
 
   if (res.status !== 429) {
     successDuration.add(res.timings.duration);
