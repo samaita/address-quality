@@ -41,8 +41,8 @@ it is omitted when blank.
 
 The load test (`load-test.js`) ramps up to `K6_VUS` virtual users (default `10`),
 spreads a fixed set of Indonesian addresses across them, and POSTs to
-`<base-url>/v1/validate`. Result CSVs are written to `tests/api/result/`
-(`YYYY-MM-DD_<test-name>_<serial>.csv`, auto-incrementing per day).
+`<base-url>/v1/validate`. Result JSON files are written to `tests/api/result/`
+(`YYYY-MM-DD_<test-name>_<serial>.json`, auto-incrementing per day).
 
 The base URL and `X-API-Key` header follow the [configuration precedence](#configuration)
 above. `run-k6.sh` no longer injects `API_KEY`; the k6 scripts resolve it
