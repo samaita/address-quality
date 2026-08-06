@@ -41,8 +41,10 @@ it is omitted when blank.
 
 The load test (`load-test.js`) ramps up to `K6_VUS` virtual users (default `10`),
 spreads a fixed set of Indonesian addresses across them, and POSTs to
-`<base-url>/v1/validate`. Result JSON files are written to `tests/api/result/`
-(`YYYY-MM-DD_<test-name>_<serial>.json`, auto-incrementing per day).
+`<base-url>/v1/validate`. Each run writes a single JSON summary report to
+`tests/api/result/` (`YYYY-MM-DD_<test-name>_<serial>.json`, auto-incrementing
+per day) containing the final results: threshold outcomes, per-check breakdown,
+and metric aggregates (avg/min/med/max/p90/p95, counts, and rates).
 
 The base URL and `X-API-Key` header follow the [configuration precedence](#configuration)
 above. `run-k6.sh` no longer injects `API_KEY`; the k6 scripts resolve it
@@ -97,4 +99,4 @@ Both scripts enforce:
 - `http_req_failed`: error rate < 1%
 - `checks`: 100% of checks pass
 
-A non-zero exit code from k6 means a threshold was breached; results are still saved to `tests/api/result/`.
+A non-zero exit code from k6 means a threshold was breached; the summary report is still saved to `tests/api/result/`.

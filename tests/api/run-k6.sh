@@ -19,4 +19,4 @@ else
 fi
 
 OUTPUT="${RESULT_DIR}/${PREFIX}${NEXT}.json"
-k6 run --out "json=${OUTPUT}" "$SCRIPT"
+k6 run -e RESULT_JSON="${OUTPUT}" "$SCRIPT"
