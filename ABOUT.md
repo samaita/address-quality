@@ -730,7 +730,7 @@ Confidence: **High** for what exists; the security posture section for gaps is I
 
 - `tests/api/smoke-test.js` — single VU/iteration; checks `/health`, valid address response fields, HTML sanitization, empty-address 400, malformed-body 400; threshold `checks rate==1.0`. FACT — smoke-test.js:6-92.
 - `tests/api/load-test.js` — 10 default VUs, ramp 10s/hold 30s/ramp-down 10s; 5 hardcoded addresses round-robin; thresholds `http_req_failed < 0.01`, `checks == 1.0`; custom `success_duration` trend. FACT — load-test.js:7-49.
-- `tests/api/run-k6.sh` — orchestrates k6 with JSON output into `tests/api/result/YYYY-MM-DD_<name>_NNNN.json`. FACT — run-k6.sh:4-22.
+- `tests/api/run-k6.sh` — orchestrates k6, writing a JSON summary report (thresholds, per-check results, metric aggregates) to `tests/api/result/YYYY-MM-DD_<name>_NNNN.json` via `handleSummary`. FACT — run-k6.sh:4-22.
 
 **Benchmarks**
 

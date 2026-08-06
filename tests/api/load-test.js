@@ -3,6 +3,8 @@ import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Trend } from 'k6/metrics';
 
+import { makeHandleSummary } from './summary.js';
+
 const { resolveBaseUrl, resolveApiKey } = require('./config.js');
 
 const BASE_URL = resolveBaseUrl();
@@ -35,6 +37,8 @@ export const options = {
 };
 
 const successDuration = new Trend('success_duration');
+
+export const handleSummary = makeHandleSummary('load-test');
 
 export default function () {
   const idx = (__VU - 1 + __ITER) % addresses.length;

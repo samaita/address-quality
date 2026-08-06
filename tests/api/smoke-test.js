@@ -1,6 +1,8 @@
 import http from 'k6/http';
 import { check, group } from 'k6';
 
+import { makeHandleSummary } from './summary.js';
+
 const { resolveBaseUrl, resolveApiKey } = require('./config.js');
 
 const BASE_URL = resolveBaseUrl();
@@ -16,6 +18,8 @@ export const options = {
     checks: ['rate==1.0'],
   },
 };
+
+export const handleSummary = makeHandleSummary('smoke-test');
 
 export default function () {
   group('GET /health', function () {
