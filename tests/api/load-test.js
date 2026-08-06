@@ -52,6 +52,4 @@ export default function () {
     'status is 200': (r) => r.status === 200,
     'request_id is present': (r) => r.status !== 200 || r.json().request_id !== '',
   });
-
-  sleep(0.5);
 }
