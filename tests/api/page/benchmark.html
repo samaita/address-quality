@@ -342,6 +342,7 @@
             <div class="aq-cards" id="aq-acc-cards"></div>
             <h3 class="aq-subtitle">Precision &amp; recall by hierarchy level</h3>
             <div class="aq-table-wrap"><table class="aq-table" id="aq-pr-table"></table></div>
+            <p class="aq-note">How to read this table: <strong>Recall</strong> is the share of all test addresses where the engine resolved this level correctly (correct &divide; total). <strong>Precision</strong> is the share of addresses where the engine returned a non-empty value at this level that was correct (correct &divide; returned) &mdash; shown as N/A when nothing was returned. Because the engine nearly always returns a value, precision &asymp; recall. The <strong>All levels (exact)</strong> row requires province, city, district and village to all be correct at once, so errors compound and it lands below any single level.</p>
           </section>
 
           <section id="performance" class="aq-section">
@@ -505,10 +506,10 @@
 
   /* ---------- benchmark: accuracy overview + precision/recall ---------- */
   var levels = [
-    { k: 'province', label: 'Province', loc: 'province' },
-    { k: 'city', label: 'City / Regency', loc: 'city' },
-    { k: 'district', label: 'District', loc: 'district' },
-    { k: 'subdistrict', label: 'Village (kelurahan / desa)', loc: 'sub_district' },
+    { k: 'p', label: 'Province', loc: 'province' },
+    { k: 'c', label: 'City / Regency', loc: 'city' },
+    { k: 'd', label: 'District', loc: 'district' },
+    { k: 's', label: 'Village (kelurahan / desa)', loc: 'sub_district' },
   ];
   var levelStats = levels.map(function (L) {
     var correct = records.filter(function (r) { return r.same[L.k] === true; }).length;
