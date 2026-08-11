@@ -1,7 +1,7 @@
 # Benchmark Page
 
 Self-contained, embeddable page that reports one Address Quality release/build:
-accuracy, hierarchy breakdown, failure analysis, performance and reproducibility metadata.
+accuracy, performance and reproducibility metadata.
 
 The only artifact is **`benchmark.html`** — a single HTML file with the data inlined.
 It renders standalone and inside an `<iframe>`, with no external dependencies, no

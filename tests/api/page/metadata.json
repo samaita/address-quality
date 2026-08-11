@@ -1,6 +1,6 @@
 {
-  "release": null,
-  "build": null,
+  "release": "v0.1.0-alpha",
+  "build": "v0.1.0-alpha",
   "git_commit": "02ba28d",
   "runner": {
     "cpu": null,
