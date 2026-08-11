@@ -34,6 +34,7 @@ export const options = {
     http_req_failed: ['rate<0.01'],
     checks: ['rate==1.0'],
   },
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
 };
 
 const successDuration = new Trend('success_duration');

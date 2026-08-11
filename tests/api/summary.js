@@ -31,12 +31,16 @@ function buildReport(data, testName) {
     }
   }
 
+  const options = data.options ? { ...data.options } : undefined;
+  if (options && options.thresholds) delete options.thresholds;
+
   return {
     test: testName,
     generated_at: new Date().toISOString(),
     test_run_duration_ms: data.state.testRunDurationMs,
     thresholds,
     checks: flattenChecks(data.root_group, []),
+    options,
     metrics,
   };
 }

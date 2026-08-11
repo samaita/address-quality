@@ -1,0 +1,18 @@
+{
+  "release": null,
+  "build": null,
+  "git_commit": "02ba28d",
+  "runner": {
+    "cpu": null,
+    "memory": null,
+    "os": null,
+    "k6_version": null
+  },
+  "server": {
+    "cpu": null,
+    "memory": null,
+    "os": null,
+    "api_version": "v1",
+    "git_commit": "02ba28d"
+  }
+}
