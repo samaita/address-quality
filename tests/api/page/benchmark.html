@@ -340,9 +340,9 @@
             <h2 class="aq-section-title">Benchmark</h2>
             <h3 class="aq-subtitle">Accuracy overview</h3>
             <div class="aq-cards" id="aq-acc-cards"></div>
-            <h3 class="aq-subtitle">Precision &amp; recall by hierarchy level</h3>
+            <h3 class="aq-subtitle">Correct by hierarchy level</h3>
             <div class="aq-table-wrap"><table class="aq-table" id="aq-pr-table"></table></div>
-            <p class="aq-note">How to read this table: <strong>Recall</strong> is the share of all test addresses where the engine resolved this level correctly (correct &divide; total). <strong>Precision</strong> is the share of addresses where the engine returned a non-empty value at this level that was correct (correct &divide; returned) &mdash; shown as N/A when nothing was returned. Because the engine nearly always returns a value, precision &asymp; recall. The <strong>All levels (exact)</strong> row requires province, city, district and village to all be correct at once, so errors compound and it lands below any single level.</p>
+            <p class="aq-note">Correct is the number of records (of 106) where the engine matched the ground truth at that level; % is that share of the total. The All four levels (exact) row requires province, city, district and subdistrict to all match at once.</p>
           </section>
 
           <section id="performance" class="aq-section">
@@ -504,23 +504,17 @@
     (B.challenges || []).map(challengeHtml).join('') ||
     '<p class="aq-note">No challenges derived for this run.</p>';
 
-  /* ---------- benchmark: accuracy overview + precision/recall ---------- */
+  /* ---------- benchmark: accuracy overview + per-level correctness ---------- */
   var levels = [
-    { k: 'p', label: 'Province', loc: 'province' },
-    { k: 'c', label: 'City / Regency', loc: 'city' },
-    { k: 'd', label: 'District', loc: 'district' },
-    { k: 's', label: 'Village (kelurahan / desa)', loc: 'sub_district' },
+    { k: 'p', label: 'Province' },
+    { k: 'c', label: 'City' },
+    { k: 'd', label: 'District (Kecamatan)' },
+    { k: 's', label: 'Subdistrict (Kelurahan)' },
   ];
   var levelStats = levels.map(function (L) {
-    var correct = records.filter(function (r) { return r.same[L.k] === true; }).length;
-    var nonEmpty = records.filter(function (r) {
-      return r.location && r.location[L.loc] && String(r.location[L.loc]).trim() !== '';
-    }).length;
     return {
       label: L.label,
-      correct: correct,
-      recall: correct / total,
-      precision: nonEmpty ? correct / nonEmpty : null,
+      correct: records.filter(function (r) { return r.same[L.k] === true; }).length,
     };
   });
 
@@ -530,15 +524,15 @@
     card('Dataset size', num(total, 0), 'records evaluated') +
     card('Dataset version', B.dataset_version ? esc(B.dataset_version) : '<span class="aq-na">N/A</span>', B.dataset_source ? 'source ' + esc(B.dataset_source) : '');
 
-  var prRows = '<thead><tr><th>Level</th><th>Correct</th><th>Recall</th><th>Precision</th></tr></thead><tbody>' +
+  var prRows = '<thead><tr><th>Level</th><th>Correct</th><th>%</th></tr></thead><tbody>' +
     levelStats.map(function (s) {
-      return '<tr><td>' + esc(s.label) + '</td><td class="aq-num">' + num(s.correct, 0) + '</td>' +
-        '<td class="aq-num">' + pct(s.recall, 1) + '</td>' +
-        '<td class="aq-num">' + (s.precision === null ? '<span class="aq-na">N/A</span>' : pct(s.precision, 1)) + '</td></tr>';
+      return '<tr><td>' + esc(s.label) + '</td>' +
+        '<td class="aq-num">' + num(s.correct, 0) + ' of ' + num(total, 0) + '</td>' +
+        '<td class="aq-num">' + pct(s.correct / total, 1) + '</td></tr>';
     }).join('') +
-    '<tr><td><strong>All levels (exact)</strong></td><td class="aq-num"><strong>' + num(correctCount, 0) + '</strong></td>' +
-    '<td class="aq-num"><strong>' + pct(correctCount / total, 1) + '</strong></td>' +
-    '<td class="aq-num"><span class="aq-na">N/A</span></td></tr></tbody>';
+    '<tr><td><strong>All four levels (exact)</strong></td>' +
+    '<td class="aq-num"><strong>' + num(correctCount, 0) + ' of ' + num(total, 0) + '</strong></td>' +
+    '<td class="aq-num"><strong>' + pct(correctCount / total, 1) + '</strong></td></tr></tbody>';
   document.getElementById('aq-pr-table').innerHTML = prRows;
 
   /* ---------- performance ---------- */
