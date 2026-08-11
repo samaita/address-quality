@@ -10,6 +10,7 @@
 .aq-benchmark {
   --aq-bg: #f7f7f8;
   --aq-surface: #ffffff;
+  --aq-surface-50: #fafafa;
   --aq-border: #e4e4e7;
   --aq-border-strong: #d4d4d8;
   --aq-text: #18181b;
@@ -28,19 +29,17 @@
   background: var(--aq-bg);
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 .aq-benchmark *,
 .aq-benchmark *::before,
 .aq-benchmark *::after { box-sizing: border-box; }
 .aq-benchmark a { color: var(--aq-accent); text-decoration: none; }
 .aq-benchmark a:hover { text-decoration: underline; }
-.aq-benchmark h1, .aq-benchmark h2, .aq-benchmark h3,
-.aq-benchmark p, .aq-benchmark ul, .aq-benchmark li,
-.aq-benchmark table, .aq-benchmark th, .aq-benchmark td,
-.aq-benchmark button, .aq-benchmark div, .aq-benchmark nav,
-.aq-benchmark header, .aq-benchmark main, .aq-benchmark footer,
-.aq-benchmark section { margin: 0; padding: 0; }
+.aq-benchmark :where(h1, h2, h3, p, ul, li, table, th, td, button) {
+  margin: 0;
+  padding: 0;
+}
 
 .aq-shell {
   max-width: 1120px;
@@ -89,33 +88,40 @@
 }
 .aq-nav a {
   display: block;
-  padding: 6px 0;
+  padding: 6px 12px;
+  border-radius: 8px;
   color: var(--aq-muted);
-  border-left: 2px solid var(--aq-border);
-  padding-left: 14px;
-  margin-left: 0;
+  font-size: 14px;
+  transition: background-color 150ms ease, color 150ms ease;
 }
-.aq-nav a:hover { color: var(--aq-accent); text-decoration: none; border-left-color: var(--aq-accent); }
+.aq-nav a:hover {
+  color: var(--aq-text);
+  background: #f4f4f5;
+  text-decoration: none;
+}
+.aq-nav a.active {
+  color: var(--aq-accent);
+  background: #eef2ff;
+  font-weight: 600;
+}
 
 .aq-main { min-width: 0; }
 .aq-section { margin-bottom: 72px; scroll-margin-top: 24px; }
 .aq-section-title {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  margin-bottom: 28px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--aq-border);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--aq-text);
+  margin-bottom: 20px;
 }
 .aq-subtitle {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--aq-faint);
+  letter-spacing: -0.01em;
+  color: var(--aq-text);
   margin: 36px 0 16px;
 }
-.aq-subtitle:first-of-type { margin-top: 0; }
+.aq-section-title + .aq-subtitle { margin-top: 0; }
 
 .aq-cards {
   display: grid;
@@ -127,6 +133,7 @@
   border: 1px solid var(--aq-border);
   border-radius: 12px;
   padding: 20px 22px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.06);
 }
 .aq-card-label {
   font-size: 12px;
@@ -169,11 +176,12 @@
 .aq-table th {
   text-align: left;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--aq-muted);
-  padding: 12px 16px;
+  padding: 10px 16px;
+  background: var(--aq-surface-50);
   border-bottom: 1px solid var(--aq-border-strong);
   white-space: nowrap;
 }
@@ -279,7 +287,7 @@
   .aq-shell { padding: 40px 20px 64px; }
   .aq-grid { grid-template-columns: 1fr; gap: 32px; }
   .aq-nav { position: static; }
-  .aq-nav a { display: inline-block; border-left: none; padding: 4px 10px; margin: 0 4px 8px 0; border: 1px solid var(--aq-border); border-radius: 999px; font-size: 13px; }
+  .aq-nav a { display: inline-block; padding: 4px 10px; margin: 0 4px 8px 0; font-size: 13px; }
   .aq-nav-title { margin-bottom: 8px; }
   .aq-title { font-size: 34px; }
 }
@@ -328,12 +336,6 @@
             <div class="aq-cards" id="aq-acc-cards"></div>
             <h3 class="aq-subtitle">Precision &amp; recall by hierarchy level</h3>
             <div class="aq-table-wrap"><table class="aq-table" id="aq-pr-table"></table></div>
-            <h3 class="aq-subtitle">Hierarchy breakdown</h3>
-            <div class="aq-table-wrap"><table class="aq-table" id="aq-hierarchy"></table></div>
-            <h3 class="aq-subtitle">Failure analysis <span class="aq-dim" id="aq-fail-count"></span></h3>
-            <p class="aq-note">Failures are shown collapsed for readability. Each row shows the Address ID, the formatted location returned by the engine, the expected (ground-truth) address, confidence, status and a derived failure reason. Raw address inputs are confidential and are not published — except in the three challenge examples above.</p>
-            <div class="aq-table-wrap"><table class="aq-table" id="aq-failures"></table></div>
-            <button class="aq-toggle" id="aq-fail-toggle" type="button" hidden></button>
           </section>
 
           <section id="performance" class="aq-section">
@@ -532,81 +534,6 @@
     '<td class="aq-num"><span class="aq-na">N/A</span></td></tr></tbody>';
   document.getElementById('aq-pr-table').innerHTML = prRows;
 
-  var hierRows = '<thead><tr><th>Hierarchy level</th><th>Correct</th><th>Incorrect</th><th>Accuracy</th></tr></thead><tbody>' +
-    levelStats.map(function (s) {
-      return '<tr><td>' + esc(s.label) + '</td><td class="aq-num">' + num(s.correct, 0) + '</td>' +
-        '<td class="aq-num">' + num(total - s.correct, 0) + '</td>' +
-        '<td class="aq-num">' + pct(s.correct / total, 1) + '</td></tr>';
-    }).join('') + '</tbody>';
-  document.getElementById('aq-hierarchy').innerHTML = hierRows;
-
-  /* ---------- benchmark: failure analysis ---------- */
-  var failures = records.filter(function (r) { return !sameAll(r); });
-
-  function failReason(r) {
-    if (r.error) return 'API request failed';
-    if (r.note === 'INSUFFICIENT_DATA_ROAD') return 'Insufficient road-level data';
-    if (!r.same.p) return 'Resolved to wrong province';
-    if (!r.same.c) return 'Resolved to wrong city / regency (ambiguous name)';
-    if (!r.same.d) return 'District resolved incorrectly';
-    if (!r.same.s) {
-      return (r.location && String(r.location.sub_district || '').trim() === '')
-        ? 'Sub-district not resolved'
-        : 'Sub-district resolved incorrectly';
-    }
-    return 'Correct';
-  }
-  function levelTicks(r) {
-    return (r.same.p ? 'P\u2713' : 'P\u2717') + ' ' +
-           (r.same.c ? 'C\u2713' : 'C\u2717') + ' ' +
-           (r.same.d ? 'D\u2713' : 'D\u2717') + ' ' +
-           (r.same.s ? 'V\u2713' : 'V\u2717');
-  }
-  function actualText(r) {
-    var a = r.actual || {};
-    return [a.province, a.city, a.district, a.subdistrict].filter(function (x) { return x && String(x).trim() !== ''; }).join(', ') || '<span class="aq-na">N/A</span>';
-  }
-  function failRow(r) {
-    var idFull = r.id || '';
-    var idShort = idFull ? '<span class="aq-mono" title="' + esc(idFull) + '">' + esc(idFull.slice(0, 8)) + '…</span>' : '<span class="aq-na">N/A</span>';
-    var formatted = r.formatted ? esc(r.formatted) : '<span class="aq-na">N/A</span>';
-    var statusBadge = r.status === 'VALID' ? badge('ok', r.status)
-      : (r.status === 'UNKNOWN' || r.status === 'CONFLICT') ? badge('bad', r.status || '')
-      : r.status ? badge('warn', r.status) : '<span class="aq-na">N/A</span>';
-    return '<tr>' +
-      '<td>' + idShort + '</td>' +
-      '<td>' + formatted + '</td>' +
-      '<td>' + actualText(r) + '</td>' +
-      '<td class="aq-num">' + (r.error || r.confidence === null || r.confidence === undefined ? '<span class="aq-na">N/A</span>' : pct(r.confidence, 0)) + '</td>' +
-      '<td>' + statusBadge + '</td>' +
-      '<td>' + badge(sameAll(r) ? 'ok' : 'bad', sameAll(r) ? 'Correct' : 'Incorrect') + '<div class="aq-dim">' + esc(levelTicks(r)) + '</div></td>' +
-      '<td>' + esc(failReason(r)) + '</td>' +
-      '</tr>';
-  }
-
-  var failHead = '<thead><tr><th>Address ID</th><th>Formatted location</th><th>Actual address</th><th>Confidence</th><th>Status</th><th>Result</th><th>Failure reason</th></tr></thead><tbody>';
-  var failBody = failures.map(failRow).join('');
-  var failFoot = '</tbody>';
-  document.getElementById('aq-fail-count').textContent = '— ' + failures.length + ' of ' + num(total, 0) + ' records failed';
-
-  var ROWS_BEFORE_TOGGLE = 8;
-  var failTbl = document.getElementById('aq-failures');
-  var failToggle = document.getElementById('aq-fail-toggle');
-  var showAll = false;
-  function renderFailures() {
-    var rows = showAll ? failures : failures.slice(0, ROWS_BEFORE_TOGGLE);
-    failTbl.innerHTML = failHead + rows.map(failRow).join('') + failFoot;
-    failToggle.hidden = failures.length <= ROWS_BEFORE_TOGGLE;
-    failToggle.textContent = showAll
-      ? 'Show fewer failures'
-      : 'Show all ' + failures.length + ' failures';
-  }
-  failToggle.addEventListener('click', function () {
-    showAll = !showAll;
-    renderFailures();
-  });
-  renderFailures();
-
   /* ---------- performance ---------- */
   var perfCards =
     card('RPS', na(reqs.rate, 1), 'requests / second') +
@@ -701,6 +628,27 @@
   relRow('Server specification', [server.cpu, server.memory, server.os].filter(Boolean).join(' · '), true);
   relRows += '</tbody>';
   document.getElementById('aq-release').innerHTML = relRows;
+
+  /* ---------- on this page: active section ---------- */
+  var navLinks = document.querySelectorAll('.aq-nav a');
+  function setActive(id) {
+    for (var i = 0; i < navLinks.length; i++) {
+      var link = navLinks[i];
+      if (link.getAttribute('href') === '#' + id) link.classList.add('active');
+      else link.classList.remove('active');
+    }
+  }
+  var sections = [].slice.call(document.querySelectorAll('.aq-section'));
+  if ('IntersectionObserver' in window && sections.length && navLinks.length) {
+    var observer = new IntersectionObserver(function (entries) {
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].isIntersecting) setActive(entries[i].target.id);
+      }
+    }, { rootMargin: '-80px 0px -60% 0px' });
+    sections.forEach(function (s) { observer.observe(s); });
+  } else {
+    setActive(sections.length ? sections[0].id : 'summary');
+  }
 
   /* ---------- footer ---------- */
   document.getElementById('aq-sources').textContent =
