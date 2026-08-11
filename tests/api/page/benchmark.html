@@ -123,6 +123,12 @@
 }
 .aq-section-title + .aq-subtitle { margin-top: 0; }
 
+/* Performance content hidden until load-test config data is available. */
+.aq-nav a[href="#performance"],
+#aq-summary-perf-title,
+#aq-summary-perf,
+#performance { display: none; }
+
 .aq-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -324,7 +330,7 @@
             <h2 class="aq-section-title">Summary</h2>
             <h3 class="aq-subtitle">Benchmark</h3>
             <div class="aq-cards" id="aq-summary-bench"></div>
-            <h3 class="aq-subtitle">Performance</h3>
+            <h3 class="aq-subtitle" id="aq-summary-perf-title">Performance</h3>
             <div class="aq-cards" id="aq-summary-perf"></div>
             <h3 class="aq-subtitle">Top 3 challenges</h3>
             <div id="aq-summary-challenges"></div>
@@ -623,9 +629,7 @@
   relRow('Dataset generation timestamp', null, true);
   relRow('Load-test timestamp', PERF.generated_at, true);
   relRow('Benchmark source', B.source, true);
-  relRow('Performance source', PERF.source, true);
   relRow('Benchmark runner', [runner.cpu, runner.memory, runner.os].filter(Boolean).join(' · '), true);
-  relRow('Server specification', [server.cpu, server.memory, server.os].filter(Boolean).join(' · '), true);
   relRows += '</tbody>';
   document.getElementById('aq-release').innerHTML = relRows;
 
