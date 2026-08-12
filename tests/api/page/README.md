@@ -7,6 +7,12 @@ The only artifact is **`benchmark.html`** — a single HTML file with the data i
 It renders standalone and inside an `<iframe>`, with no external dependencies, no
 CORS, and scoped CSS that cannot affect the host page.
 
+The build also writes **`full-benchmark.html`** — the same page but untrimmed:
+it keeps the raw address input for every record, renders the top-100 failed
+matches ranked by confidence (high to low) and always shows the performance run.
+Because it embeds confidential raw inputs, `full-benchmark.html` is gitignored
+and intended only for local inspection, never for publishing.
+
 ## Build
 
 ```bash
@@ -42,6 +48,10 @@ Raw address inputs are confidential. They are embedded in `benchmark.html`
 **only** for the three Top-Challenge example records. All other records are
 embedded trimmed (Address ID, status, confidence, formatted location, ground
 truth and derived flags). Failure tables and lists never include raw inputs.
+
+`full-benchmark.html` is the deliberate exception: it is the untrimmed build used
+to inspect raw inputs against the resolved/actual addresses locally. It is
+excluded from git (`.gitignore`) and must not be published.
 
 ## Updating after a new benchmark run
 

@@ -7,9 +7,12 @@
  *   - latest tests/api/benchmark/*_benchmark_v1_*.json
  *   - latest tests/api/result/*_load-test_*.json
  *
- * Writes a single self-contained HTML file with all data inlined.
- * Privacy rule: raw_address is confidential. It is embedded ONLY for the
- * three Top-Challenge example records. All other records are trimmed.
+ * Writes two self-contained HTML files with all data inlined:
+ *   - benchmark.html       trimmed (public): raw_address only for the three
+ *                          Top-Challenge example records, everything else trimmed.
+ *   - full-benchmark.html  untrimmed (local/gitignored): keeps raw_address for
+ *                          every record, renders the top-100 failed matches
+ *                          ranked by confidence and shows the performance run.
  */
 'use strict';
 
@@ -21,6 +24,7 @@ const BENCH_DIR = path.join(PAGE_DIR, '..', 'benchmark');
 const RESULT_DIR = path.join(PAGE_DIR, '..', 'result');
 const TEMPLATE = path.join(PAGE_DIR, 'template.html');
 const OUTPUT = path.join(PAGE_DIR, 'benchmark.html');
+const FULL_OUTPUT = path.join(PAGE_DIR, 'full-benchmark.html');
 const META_FILE = path.join(PAGE_DIR, 'metadata.json');
 
 function latestFile(dir, pattern) {
@@ -214,6 +218,73 @@ function buildPayload(meta, benchmarkFile, perfFile, benchmarkRows) {
   };
 }
 
+function buildFullPayload(meta, benchmarkFile, perfFile, benchmarkRows) {
+  const payload = buildPayload(meta, benchmarkFile, perfFile, benchmarkRows);
+  const records = payload.benchmark.records;
+
+  benchmarkRows.forEach((row, i) => {
+    records[i].raw = row.raw_address;
+  });
+
+  const failures = [];
+  benchmarkRows.forEach((row) => {
+    const q = row.quality;
+    const c = row.comparison || {};
+    if (!q) return;
+    if (c.same_province && c.same_city && c.same_district && c.same_subdistrict) return;
+    const a = q.assessment || {};
+    failures.push({
+      raw: row.raw_address,
+      id: q.address_id,
+      status: q.status,
+      confidence: q.confidence,
+      formatted: q.formatted_address,
+      actual: {
+        province: c.actual_province,
+        city: c.actual_city,
+        district: c.actual_district,
+        subdistrict: c.actual_subdistrict,
+      },
+      same: {
+        p: c.same_province,
+        c: c.same_city,
+        d: c.same_district,
+        s: c.same_subdistrict,
+      },
+      missing: a.missing || [],
+      conflicts: a.conflicts || [],
+      ambiguous: a.ambiguous || [],
+      note: c.note || null,
+    });
+  });
+
+  failures.sort(
+    (a, b) => (b.confidence === null || b.confidence === undefined ? -1 : b.confidence) -
+             (a.confidence === null || a.confidence === undefined ? -1 : a.confidence)
+  );
+
+  payload.benchmark.full = true;
+  payload.benchmark.failure_total = failures.length;
+  payload.benchmark.failures = failures.slice(0, 100);
+
+  return payload;
+}
+
+function renderTemplate(payload) {
+  const json = JSON.stringify(payload)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+
+  let html = fs.readFileSync(TEMPLATE, 'utf-8');
+  if (!html.includes('__AQ_DATA__')) {
+    console.error('template.html is missing the __AQ_DATA__ marker.');
+    process.exit(1);
+  }
+  html = html.replace('__AQ_DATA__', json);
+  return html;
+}
+
 function main() {
   let meta = {};
   if (fs.existsSync(META_FILE)) {
@@ -236,22 +307,16 @@ function main() {
 
   const benchmarkRows = readJson(path.join(BENCH_DIR, benchmarkFile));
   const payload = buildPayload(meta, benchmarkFile, perfFile, benchmarkRows);
+  const fullPayload = buildFullPayload(meta, benchmarkFile, perfFile, benchmarkRows);
 
-  const json = JSON.stringify(payload)
-    .replace(/</g, '\\u003c')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
-
-  let html = fs.readFileSync(TEMPLATE, 'utf-8');
-  if (!html.includes('__AQ_DATA__')) {
-    console.error('template.html is missing the __AQ_DATA__ marker.');
-    process.exit(1);
-  }
-  html = html.replace('__AQ_DATA__', json);
+  const html = renderTemplate(payload);
+  const fullHtml = renderTemplate(fullPayload);
 
   fs.mkdirSync(PAGE_DIR, { recursive: true });
   fs.writeFileSync(OUTPUT, html);
+  fs.writeFileSync(FULL_OUTPUT, fullHtml);
   console.log(`Wrote ${OUTPUT}`);
+  console.log(`Wrote ${FULL_OUTPUT} (${fullPayload.benchmark.failure_total} failures shown, raw addresses included)`);
   console.log(
     `  benchmark:  ${benchmarkFile} (${benchmarkRows.length} records)`
   );
