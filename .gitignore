@@ -8,6 +8,7 @@ tests/api/benchmark/*.json
 tests/api/**/*.xlsx
 tests/api/cases/*.csv
 !tests/api/cases/example.csv
+tests/api/page/full-benchmark.html
 docs/ISSUES.md
 bin*.db
 .DS_Store

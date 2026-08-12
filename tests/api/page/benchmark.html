@@ -129,6 +129,12 @@
 #aq-summary-perf,
 #performance { display: none; }
 
+/* Full (untrimmed) builds expose the performance run. */
+.aq-benchmark.aq-full .aq-nav a[href="#performance"],
+.aq-benchmark.aq-full #aq-summary-perf-title,
+.aq-benchmark.aq-full #aq-summary-perf,
+.aq-benchmark.aq-full #performance { display: block; }
+
 .aq-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -343,6 +349,11 @@
             <h3 class="aq-subtitle">Correct by hierarchy level</h3>
             <div class="aq-table-wrap"><table class="aq-table" id="aq-pr-table"></table></div>
             <p class="aq-note">Correct is the number of records (of 106) where the engine matched the ground truth at that level; % is that share of the total. The All four levels (exact) row requires province, city, district and subdistrict to all match at once.</p>
+            <h3 class="aq-subtitle" id="aq-failures-title" hidden>Failed matches — by confidence</h3>
+            <div class="aq-table-wrap" id="aq-failures-wrap" hidden>
+              <table class="aq-table" id="aq-failures"></table>
+            </div>
+            <p class="aq-note" id="aq-failures-note" hidden></p>
           </section>
 
           <section id="performance" class="aq-section">
@@ -389,6 +400,10 @@
   }
   document.getElementById('aq-loading').hidden = true;
   document.getElementById('aq-app').hidden = false;
+
+  if (D.benchmark.full) {
+    document.querySelector('.aq-benchmark').classList.add('aq-full');
+  }
 
   function esc(v) {
     if (v === null || v === undefined) return '';
@@ -534,6 +549,39 @@
     '<td class="aq-num"><strong>' + num(correctCount, 0) + ' of ' + num(total, 0) + '</strong></td>' +
     '<td class="aq-num"><strong>' + pct(correctCount / total, 1) + '</strong></td></tr></tbody>';
   document.getElementById('aq-pr-table').innerHTML = prRows;
+
+  /* ---------- benchmark: failed matches (full builds only) ---------- */
+  if (B.full && Array.isArray(B.failures) && B.failures.length) {
+    var failRows = '<thead><tr><th>#</th><th>Confidence</th><th>Status</th><th>Raw input</th><th>Resolved to</th><th>Actual address</th><th>Assessment flags</th></tr></thead><tbody>';
+    B.failures.forEach(function (f, i) {
+      var flags = [];
+      if (f.same) {
+        if (!f.same.p) flags.push('province mismatch');
+        if (!f.same.c) flags.push('city mismatch');
+        if (!f.same.d) flags.push('district mismatch');
+        if (!f.same.s) flags.push('village mismatch');
+      }
+      if (f.missing && f.missing.length) flags.push('missing: ' + f.missing.join(', '));
+      if (f.conflicts && f.conflicts.length) flags.push('conflicts: ' + f.conflicts.join(', '));
+      if (f.ambiguous && f.ambiguous.length) flags.push('ambiguous: ' + f.ambiguous.join(', '));
+      var actual = [f.actual.province, f.actual.city, f.actual.district, f.actual.subdistrict].filter(Boolean).join(', ');
+      failRows += '<tr><td class="aq-num">' + num(i + 1, 0) + '</td>' +
+        '<td class="aq-num">' + (f.confidence === null || f.confidence === undefined ? '<span class="aq-na">N/A</span>' : pct(f.confidence, 0)) + '</td>' +
+        '<td>' + esc(f.status || '') + '</td>' +
+        '<td class="aq-mono">' + esc(f.raw || '') + '</td>' +
+        '<td>' + esc(f.formatted || '') + '</td>' +
+        '<td>' + esc(actual) + '</td>' +
+        '<td>' + (flags.length ? esc(flags.join('; ')) : '—') + '</td></tr>';
+    });
+    failRows += '</tbody>';
+    document.getElementById('aq-failures').innerHTML = failRows;
+    document.getElementById('aq-failures-title').hidden = false;
+    document.getElementById('aq-failures-wrap').hidden = false;
+    document.getElementById('aq-failures-note').innerHTML =
+      esc(B.failure_total) + ' of ' + esc(total) + ' records failed to match all four hierarchy levels. Shown: ' + esc(B.failures.length) +
+      (B.failure_total > B.failures.length ? ' (limited to the top ' + esc(B.failures.length) + ' by confidence).' : ', ranked by confidence from high to low.');
+    document.getElementById('aq-failures-note').hidden = false;
+  }
 
   /* ---------- performance ---------- */
   var perfCards =
