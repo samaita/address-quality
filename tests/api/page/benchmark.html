@@ -132,7 +132,7 @@
 /* Full (untrimmed) builds expose the performance run. */
 .aq-benchmark.aq-full .aq-nav a[href="#performance"],
 .aq-benchmark.aq-full #aq-summary-perf-title,
-.aq-benchmark.aq-full #aq-summary-perf,
+.aq-benchmark.aq-full #aq-summary-perf { display: grid; }
 .aq-benchmark.aq-full #performance { display: block; }
 
 .aq-cards {
@@ -563,7 +563,6 @@
       }
       if (f.missing && f.missing.length) flags.push('missing: ' + f.missing.join(', '));
       if (f.conflicts && f.conflicts.length) flags.push('conflicts: ' + f.conflicts.join(', '));
-      if (f.ambiguous && f.ambiguous.length) flags.push('ambiguous: ' + f.ambiguous.join(', '));
       var actual = [f.actual.province, f.actual.city, f.actual.district, f.actual.subdistrict].filter(Boolean).join(', ');
       failRows += '<tr><td class="aq-num">' + num(i + 1, 0) + '</td>' +
         '<td class="aq-num">' + (f.confidence === null || f.confidence === undefined ? '<span class="aq-na">N/A</span>' : pct(f.confidence, 0)) + '</td>' +
