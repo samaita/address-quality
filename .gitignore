@@ -11,7 +11,6 @@ tests/api/cases/*.csv
 tests/api/page/full-benchmark.html
 docs/ISSUES.md
 bin*.db
-plan/*.md
 .DS_Store
 node_modules/
 package-lock.json
