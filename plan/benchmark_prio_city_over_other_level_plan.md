@@ -2,9 +2,9 @@
 
 > **Goal:** When an address contains a token that is both a city name and a subdistrict/district name, resolve it as the **city** — unless other `place_name` evidence already pins the location. When the city is chosen and both Kota and Kabupaten forms exist, prefer **Kota** unless only Kabupaten exists.
 
-**Architecture:** No new table, no new lookup. The collision set is derived from the **existing caches** (province/city/district/subdistrict, all keyed by `normalizer.Normalize(name)` under `{sourceID}:{normalized}`) at load time, and held in a small `map[string]string` (normalized name → `"KOTA"`/`"KABUPATEN"`). Suppression happens during entity resolution, gated on **other place-name evidence**.
+**Architecture:** A new `location_city_priority` table (per source: normalized name + `city_type`) populated by the seeder, loaded once into memory via `sync.Once`. `city_type` (KOTA/KABUPATEN) is derived from the **original DB name** (`LIKE 'Kota %'`), never from the normalized key — the normalizer strips `kota`/`kabupaten` prefixes. Suppression happens during entity resolution, gated on **other place-name evidence**.
 
-**Tech Stack:** Go (service layer), existing normalizer + caches, SQLite (`location.db`), k6 benchmark harness.
+**Tech Stack:** Go (service layer), SQLite (`location.db`), existing normalizer (`normalizer.Normalize` used for all keys), k6 benchmark harness.
 
 **Current state (2026-08-20 benchmark, 106 records):** 49.1% exact matches (52/106). Challenge #2 = 25 records (23.6%).
 
@@ -19,11 +19,10 @@
 
 ## Design summary (user directives)
 
-1. **No new table / no new in-memory lookup structure.** The priority set is computed from the **existing caches** using the **existing `normalizer.Normalize`** function — the same key that already indexes every cache (`{sourceID}:{normalized}`).
-2. **Other-evidence detection = `place_name` evidence only.** A token that resolves in the DB is evidence (that's the existing logic). If any **other** `place_name` token resolves to a location entity, the city priority for the ambiguous token is **ignored**. Postal codes and road names do not count as place-name evidence:
-   - Postal code — separate evidence type (`postal_code`); per user's earlier directive "Postal code is also evidence" it gates priority too (a resolved postal code pins the location, so priority is unnecessary and must not fight it).
-   - Road names (`road_name` type) resolve to nothing today (verified) — they cannot pin a location, so they never block priority.
-3. **Kota unless no Kab.** Derived at load time from existing city cache: if any city row for the name is `Kota X` → `KOTA`, else `KABUPATEN`.
+1. **New table is fine** — we cannot know which city names overlap district/subdistrict without computing it; the seeder computes and stores it.
+2. **`city_type` from the original name, not the normalizer.** The normalizer strips `kota`/`kabupaten`/`kecamatan` prefixes, so the normalized key is just the bare name (`bandung`). KOTA/KABUPATEN must be read from the DB `name` column (`LIKE 'Kota %'`) at seed time and stored in the table. All matching keys continue to use the **existing `normalizer.Normalize`** — no new normalization logic anywhere.
+3. **Other-evidence detection = `place_name` evidence.** A token that resolves in the DB is evidence (existing logic). If any **other** place_name token resolves to a location entity, the city priority for the ambiguous token is **ignored**. A **resolved postal code** also counts as evidence (user directive). **Road names** resolve to nothing today (verified) — they never count, never block priority.
+4. **Kota unless no Kab:** `city_type` = `KOTA` if any city row with that name is `Kota X`, else `KABUPATEN`. Used as a tie-break when the city is chosen with no other evidence.
 
 ---
 
@@ -41,87 +40,212 @@ git check-ignore plan/benchmark_prio_city_over_other_level_plan.md   # should pr
 
 ---
 
-## Task 2: Service — derive priority set from existing caches
+## Task 2: Database — new `location_city_priority` table
 
-**Objective:** Build `cityPrioritySet map[string]string` (normalized name → city type) once, from the already-loaded province/city/district/subdistrict caches. No DB change.
+**Objective:** Store, per source, city names duplicated as subdistrict/district names, plus the preferred city form type.
 
 **Files:**
-- Modify: `internal/service/service.go` (fields)
-- Modify: `internal/service/validate_helper.go` (build in `loadPhraseDict` / a new step)
+- Modify: `db/location.sql` (add table + index)
+- Modify: `internal/database/location.go` (add `FindAllCityPriority` returning name + type)
 
-**Step 1: Add field to `Service`**
+**Step 1: Add table to `db/location.sql`**
 
-```go
-// normalized city name -> "KOTA" | "KABUPATEN" for names that ALSO exist
-// as subdistrict/district; empty map when none
-cityPrioritySet map[string]string
+```sql
+-- location_city_priority: normalized city names that ALSO exist as
+-- subdistrict/district names in the same source, with the preferred
+-- city form type ("KOTA" or "KABUPATEN") to use when the token is
+-- resolved as a city with no other disambiguating evidence.
+-- city_type is derived from the ORIGINAL name column ('Kota %'), never
+-- from lowercase_normalized (the normalizer strips admin prefixes).
+CREATE TABLE IF NOT EXISTS location_city_priority (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_source_id    INTEGER NOT NULL REFERENCES location_sources(id),
+    lowercase_normalized  TEXT NOT NULL,
+    city_type             TEXT NOT NULL DEFAULT 'KOTA',   -- 'KOTA' | 'KABUPATEN'
+    created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at            TEXT,
+    deleted_at            TEXT,
+    UNIQUE(location_source_id, lowercase_normalized)
+);
 ```
 
-No new `sync.Once` needed — computed inside the existing `loadPhraseDict` (which already runs once under `phraseDictOnce`).
-
-**Step 2: Compute the set in `loadPhraseDict`**
-
-The caches are already loaded by the time `loadPhraseDict` runs (`ensureEntitiesCachesLoaded` → provinces, cities, districts, subdistricts → then `ensurePhraseDictLoaded`). Add, at the start of `loadPhraseDict`:
+**Step 2: Add repository method** in `internal/database/location.go`:
 
 ```go
-// city names that also exist as subdistrict/district
-cityNameSet := make(map[string]struct{})
-for _, entries := range svc.subDistrictCache {
-    for _, e := range entries {
-        cityNameSet[e.Name] = struct{}{}
-    }
-}
-for _, entries := range svc.districtCache {
-    for _, e := range entries {
-        cityNameSet[e.Name] = struct{}{}
-    }
+type CityPriorityRow struct {
+    LowercaseNormalized string
+    CityType            string // "KOTA" | "KABUPATEN"
 }
 
-// prefer KOTA if any city row for the name is "Kota X", else KABUPATEN
-svc.cityPrioritySet = make(map[string]string)
-for _, entries := range svc.cityCache {
-    for _, e := range entries {
-        if _, dup := cityNameSet[e.Name]; !dup {
-            continue
+func (r *LocationRepository) FindAllCityPriority(ctx context.Context, sourceID int64) ([]CityPriorityRow, error) {
+    rows, err := r.db.QueryContext(ctx, `
+        SELECT lowercase_normalized, city_type FROM location_city_priority
+        WHERE location_source_id = ? AND deleted_at IS NULL
+    `, sourceID)
+    if err != nil {
+        return nil, logDBErr(ctx, "find_all_city_priority", sourceID, fmt.Errorf("find all city priority: %w", err))
+    }
+    defer rows.Close()
+    var out []CityPriorityRow
+    for rows.Next() {
+        var r CityPriorityRow
+        if err := rows.Scan(&r.LowercaseNormalized, &r.CityType); err != nil {
+            return nil, logDBErr(ctx, "find_all_city_priority_scan", sourceID, fmt.Errorf("scan city priority: %w", err))
         }
-        if strings.HasPrefix(e.Name, "kota ") {
-            svc.cityPrioritySet[e.Name] = "KOTA"
-        } else if _, seen := svc.cityPrioritySet[e.Name]; !seen {
-            svc.cityPrioritySet[e.Name] = "KABUPATEN"
-        }
+        out = append(out, r)
     }
+    if err := rows.Err(); err != nil {
+        return nil, logDBErr(ctx, "find_all_city_priority_rows", sourceID, fmt.Errorf("rows city priority: %w", err))
+    }
+    return out, nil
 }
 ```
 
-Note: `e.Name` is the **normalized** name (`normalizer.Normalize(r.Name)` at load time) — same key used everywhere, so no re-normalization at request time. `Kota`/`Kabupaten` prefixes are stripped by the normalizer, so `e.Name` is the bare name (e.g. `bandung`); the `strings.HasPrefix(e.Name, "kota ")` check is a safety net (multi-word names like `kota batu` normalize to `batu`, so the bare name check governs). The loop over city entries sets `KOTA` when any city row is a Kota, and only falls back to `KABUPATEN` when none is — matching "use kota unless there is no other than kab".
-
-**Step 3: Verify build + unit test**
+**Step 3: Extend the `LocationRepository` interface** in `internal/service/service.go`:
 
 ```go
-func TestCityPriorityDerivedFromCaches(t *testing.T) {
-    // fake caches: city "bandung" (Kota), subdistrict "bandung"; city "karanganyar" (Kab), subdistrict "karanganyar"
-    // assert cityPrioritySet["bandung"] == "KOTA" && cityPrioritySet["karanganyar"] == "KABUPATEN"
-}
+FindAllCityPriority(ctx context.Context, sourceID int64) ([]database.CityPriorityRow, error)
 ```
+
+**Step 4: Verify build**
 
 ```bash
 go build ./...
-go test ./internal/service/ -run TestCityPriorityDerivedFromCaches -v
 ```
 
 ---
 
-## Task 3: Core fix — city wins, gated on other place-name evidence
+## Task 3: Seeder — populate `location_city_priority` (city_type from original name)
 
-**Objective:** During `ResolveEvidence`, for a priority token, suppress SUBDISTRICT/DISTRICT candidates unless another place-name (or postal-code) evidence resolved to a location.
+**Objective:** After seeding + hierarchy rebuild, insert every city-level name that also appears at level 4 or 5, with `city_type` derived from the **original `name` column**.
+
+**Files:**
+- Modify: `cmd/seeder/main.go`
+- Modify: `internal/database/location.go` (add `RebuildCityPriority`)
+
+**Step 1: Add repository method**
+
+```go
+func (r *LocationRepository) RebuildCityPriority(ctx context.Context, sourceID int64) error {
+    if _, err := r.db.ExecContext(ctx, `
+        DELETE FROM location_city_priority WHERE location_source_id = ?
+    `, sourceID); err != nil {
+        return logDBErr(ctx, "rebuild_city_priority_delete", sourceID, fmt.Errorf("delete city priority: %w", err))
+    }
+    _, err := r.db.ExecContext(ctx, `
+        INSERT OR IGNORE INTO location_city_priority (location_source_id, lowercase_normalized, city_type)
+        SELECT c3.location_source_id, c3.lowercase_normalized,
+               CASE WHEN MAX(CASE WHEN c3.name LIKE 'Kota %' THEN 1 ELSE 0 END) = 1
+                    THEN 'KOTA' ELSE 'KABUPATEN' END
+        FROM location_codes c3
+        WHERE c3.level_id = 3 AND c3.deleted_at IS NULL
+          AND EXISTS (
+            SELECT 1 FROM location_codes low
+            WHERE low.location_source_id = c3.location_source_id
+              AND low.lowercase_normalized = c3.lowercase_normalized
+              AND low.level_id IN (4, 5) AND low.deleted_at IS NULL
+          )
+        GROUP BY c3.location_source_id, c3.lowercase_normalized
+    `, sourceID)
+    if err != nil {
+        return logDBErr(ctx, "rebuild_city_priority_insert", sourceID, fmt.Errorf("insert city priority: %w", err))
+    }
+    return nil
+}
+```
+
+**Note:** `c3.name LIKE 'Kota %'` reads the **original DB name** (`Kota Bandung`, `Kabupaten Karanganyar`) — this is the only place KOTA/KABUPATEN is determined. The stored key is `lowercase_normalized` (the existing normalizer's output), so runtime lookup needs no new normalization.
+
+**Step 2: Call it from `cmd/seeder/main.go`** after `RebuildLocationHierarchy`:
+
+```go
+logger.Info().Msg("rebuilding city priority lookup...")
+if err := repo.RebuildCityPriority(ctx, sourceID); err != nil {
+    logger.Fatal().Err(err).Msg("rebuild city priority")
+}
+```
+
+**Step 3: Re-seed and verify**
+
+```bash
+make build-seed
+go run ./cmd/seeder --truncate
+# then the normal seed path (tables must exist): go run ./cmd/seeder
+```
+
+```bash
+sqlite3 db/location.db "SELECT COUNT(*) FROM location_city_priority;"               # expect 234
+sqlite3 db/location.db "SELECT lowercase_normalized, city_type FROM location_city_priority WHERE lowercase_normalized IN ('bandung','depok','surabaya','karanganyar','kupang');"
+# bandung -> KOTA, depok -> KOTA, surabaya -> KOTA, karanganyar -> KABUPATEN, kupang -> KOTA
+```
+
+---
+
+## Task 4: Service — load priority set once into memory
+
+**Objective:** Load `location_city_priority` into `map[string]string` (normalized name → city type) once per source, following the `sync.Once` cache pattern. No new normalization — the keys are already normalized by the seeder.
+
+**Files:**
+- Modify: `internal/service/service.go` (fields + interface)
+- Modify: `internal/service/validate_helper.go` (loader + ensure func)
+- Modify: `internal/service/resolve.go` (wire into `ensureEntitiesCachesLoaded`)
+
+**Step 1: Add fields to `Service`**
+
+```go
+cityPrioritySet  map[string]string // normalized name -> "KOTA" | "KABUPATEN"
+cityPriorityOnce sync.Once
+cityPriorityErr  error
+```
+
+**Step 2: Add loader** (in `validate_helper.go`, mirroring `loadCities`):
+
+```go
+func (svc *Service) loadCityPriority(ctx context.Context, sourceID int64) {
+    rows, err := svc.locationRepo.FindAllCityPriority(ctx, sourceID)
+    if err != nil {
+        svc.cityPriorityErr = err
+        return
+    }
+    set := make(map[string]string, len(rows))
+    for _, r := range rows {
+        set[r.LowercaseNormalized] = r.CityType
+    }
+    svc.cityPrioritySet = set
+}
+
+func ensureCityPriorityLoaded(svc *Service, ctx context.Context, sourceID int64) error {
+    svc.cityPriorityOnce.Do(func() { svc.loadCityPriority(ctx, sourceID) })
+    return svc.cityPriorityErr
+}
+```
+
+**Step 3: Wire into `ensureEntitiesCachesLoaded`** in `internal/service/resolve.go` (before phrase-dict build):
+
+```go
+if err := ensureCityPriorityLoaded(svc, ctx, sourceID); err != nil {
+    return err
+}
+```
+
+**Step 4: Verify build + loader unit test**
+
+```bash
+go build ./...
+go test ./internal/service/ -run TestLoadCityPriority -v
+```
+
+---
+
+## Task 5: Core fix — city wins, gated on other place-name evidence
+
+**Objective:** During `ResolveEvidence`, for a priority token, suppress SUBDISTRICT/DISTRICT candidates unless another place-name (or resolved postal-code) evidence exists.
 
 **Files:**
 - Modify: `internal/service/resolve.go` (`ResolveEvidence`)
 - Modify: `internal/service/validate_helper.go` (evidence-type helper)
 
 **Step 1: Define "other evidence" check**
-
-In `ResolveEvidence`, after the resolution loop, detect:
 
 ```go
 func hasOtherLocationEvidence(resolved []model.ResolvedEvidence, priorityValue string) bool {
@@ -133,7 +257,7 @@ func hasOtherLocationEvidence(resolved []model.ResolvedEvidence, priorityValue s
         if re.Evidence.Type == model.EvidencePlaceName && len(re.Candidates) > 0 {
             return true
         }
-        // postal code is also evidence (user directive): if it resolved, it pins the location
+        // resolved postal code is also evidence (user directive)
         if re.Evidence.Type == model.EvidencePostalCode && len(re.Candidates) > 0 {
             return true
         }
@@ -143,11 +267,7 @@ func hasOtherLocationEvidence(resolved []model.ResolvedEvidence, priorityValue s
 }
 ```
 
-Note: a `postal_code` evidence *value* is a 5-digit number; its candidates are subdistricts from `resolvePostalCodeEntity`. If it resolved, the location is pinned — priority is unnecessary. If it didn't resolve (bad code), it can't pin anything, so it doesn't block priority.
-
-**Step 2: Apply suppression in `ResolveEvidence`**
-
-After the existing `for _, ev := range evidence` loop:
+**Step 2: Apply suppression in `ResolveEvidence`** (after the resolution loop):
 
 ```go
 for _, ev := range evidence {
@@ -185,26 +305,18 @@ for _, ev := range evidence {
 }
 ```
 
-This is the minimal change: the suppression only kicks in when the token is the **sole resolved evidence**; otherwise the existing candidate-building, enrichment, and scoring run unchanged.
+Note: at this point `Candidates[].Name` is the **original** name (e.g. `Kota Bandung`, `Kabupaten Bandung`) — the sort's `HasPrefix("Kota ")` reads the original name, which is correct here (this is runtime entity data, not a normalized key).
 
 **Step 3: Explicit `kecamatan`/`kelurahan`/`desa` context**
 
-The normalizer strips admin prefixes (`kecamatan`, `kelurahan`, `desa` are in `adminSet`), so "kecamatan bandung" and "bandung" look identical post-normalization. To honor explicit context, detect the admin prefix **before** normalization in `ValidateAddressV1`:
-
-```go
-// on the sanitized string, find priority tokens immediately preceded by
-// (kecamatan|kec\.?|kelurahan|kel\.?|desa)
-// collect them into explicitSubdistrictTokens map[string]bool
-```
-
-Then in the suppression step, skip tokens in `explicitSubdistrictTokens` (keep their SUBDISTRICT/DISTRICT entities).
+The normalizer strips admin prefixes, so "kecamatan bandung" == "bandung" post-normalization. Detect the admin prefix **before** normalization in `ValidateAddressV1` (regex on the sanitized string: `(kecamatan|kec\.?|kelurahan|kel\.?|desa)\s+(NAME)`), collect those tokens into `explicitSubdistrictTokens`, and skip suppression for them.
 
 **Step 4: Unit tests** (new `internal/service/priority_test.go`)
 
 ```go
 func TestCityPrioritySuppressesSubdistrict(t *testing.T) {
     // "Bandung" alone; priority {"bandung":"KOTA"}
-    // assert candidates for "bandung" contain CITY only; winner Kota Bandung
+    // assert candidates contain CITY only; winner Kota Bandung
 }
 
 func TestCityPriorityIgnoredWithOtherPlaceName(t *testing.T) {
@@ -244,7 +356,7 @@ go build ./... && go test ./internal/service/ -v
 
 ---
 
-## Task 4: Benchmark — measure the improvement
+## Task 6: Benchmark — measure the improvement
 
 **Objective:** Re-run the benchmark against the fixed build and compare challenge #2 counts.
 
@@ -281,9 +393,39 @@ make test-api-smoke
 
 ---
 
+## Task 7: Night dev-run schedule (cheaper off-peak)
+
+**Objective:** All heavy development and validation runs happen at night when compute/API costs are lower.
+
+**Context:** The plan's execution (re-seed, build, benchmark, k6 load test) is compute-heavy and hits the API repeatedly. Running these at night avoids peak pricing.
+
+**Step 1: Define the night window**
+
+- Suggested: **00:00–06:00 WIB** (UTC+7) — quiet hours.
+- Confirm the actual cheap-rate window with the user (cloud provider billing / API tier) before hard-coding.
+
+**Step 2: Execution order within the window**
+
+1. Re-seed `location.db` (`bin/seeder --truncate` + seed + `RebuildCityPriority`) — heavy DB write.
+2. `go build ./...` + full unit test suite.
+3. Start server, run `make benchmark` + `make benchmark-page`.
+4. Run k6 load test (`make test-api-load`) — the noisiest, most API-heavy step.
+5. Collect results, update the benchmark page, report delta vs 49.1% baseline.
+
+**Step 3: Automation option**
+
+If the user wants it hands-off, schedule the whole sequence as a Hermes cron job in the night window (e.g. `0 2 * * *` WIB). The job prompt must be self-contained: re-seed, build, run benchmark, save results, report.
+
+**Step 4: Cost note**
+
+The night window also applies to any future benchmark/load-test cycles, not just this plan — add it to the dev routine.
+
+---
+
 ## Acceptance Criteria
 
-- [ ] No new DB table, no new loader — priority set derived from existing caches via `normalizer.Normalize` keys.
+- [ ] `location_city_priority` table exists, 234 rows, `city_type` populated from **original names** (`KOTA` for bandung/depok/surabaya/kupang, `KABUPATEN` for karanganyar).
+- [ ] All keys use the existing `normalizer.Normalize`; no new normalization logic.
 - [ ] `Bandung` alone → **Kota Bandung**.
 - [ ] `JL. GATOT SUBROTO NO.86 BANDUNG` → Kota Bandung (challenge #2 example fixed).
 - [ ] `Jl. Kenangan, Depok, Yogyakarta` → priority ignored (Yogyakarta place-name evidence wins).
@@ -292,15 +434,17 @@ make test-api-smoke
 - [ ] `kecamatan bandung` → subdistrict path preserved.
 - [ ] `karanganyar` → Kabupaten (only Kab form).
 - [ ] Benchmark challenge #2 < 25; exact-match % > 49.1%.
+- [ ] Dev/benchmark runs executed in the night window per Task 7.
 - [ ] All Go tests + k6 smoke pass.
 
 ## Risks / Tradeoffs / Open Questions
 
-1. **Road names are non-evidence (verified):** `Jl. Aceh, Bandung` leaves "aceh" unresolved, so priority applies. This is correct per the user's directive (road names can't pin a location today).
-2. **Postal code counts as evidence** (user directive): a *resolved* postal code blocks priority — it already pins the location better than the priority heuristic. An *unresolved* postal code (typo'd) does not block.
-3. **KOTA is a tie-break, not an override:** priority only kicks in with no other evidence; among equal city candidates the `city_type` preference picks Kota when present. It never overrides province/postal evidence.
+1. **Road names are non-evidence (verified):** `Jl. Aceh, Bandung` leaves "aceh" unresolved, so priority applies. Correct per directive.
+2. **Postal code counts as evidence** (user directive): a *resolved* postal code blocks priority; an *unresolved* (typo'd) one does not.
+3. **KOTA is a tie-break, not an override:** priority only kicks in with no other evidence; `city_type` picks Kota among equal city candidates. Never overrides province/postal evidence.
 4. **Multi-token names (25 of 234, e.g. `tebing tinggi`)** never match as single words today — inert in the priority set; no regression risk, no benefit yet.
-5. **No deployment/seed step needed** (unlike the previous design) — the fix is purely in-memory from data already loaded. `go build` + restart is the whole deploy.
+5. **Seeding dependency:** the new table is populated by the seeder — deployed DBs need a re-seed (`bin/seeder --truncate` + seed) before the service picks it up. Include this in the night run.
+6. **Night window details** (exact hours, automation vs manual) — confirm with the user in Task 7.
 
 ## Verification commands (quick reference)
 
@@ -308,4 +452,6 @@ make test-api-smoke
 go build ./... && go test ./...
 make benchmark && make benchmark-page
 git check-ignore plan/benchmark_prio_city_over_other_level_plan.md   # expect nothing
+sqlite3 db/location.db "SELECT COUNT(*) FROM location_city_priority;"                       # 234
+sqlite3 db/location.db "SELECT lowercase_normalized, city_type FROM location_city_priority WHERE lowercase_normalized='bandung';"  # KOTA
 ```
