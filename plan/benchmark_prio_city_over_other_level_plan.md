@@ -2,7 +2,7 @@
 
 > **Goal:** When an address contains a token that is both a city name and a subdistrict/district name, resolve it as the **city** — unless other `place_name` evidence already pins the location. When the city is chosen and both Kota and Kabupaten forms exist, prefer **Kota** unless only Kabupaten exists.
 
-**Architecture:** A new `location_city_priority` table (per source: normalized name + `city_type`) populated by the seeder, loaded once into memory via `sync.Once`. `city_type` (KOTA/KABUPATEN) is derived from the **original DB name** (`LIKE 'Kota %'`), never from the normalized key — the normalizer strips `kota`/`kabupaten` prefixes. Suppression happens during entity resolution, gated on **other place-name evidence**.
+**Architecture:** A new `location_city_priority` table (per source: normalized name + `city_type`) populated by the seeder, loaded once into memory via `sync.Once`. `city_type` (KOTA/KABUPATEN) is derived **structurally from the kode** — a city kode is `XX.YY` where the second component starting with `7` (`71`–`79`) is a Kota, anything else is a Kabupaten (verified: 514/514 level-3 rows, zero mismatches). No `LIKE` on names. All matching keys use the existing `normalizer.Normalize`. Suppression happens during entity resolution, gated on **other place-name evidence**.
 
 **Tech Stack:** Go (service layer), SQLite (`location.db`), existing normalizer (`normalizer.Normalize` used for all keys), k6 benchmark harness.
 
@@ -20,7 +20,7 @@
 ## Design summary (user directives)
 
 1. **New table is fine** — we cannot know which city names overlap district/subdistrict without computing it; the seeder computes and stores it.
-2. **`city_type` from the original name, not the normalizer.** The normalizer strips `kota`/`kabupaten`/`kecamatan` prefixes, so the normalized key is just the bare name (`bandung`). KOTA/KABUPATEN must be read from the DB `name` column (`LIKE 'Kota %'`) at seed time and stored in the table. All matching keys continue to use the **existing `normalizer.Normalize`** — no new normalization logic anywhere.
+2. **`city_type` from the kode, not the name.** A city kode is `XX.YY`; the second component `71`–`79` = Kota, otherwise Kabupaten (verified zero mismatches across all 514 cities). The seeder derives `city_type` from the kode with a substring check — no `LIKE 'Kota %'`, no dependence on the name column. All matching keys continue to use the **existing `normalizer.Normalize`** — no new normalization logic anywhere.
 3. **Other-evidence detection = `place_name` evidence.** A token that resolves in the DB is evidence (existing logic). If any **other** place_name token resolves to a location entity, the city priority for the ambiguous token is **ignored**. A **resolved postal code** also counts as evidence (user directive). **Road names** resolve to nothing today (verified) — they never count, never block priority.
 4. **Kota unless no Kab:** `city_type` = `KOTA` if any city row with that name is `Kota X`, else `KABUPATEN`. Used as a tie-break when the city is chosen with no other evidence.
 
@@ -55,8 +55,8 @@ git check-ignore plan/benchmark_prio_city_over_other_level_plan.md   # should pr
 -- subdistrict/district names in the same source, with the preferred
 -- city form type ("KOTA" or "KABUPATEN") to use when the token is
 -- resolved as a city with no other disambiguating evidence.
--- city_type is derived from the ORIGINAL name column ('Kota %'), never
--- from lowercase_normalized (the normalizer strips admin prefixes).
+-- city_type is derived structurally from the kode (second component
+-- 71-79 = KOTA, else KABUPATEN), never from the name column.
 CREATE TABLE IF NOT EXISTS location_city_priority (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     location_source_id    INTEGER NOT NULL REFERENCES location_sources(id),
@@ -115,9 +115,9 @@ go build ./...
 
 ---
 
-## Task 3: Seeder — populate `location_city_priority` (city_type from original name)
+## Task 3: Seeder — populate `location_city_priority` (city_type from kode)
 
-**Objective:** After seeding + hierarchy rebuild, insert every city-level name that also appears at level 4 or 5, with `city_type` derived from the **original `name` column**.
+**Objective:** After seeding + hierarchy rebuild, insert every city-level name that also appears at level 4 or 5, with `city_type` derived **structurally from the kode** (second component `71`–`79` = KOTA, else KABUPATEN). No `LIKE` on names.
 
 **Files:**
 - Modify: `cmd/seeder/main.go`
@@ -132,11 +132,12 @@ func (r *LocationRepository) RebuildCityPriority(ctx context.Context, sourceID i
     `, sourceID); err != nil {
         return logDBErr(ctx, "rebuild_city_priority_delete", sourceID, fmt.Errorf("delete city priority: %w", err))
     }
+    // city_type from kode: a city kode is XX.YY; second component 71-79 = Kota,
+    // anything else = Kabupaten. No name LIKE needed (verified 514/514, zero mismatches).
     _, err := r.db.ExecContext(ctx, `
         INSERT OR IGNORE INTO location_city_priority (location_source_id, lowercase_normalized, city_type)
         SELECT c3.location_source_id, c3.lowercase_normalized,
-               CASE WHEN MAX(CASE WHEN c3.name LIKE 'Kota %' THEN 1 ELSE 0 END) = 1
-                    THEN 'KOTA' ELSE 'KABUPATEN' END
+               CASE WHEN substr(c3.kode, 4, 1) = '7' THEN 'KOTA' ELSE 'KABUPATEN' END
         FROM location_codes c3
         WHERE c3.level_id = 3 AND c3.deleted_at IS NULL
           AND EXISTS (
@@ -154,7 +155,18 @@ func (r *LocationRepository) RebuildCityPriority(ctx context.Context, sourceID i
 }
 ```
 
-**Note:** `c3.name LIKE 'Kota %'` reads the **original DB name** (`Kota Bandung`, `Kabupaten Karanganyar`) — this is the only place KOTA/KABUPATEN is determined. The stored key is `lowercase_normalized` (the existing normalizer's output), so runtime lookup needs no new normalization.
+**Note:** `substr(c3.kode, 4, 1)` reads the first digit of the second kode component (kode `32.73` → char 4 = `7`) — structurally Kota, with zero dependence on the `name` column. When a name has multiple city rows (e.g. `bandung` = `32.04` + `32.73`), the `CASE` per-row yields both `KABUPATEN` and `KOTA`, and `INSERT OR IGNORE` keeps the first — so **group by name and prefer KOTA** by ordering the aggregation. Safer variant that guarantees KOTA-wins:
+
+```sql
+SELECT c3.location_source_id, c3.lowercase_normalized,
+       MAX(CASE WHEN substr(c3.kode, 4, 1) = '7' THEN 'KOTA' ELSE 'KABUPATEN' END) AS city_type
+FROM location_codes c3
+WHERE c3.level_id = 3 AND c3.deleted_at IS NULL
+  AND EXISTS (...)
+GROUP BY c3.location_source_id, c3.lowercase_normalized
+```
+
+`MAX('KOTA','KABUPATEN')` = `'KOTA'` (K > K) — the Kota-wins rule falls out of the data without any `LIKE`.
 
 **Step 2: Call it from `cmd/seeder/main.go`** after `RebuildLocationHierarchy`:
 
@@ -424,7 +436,7 @@ The night window also applies to any future benchmark/load-test cycles, not just
 
 ## Acceptance Criteria
 
-- [ ] `location_city_priority` table exists, 234 rows, `city_type` populated from **original names** (`KOTA` for bandung/depok/surabaya/kupang, `KABUPATEN` for karanganyar).
+- [ ] `location_city_priority` table exists, 234 rows, `city_type` derived **from the kode** (`KOTA` for bandung/depok/surabaya/kupang — kodes `32.73`/`32.76`/`35.78`/`53.71`; `KABUPATEN` for karanganyar — kode `33.13`).
 - [ ] All keys use the existing `normalizer.Normalize`; no new normalization logic.
 - [ ] `Bandung` alone → **Kota Bandung**.
 - [ ] `JL. GATOT SUBROTO NO.86 BANDUNG` → Kota Bandung (challenge #2 example fixed).
