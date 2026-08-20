@@ -25,6 +25,33 @@
   - JL. Terusan Ir. Sutami No.62, Bandung -> Kabupaten Bandung (city still wrong: should be Kota)
 - **REGRESSED: 0 records.** No previously-correct record became wrong.
 
+## Level-matched comparison (the real improvement)
+
+Exact-match (4/4 levels) is the "first-class" outcome, but it hides partial
+improvement. Comparing matched-levels per record:
+
+| Levels matched | BEFORE | AFTER |
+|---|---|---|
+| 0 levels | 18 | **13** |
+| 1 level | 3 | 4 |
+| 2 levels | 11 | **15** |
+| 3 levels | 22 | 22 |
+| 4 levels (exact) | 52 | 52 |
+| **Average levels matched** | **2.821** | **2.906** |
+
+Per-record shift: **+2 levels: 4 records, +1 level: 1 record, +0: 100.**
+Improved: 5, worsened: 0, unchanged: 100.
+
+The 5 improved records went from 0/4 levels (wrong province, city, everything —
+Tulungagung/Serang subdistrict chains) to 2/4 (correct province + city: Kota
+Bandung, Jawa Barat). Road-type addresses: avg levels 2.850 -> 2.940.
+
+**Verdict: real improvement, invisible in the strict 4/4 headline.**
+The fix moved 5 records from "completely wrong" to "correct city+province",
+which matters for logistics (right city is the actionable unit). The 4/4 metric
+did not move because those records still miss district/subdistrict (road-level,
+no street data -> challenge #3).
+
 ## Why exact-match % did not move
 
 Exact match requires province+city+district+subdistrict all correct. The 5 fixed
