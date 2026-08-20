@@ -452,12 +452,9 @@ make test-api-smoke
 
 **Context:** The plan's execution (re-seed, build, benchmark, k6 load test) is compute-heavy and hits the API repeatedly. Running these at night avoids peak pricing.
 
-**Step 1: Define the night window**
+**Schedule:** Start **tonight at 22:00 WIB (UTC+7)** — confirmed by the user.
 
-- Suggested: **00:00–06:00 WIB** (UTC+7) — quiet hours.
-- Confirm the actual cheap-rate window with the user (cloud provider billing / API tier) before hard-coding.
-
-**Step 2: Execution order within the window**
+**Step 1: Execution order within the window**
 
 1. Re-seed `location.db` (`bin/seeder --truncate` + seed + `RebuildCityPriority`) — heavy DB write.
 2. `go build ./...` + full unit test suite.
@@ -465,13 +462,17 @@ make test-api-smoke
 4. Run k6 load test (`make test-api-load`) — the noisiest, most API-heavy step.
 5. Collect results, update the benchmark page, report delta vs 49.1% baseline.
 
-**Step 3: Automation option**
+**Step 2: Automation**
 
-If the user wants it hands-off, schedule the whole sequence as a Hermes cron job in the night window (e.g. `0 2 * * *` WIB). The job prompt must be self-contained: re-seed, build, run benchmark, save results, report.
+Schedule the whole sequence as a Hermes cron job starting tonight 22:00 WIB. The job prompt must be self-contained: re-seed, build, run benchmark, save results, report. (0 22 * * * in local WIB time = the nightly window; can run once tonight or recur nightly while the plan is active.)
 
-**Step 4: Cost note**
+**Step 3: Cost note**
 
 The night window also applies to any future benchmark/load-test cycles, not just this plan — add it to the dev routine.
+
+**Step 4: Hand-off**
+
+After the run: report challenge #2 count + exact-match % delta vs the 49.1% / 25-record baseline, and confirm whether the priority fix is working as designed (see Acceptance Criteria).
 
 ---
 
