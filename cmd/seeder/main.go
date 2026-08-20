@@ -192,6 +192,12 @@ Flags:
 		logger.Fatal().Err(err).Msg("rebuild hierarchy")
 	}
 	logger.Info().Msg("hierarchy rebuild complete")
+
+	logger.Info().Msg("rebuilding city priority lookup...")
+	if err := repo.RebuildCityPriority(ctx, sourceID); err != nil {
+		logger.Fatal().Err(err).Msg("rebuild city priority")
+	}
+	logger.Info().Msg("city priority rebuild complete")
 }
 
 func parseWilayah(path string) ([]database.LocationCodeRow, error) {

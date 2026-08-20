@@ -30,6 +30,7 @@ type LocationRepository interface {
 	FindSourceByCode(ctx context.Context, code string) (int64, string, error)
 	LoadCityProvinceMapping(ctx context.Context, sourceID int64) (map[int64]int64, error)
 	LoadFullHierarchy(ctx context.Context, sourceID int64) (*database.HierarchyMap, error)
+	FindAllCityPriority(ctx context.Context, sourceID int64) ([]database.CityPriorityRow, error)
 }
 
 type provinceEntry struct {
@@ -86,6 +87,10 @@ type Service struct {
 	subDistrictOnce  sync.Once
 	subDistrictErr   error
 	subDistrictByID  map[int64]*subDistrictEntry
+
+	cityPrioritySet  map[string]string // normalized name -> "KOTA" | "KABUPATEN"
+	cityPriorityOnce sync.Once
+	cityPriorityErr  error
 
 	hierarchyCache *database.HierarchyMap
 	hierarchyOnce  sync.Once
