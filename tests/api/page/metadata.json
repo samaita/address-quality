@@ -1,18 +1,60 @@
-{
-  "release": "v0.1.0-alpha",
-  "build": "v0.1.0-alpha",
-  "git_commit": "02ba28d",
-  "runner": {
-    "cpu": null,
-    "memory": null,
-    "os": null,
-    "k6_version": null
-  },
-  "server": {
-    "cpu": null,
-    "memory": null,
-    "os": null,
-    "api_version": "v1",
-    "git_commit": "02ba28d"
+[
+  {
+    "release": "v0.1.0-alpha",
+    "build": "v0.1.0-alpha",
+    "git_commit": "02ba28d",
+    "benchmark_timestamp": "2026-08-11",
+    "dataset_version": "2025",
+    "dataset_source": "kemendagri",
+    "dataset_generation_timestamp": null,
+    "load_test_timestamp": "2026-08-06T15:23:05.382Z",
+    "benchmark_source": "2026-08-11_benchmark_v1_0000.json",
+    "benchmark_runner": null,
+    "runner": {
+      "cpu": null,
+      "memory": null,
+      "os": null,
+      "k6_version": null
+    },
+    "server": {
+      "cpu": null,
+      "memory": null,
+      "os": null,
+      "api_version": "v1",
+      "git_commit": "02ba28d"
+    },
+    "metrics": {
+      "overall_accuracy": 49.1,
+      "dataset_size": 106,
+      "average_confidence": 72.8,
+      "dataset_version": "2025",
+      "hierarchy": [
+        {
+          "level": "Province",
+          "correct": 87,
+          "pct": 82.1
+        },
+        {
+          "level": "City",
+          "correct": 81,
+          "pct": 76.4
+        },
+        {
+          "level": "District (Kecamatan)",
+          "correct": 76,
+          "pct": 71.7
+        },
+        {
+          "level": "Subdistrict (Kelurahan)",
+          "correct": 55,
+          "pct": 51.9
+        },
+        {
+          "level": "All four levels (exact)",
+          "correct": 52,
+          "pct": 49.1
+        }
+      ]
+    }
   }
-}
+]
