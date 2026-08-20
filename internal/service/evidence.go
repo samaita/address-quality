@@ -8,9 +8,38 @@ import (
 	"strings"
 
 	"address-quality/internal/model"
+	"address-quality/internal/normalizer"
 )
 
 var roadPrefixPattern = regexp.MustCompile(`\b(jl|jalan|gg|gang)\b`)
+
+// detectRoadContextTokens returns the set of normalized tokens that follow a
+// road prefix (jl/jalan/gg/gang) in the raw (pre-normalization) text. Such
+// tokens are road names, not location evidence, and must not block the city
+// priority. e.g. "Jl. Aceh, Bandung" -> {"aceh"}; "Jl. Gatot Subroto No.86" -> {"gatot","subroto"}.
+func detectRoadContextTokens(raw string) map[string]bool {
+	tokens := make(map[string]bool)
+	lower := strings.ToLower(raw)
+	re := regexp.MustCompile(`\b(jl\.?|jalan|gg\.?|gang)\s+([a-z][a-z\s]*)`)
+	for _, m := range re.FindAllStringSubmatch(lower, -1) {
+		if len(m) > 2 && m[2] != "" {
+			phrase := strings.TrimSpace(m[2])
+			// cut at common road-name terminators: numbers, "no", "rt", "rw", comma
+			cut := regexp.MustCompile(`\b(no\.?|rt\.?|rw\.?|\d+|,)\b`)
+			if idx := cut.FindStringIndex(phrase); idx != nil {
+				phrase = phrase[:idx[0]]
+			}
+			phrase = strings.TrimSpace(phrase)
+			if phrase == "" {
+				continue
+			}
+			for _, w := range strings.Fields(phrase) {
+				tokens[normalizer.Normalize(w)] = true
+			}
+		}
+	}
+	return tokens
+}
 
 func ExtractEvidence(normalized string) []model.Evidence {
 	var evidence []model.Evidence

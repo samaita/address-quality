@@ -193,6 +193,19 @@ func (svc *Service) loadHierarchy(ctx context.Context, sourceID int64) {
 	svc.hierarchyCache = h
 }
 
+func (svc *Service) loadCityPriority(ctx context.Context, sourceID int64) {
+	rows, err := svc.locationRepo.FindAllCityPriority(ctx, sourceID)
+	if err != nil {
+		svc.cityPriorityErr = err
+		return
+	}
+	set := make(map[string]string, len(rows))
+	for _, r := range rows {
+		set[r.LowercaseNormalized] = r.CityType
+	}
+	svc.cityPrioritySet = set
+}
+
 func ensureProvincesLoaded(svc *Service, ctx context.Context) error {
 	svc.provinceOnce.Do(func() { svc.loadProvinces(ctx) })
 	return svc.provinceErr
@@ -211,6 +224,11 @@ func ensureDistrictsLoaded(svc *Service, ctx context.Context, sourceID int64) er
 func ensureSubDistrictsLoaded(svc *Service, ctx context.Context, sourceID int64) error {
 	svc.subDistrictOnce.Do(func() { svc.loadSubDistricts(ctx, sourceID) })
 	return svc.subDistrictErr
+}
+
+func ensureCityPriorityLoaded(svc *Service, ctx context.Context, sourceID int64) error {
+	svc.cityPriorityOnce.Do(func() { svc.loadCityPriority(ctx, sourceID) })
+	return svc.cityPriorityErr
 }
 
 func ensureHierarchyLoaded(svc *Service, ctx context.Context, sourceID int64) error {

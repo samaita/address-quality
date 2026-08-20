@@ -519,6 +519,146 @@ type HierarchyMap struct {
 	SubDistrictToDist map[int64]int64
 }
 
+type CityPriorityRow struct {
+	LowercaseNormalized string
+	CityType            string // "KOTA" | "KABUPATEN"
+}
+
+func (r *LocationRepository) FindAllCityPriority(ctx context.Context, sourceID int64) ([]CityPriorityRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT lowercase_normalized, city_type FROM location_city_priority
+		WHERE location_source_id = ? AND deleted_at IS NULL
+	`, sourceID)
+	if err != nil {
+		return nil, logDBErr(ctx, "find_all_city_priority", sourceID, fmt.Errorf("find all city priority: %w", err))
+	}
+	defer rows.Close()
+
+	var out []CityPriorityRow
+	for rows.Next() {
+		var r CityPriorityRow
+		if err := rows.Scan(&r.LowercaseNormalized, &r.CityType); err != nil {
+			return nil, logDBErr(ctx, "find_all_city_priority_scan", sourceID, fmt.Errorf("scan city priority: %w", err))
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logDBErr(ctx, "find_all_city_priority_rows", sourceID, fmt.Errorf("rows city priority: %w", err))
+	}
+	return out, nil
+}
+
+// CityNamesOverlappingLowerLevels returns normalized city names (level_id = 3,
+// the location_levels id for city) that ALSO exist as district (4) or
+// subdistrict (5) in the same source.
+func (r *LocationRepository) CityNamesOverlappingLowerLevels(ctx context.Context, sourceID int64) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT c3.lowercase_normalized
+		FROM location_codes c3
+		WHERE c3.location_source_id = ? AND c3.level_id = 3 AND c3.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM location_codes low
+			WHERE low.location_source_id = c3.location_source_id
+			  AND low.lowercase_normalized = c3.lowercase_normalized
+			  AND low.level_id IN (4, 5) AND low.deleted_at IS NULL
+		  )
+	`, sourceID)
+	if err != nil {
+		return nil, logDBErr(ctx, "city_names_overlapping", sourceID, fmt.Errorf("city names overlapping: %w", err))
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, logDBErr(ctx, "city_names_overlapping_scan", sourceID, fmt.Errorf("scan city names: %w", err))
+		}
+		names = append(names, n)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logDBErr(ctx, "city_names_overlapping_rows", sourceID, fmt.Errorf("rows city names: %w", err))
+	}
+	return names, nil
+}
+
+// CityRowsByName returns all city rows (level_id = 3) matching the given
+// normalized name — e.g. "bandung" -> ["Kabupaten Bandung", "Kota Bandung"].
+func (r *LocationRepository) CityRowsByName(ctx context.Context, sourceID int64, lowercaseNormalized string) ([]CityRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, location_source_id, kode, name, lowercase_normalized, COALESCE(postal_code, '')
+		FROM location_codes
+		WHERE location_source_id = ? AND level_id = 3
+		  AND lowercase_normalized = ? AND deleted_at IS NULL
+	`, sourceID, lowercaseNormalized)
+	if err != nil {
+		return nil, logDBErr(ctx, "city_rows_by_name", map[string]any{"source_id": sourceID, "name": lowercaseNormalized}, fmt.Errorf("city rows by name: %w", err))
+	}
+	defer rows.Close()
+
+	var cities []CityRow
+	for rows.Next() {
+		var c CityRow
+		if err := rows.Scan(&c.ID, &c.SourceID, &c.Kode, &c.Name, &c.LowercaseNormalized, &c.PostalCode); err != nil {
+			return nil, logDBErr(ctx, "city_rows_by_name_scan", lowercaseNormalized, fmt.Errorf("scan city row: %w", err))
+		}
+		cities = append(cities, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logDBErr(ctx, "city_rows_by_name_rows", lowercaseNormalized, fmt.Errorf("rows city row: %w", err))
+	}
+	return cities, nil
+}
+
+// RebuildCityPriority populates location_city_priority for the given source:
+// every city name (level_id = 3) that also exists as district/subdistrict,
+// with city_type derived via location_levels (pick the "Kota"-prefixed row in Go).
+func (r *LocationRepository) RebuildCityPriority(ctx context.Context, sourceID int64) error {
+	names, err := r.CityNamesOverlappingLowerLevels(ctx, sourceID)
+	if err != nil {
+		return err
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return logDBErr(ctx, "rebuild_city_priority_begin_tx", sourceID, fmt.Errorf("begin tx: %w", err))
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM location_city_priority WHERE location_source_id = ?`, sourceID); err != nil {
+		return logDBErr(ctx, "rebuild_city_priority_delete", sourceID, fmt.Errorf("delete city priority: %w", err))
+	}
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT OR IGNORE INTO location_city_priority (location_source_id, lowercase_normalized, city_type)
+		VALUES (?, ?, ?)
+	`)
+	if err != nil {
+		return logDBErr(ctx, "rebuild_city_priority_prepare", sourceID, fmt.Errorf("prepare: %w", err))
+	}
+	defer stmt.Close()
+
+	for _, name := range names {
+		cityRows, err := r.CityRowsByName(ctx, sourceID, name)
+		if err != nil {
+			return err
+		}
+		// prefer the "Kota X" row; fall back to "Kabupaten X"
+		cityType := "KABUPATEN"
+		for _, cr := range cityRows {
+			if strings.HasPrefix(cr.Name, "Kota ") {
+				cityType = "KOTA"
+				break
+			}
+		}
+		if _, err := stmt.ExecContext(ctx, sourceID, name, cityType); err != nil {
+			return logDBErr(ctx, "rebuild_city_priority_insert", name, fmt.Errorf("insert %s: %w", name, err))
+		}
+	}
+
+	return logDBErr(ctx, "rebuild_city_priority_commit", sourceID, tx.Commit())
+}
+
 func (r *LocationRepository) LoadFullHierarchy(ctx context.Context, sourceID int64) (*HierarchyMap, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT province_id, city_id, district_id, subdistrict_id
