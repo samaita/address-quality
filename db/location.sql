@@ -104,3 +104,21 @@ CREATE TABLE IF NOT EXISTS location_hierarchy (
     deleted_at         TEXT,
     UNIQUE(location_source_id, subdistrict_id)
 );
+
+-- location_city_priority: normalized city names that ALSO exist as
+-- subdistrict/district names in the same source, with the preferred
+-- city form type ("KOTA" or "KABUPATEN") to use when the token is
+-- resolved as a city with no other disambiguating evidence.
+-- city_type is determined via location_levels: query city rows by
+-- level_id=3 (location_levels id for city) + lowercase_normalized,
+-- pick the "Kota"-prefixed row in Go (no SQL LIKE).
+CREATE TABLE IF NOT EXISTS location_city_priority (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_source_id    INTEGER NOT NULL REFERENCES location_sources(id),
+    lowercase_normalized  TEXT NOT NULL,
+    city_type             TEXT NOT NULL DEFAULT 'KOTA',   -- 'KOTA' | 'KABUPATEN'
+    created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at            TEXT,
+    deleted_at            TEXT,
+    UNIQUE(location_source_id, lowercase_normalized)
+);
