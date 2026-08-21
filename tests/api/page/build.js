@@ -3,9 +3,14 @@
  * Builds the embeddable benchmark page (tests/api/page/benchmark.html).
  *
  * Reads:
- *   - tests/api/page/metadata.json     (manually managed release/build/env metadata)
+ *   - tests/api/page/release.json      (manually managed release/build/env config)
+ *   - tests/api/page/metadata.json     (auto-appended array, one entry per test run)
  *   - latest tests/api/benchmark/*_benchmark_v1_*.json
  *   - latest tests/api/result/*_load-test_*.json
+ *
+ * Computes run metrics, appends (or replaces, keyed by release+build) a new
+ * entry to metadata.json, and exposes the previous entry as "before" so the
+ * page can render a before/after comparison.
  *
  * Writes two self-contained HTML files with all data inlined:
  *   - benchmark.html       trimmed (public): raw_address only for the three
@@ -26,6 +31,7 @@ const TEMPLATE = path.join(PAGE_DIR, 'template.html');
 const OUTPUT = path.join(PAGE_DIR, 'benchmark.html');
 const FULL_OUTPUT = path.join(PAGE_DIR, 'full-benchmark.html');
 const META_FILE = path.join(PAGE_DIR, 'metadata.json');
+const RELEASE_FILE = path.join(PAGE_DIR, 'release.json');
 
 function latestFile(dir, pattern) {
   if (!fs.existsSync(dir)) return null;
@@ -184,30 +190,90 @@ function buildChallenges(rows, trimmed) {
   return { total, correct: correct.length, challenges };
 }
 
-function buildPayload(meta, benchmarkFile, perfFile, benchmarkRows) {
-  const perf = perfFile ? readJson(path.join(RESULT_DIR, perfFile)) : null;
-
-  const datasetRecord = benchmarkRows.find(
+function datasetVersionOf(rows) {
+  const datasetRecord = rows.find(
     (r) => r.quality && r.quality.metadata && r.quality.metadata.location_version
   );
-  const datasetVersion = datasetRecord
-    ? datasetRecord.quality.metadata.location_version
-    : null;
-  const datasetSource = datasetRecord
-    ? datasetRecord.quality.metadata.location_source
-    : null;
+  return datasetRecord
+    ? {
+        version: datasetRecord.quality.metadata.location_version,
+        source: datasetRecord.quality.metadata.location_source,
+      }
+    : { version: null, source: null };
+}
 
+function computeMetrics(rows) {
+  const total = rows.length;
+  const hierarchy = [
+    { k: 'same_province', level: 'Province' },
+    { k: 'same_city', level: 'City' },
+    { k: 'same_district', level: 'District (Kecamatan)' },
+    { k: 'same_subdistrict', level: 'Subdistrict (Kelurahan)' },
+  ].map((L) => {
+    const correct = rows.filter((r) => r.comparison && r.comparison[L.k] === true).length;
+    return { level: L.level, correct, pct: pct(correct, total) };
+  });
+
+  const exact = rows.filter((r) =>
+    r.comparison && r.comparison.same_province && r.comparison.same_city &&
+    r.comparison.same_district && r.comparison.same_subdistrict
+  ).length;
+  hierarchy.push({ level: 'All four levels (exact)', correct: exact, pct: pct(exact, total) });
+
+  const confs = rows
+    .filter((r) => r.quality && r.quality.confidence !== null && r.quality.confidence !== undefined)
+    .map((r) => r.quality.confidence);
+  const avgConf = confs.length ? confs.reduce((a, c) => a + c, 0) / confs.length : null;
+
+  return {
+    overall_accuracy: pct(exact, total),
+    dataset_size: total,
+    average_confidence: avgConf === null ? null : Math.round(avgConf * 1000) / 10,
+    dataset_version: null,
+    hierarchy,
+  };
+}
+
+function buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows) {
+  const perf = perfFile ? readJson(path.join(RESULT_DIR, perfFile)) : null;
+  const dataset = datasetVersionOf(benchmarkRows);
+  const runner = releaseConfig.runner || {};
+  const server = releaseConfig.server || {};
+
+  const metrics = computeMetrics(benchmarkRows);
+  metrics.dataset_version = dataset.version;
+
+  return {
+    release: releaseConfig.release || null,
+    build: releaseConfig.build || null,
+    git_commit: releaseConfig.git_commit || null,
+    benchmark_timestamp: benchmarkFile ? benchmarkFile.slice(0, 10) : null,
+    dataset_version: dataset.version,
+    dataset_source: dataset.source,
+    dataset_generation_timestamp: null,
+    load_test_timestamp: perf ? perf.generated_at || null : null,
+    benchmark_source: benchmarkFile,
+    benchmark_runner: [runner.cpu, runner.memory, runner.os].filter(Boolean).join(' · ') || null,
+    runner,
+    server,
+    metrics,
+  };
+}
+
+function buildPayload(meta, before, benchmarkFile, perfFile, benchmarkRows) {
+  const perf = perfFile ? readJson(path.join(RESULT_DIR, perfFile)) : null;
   const trimmed = benchmarkRows.map(trimRecord);
   const { total, correct, challenges } = buildChallenges(benchmarkRows, trimmed);
 
   return {
     meta,
+    before,
     benchmark: {
       source: benchmarkFile,
       timestamp: benchmarkFile ? benchmarkFile.slice(0, 10) : null,
       dataset_size: total,
-      dataset_version: datasetVersion,
-      dataset_source: datasetSource,
+      dataset_version: meta.dataset_version,
+      dataset_source: meta.dataset_source,
       exact_matches: correct,
       records: trimmed,
       challenges,
@@ -218,8 +284,8 @@ function buildPayload(meta, benchmarkFile, perfFile, benchmarkRows) {
   };
 }
 
-function buildFullPayload(meta, benchmarkFile, perfFile, benchmarkRows) {
-  const payload = buildPayload(meta, benchmarkFile, perfFile, benchmarkRows);
+function buildFullPayload(meta, before, benchmarkFile, perfFile, benchmarkRows) {
+  const payload = buildPayload(meta, before, benchmarkFile, perfFile, benchmarkRows);
   const records = payload.benchmark.records;
 
   benchmarkRows.forEach((row, i) => {
@@ -285,12 +351,35 @@ function renderTemplate(payload) {
   return html;
 }
 
+function entryKey(entry) {
+  return `${entry.release || ''}|${entry.build || ''}`;
+}
+
+function upsertEntry(entries, entry) {
+  const key = entryKey(entry);
+  const idx = entries.findIndex((e) => entryKey(e) === key);
+  if (idx >= 0) {
+    const before = idx > 0 ? entries[idx - 1] : null;
+    entries[idx] = entry;
+    return { entries, before };
+  }
+  const before = entries.length ? entries[entries.length - 1] : null;
+  entries.push(entry);
+  return { entries, before };
+}
+
+function readMetadataEntries() {
+  if (!fs.existsSync(META_FILE)) return [];
+  const existing = readJson(META_FILE);
+  return Array.isArray(existing) ? existing : [existing];
+}
+
 function main() {
-  let meta = {};
-  if (fs.existsSync(META_FILE)) {
-    meta = readJson(META_FILE);
+  let releaseConfig = {};
+  if (fs.existsSync(RELEASE_FILE)) {
+    releaseConfig = readJson(RELEASE_FILE);
   } else {
-    console.warn('metadata.json not found; using empty metadata.');
+    console.warn('release.json not found; using empty release config.');
   }
 
   const benchmarkFile = latestFile(BENCH_DIR, /_benchmark_v\d+_\d{4}\.json$/);
@@ -306,8 +395,13 @@ function main() {
   }
 
   const benchmarkRows = readJson(path.join(BENCH_DIR, benchmarkFile));
-  const payload = buildPayload(meta, benchmarkFile, perfFile, benchmarkRows);
-  const fullPayload = buildFullPayload(meta, benchmarkFile, perfFile, benchmarkRows);
+  const entry = buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows);
+
+  const { entries, before } = upsertEntry(readMetadataEntries(), entry);
+  fs.writeFileSync(META_FILE, JSON.stringify(entries, null, 2) + '\n');
+
+  const payload = buildPayload(entry, before, benchmarkFile, perfFile, benchmarkRows);
+  const fullPayload = buildFullPayload(entry, before, benchmarkFile, perfFile, benchmarkRows);
 
   const html = renderTemplate(payload);
   const fullHtml = renderTemplate(fullPayload);
@@ -322,6 +416,9 @@ function main() {
   );
   console.log(
     `  performance: ${perfFile || 'N/A'} (${perfFile ? 'load-test summary' : 'missing'})`
+  );
+  console.log(
+    `  metadata:   ${entries.length} test run(s) in metadata.json${before ? ' (before = ' + entryKey(before) + ')' : ' (no previous run)'}`
   );
 }
 
