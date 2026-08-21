@@ -10,7 +10,7 @@ tests/api/cases/*.csv
 !tests/api/cases/example.csv
 tests/api/page/full-benchmark.html
 docs/ISSUES.md
-bin*.db
+bin
 .DS_Store
 node_modules/
 package-lock.json
