@@ -7,13 +7,22 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"address-quality/internal/database"
+	"address-quality/internal/logger"
 	"address-quality/internal/model"
+	"address-quality/internal/queue"
 	"address-quality/internal/sanitizer"
 )
 
 var ErrValidation = errors.New("validation error")
+
+const (
+	storeQueueSize     = 1000
+	storeQueueWorkers  = 2
+	storeQueueJobLimit = 5 * time.Second
+)
 
 type AddressRepository interface {
 	InsertAddressRequest(ctx context.Context, rec *database.AddressRecord) error
@@ -66,6 +75,7 @@ type Service struct {
 	maxAddressLength   int
 	sourceCode         string
 	enableStoreRequest bool
+	storeQueue         *queue.Queue[*database.AddressRecord]
 
 	provinceCache       map[string][]*provinceEntry
 	provinceOnce        sync.Once
@@ -102,7 +112,29 @@ type Service struct {
 }
 
 func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string, enableStoreRequest bool) *Service {
-	return &Service{repo: repo, locationRepo: locationRepo, s: s, maxAddressLength: maxAddressLength, sourceCode: sourceCode, enableStoreRequest: enableStoreRequest}
+	svc := &Service{repo: repo, locationRepo: locationRepo, s: s, maxAddressLength: maxAddressLength, sourceCode: sourceCode, enableStoreRequest: enableStoreRequest}
+
+	if enableStoreRequest {
+		svc.storeQueue = queue.New(storeQueueSize, storeQueueWorkers, func(ctx context.Context, rec *database.AddressRecord) {
+			jobCtx, cancel := context.WithTimeout(ctx, storeQueueJobLimit)
+			defer cancel()
+			if err := svc.repo.InsertAddressRequest(jobCtx, rec); err != nil {
+				logger.Warn().Err(err).Str("request_id", rec.ID).Msg("failed to store address request")
+			}
+		})
+	}
+
+	return svc
+}
+
+// Shutdown stops the store queue from accepting new jobs and waits for all
+// queued address records to be written before returning. It is a no-op when
+// request storage is disabled.
+func (svc *Service) Shutdown(ctx context.Context) error {
+	if svc.storeQueue == nil {
+		return nil
+	}
+	return svc.storeQueue.Shutdown(ctx)
 }
 
 func (svc *Service) Ping(ctx context.Context) error {

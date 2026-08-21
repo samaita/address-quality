@@ -187,8 +187,8 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 
 	record := buildAddressRecord(requestID, data, now)
 	if svc.enableStoreRequest {
-		if err := svc.repo.InsertAddressRequest(ctx, record); err != nil {
-			return nil, err
+		if err := svc.storeQueue.Submit(record); err != nil {
+			log.Warn().Err(err).Str("request_id", requestID).Msg("store queue rejected record")
 		}
 	}
 

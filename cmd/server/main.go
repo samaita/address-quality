@@ -14,7 +14,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"address-quality/internal/config"
 	"address-quality/internal/database"
@@ -47,7 +53,26 @@ func main() {
 
 	e.Server.Addr = fmt.Sprintf(":%d", cfg.Port)
 	logger.Info().Int("port", cfg.Port).Msg("server starting")
-	if err := e.StartServer(e.Server); err != nil {
-		logger.Fatal().Err(err).Msg("server failed to start")
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		if err := e.StartServer(e.Server); err != nil && err != http.ErrServerClosed {
+			logger.Fatal().Err(err).Msg("server failed to start")
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Info().Msg("shutdown signal received")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := e.Shutdown(shutdownCtx); err != nil {
+		logger.Error().Err(err).Msg("http server shutdown failed")
+	}
+	if err := svc.Shutdown(shutdownCtx); err != nil {
+		logger.Error().Err(err).Msg("store queue drain failed")
 	}
 }
