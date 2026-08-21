@@ -6,6 +6,8 @@ package database
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -78,4 +80,36 @@ func (r *Repository) InsertAddressRequest(ctx context.Context, rec *AddressRecor
 
 func (r *Repository) Ping(ctx context.Context) error {
 	return logDBErr(ctx, "ping", "", r.db.PingContext(ctx))
+}
+
+func (r *Repository) HasAddressTables(ctx context.Context) (bool, error) {
+	var name string
+	err := r.db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='address_requests'`).Scan(&name)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, logDBErr(ctx, "has_address_tables", "", err)
+}
+
+func (r *Repository) ExecSchema(ctx context.Context, sqlContent string) error {
+	for _, stmt := range strings.Split(sqlContent, ";") {
+		lines := strings.Split(stmt, "\n")
+		start := 0
+		for start < len(lines) {
+			trimmed := strings.TrimSpace(lines[start])
+			if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+				start++
+			} else {
+				break
+			}
+		}
+		stmt = strings.TrimSpace(strings.Join(lines[start:], "\n"))
+		if stmt == "" {
+			continue
+		}
+		if _, err := r.db.ExecContext(ctx, stmt); err != nil {
+			return logDBErr(ctx, "exec_schema", stmt, fmt.Errorf("exec schema: %w", err))
+		}
+	}
+	return nil
 }
