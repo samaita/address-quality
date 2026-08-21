@@ -28,12 +28,19 @@ func logDBErr(ctx context.Context, op string, input any, err error) error {
 	return err
 }
 
+// sqliteDSN returns a SQLite connection string with a busy timeout so
+// concurrent writers wait for the lock instead of failing with "database is
+// locked".
+func sqliteDSN(dbPath string) string {
+	return dbPath + "?_pragma=busy_timeout(5000)"
+}
+
 type Repository struct {
 	db *sql.DB
 }
 
 func New(dbPath string, maxOpenConns int) (*Repository, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
 		return nil, logDBErr(context.Background(), "open", dbPath, err)
 	}
