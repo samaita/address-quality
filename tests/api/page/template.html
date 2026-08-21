@@ -348,7 +348,7 @@
             <div class="aq-cards" id="aq-acc-cards"></div>
             <h3 class="aq-subtitle">Correct by hierarchy level</h3>
             <div class="aq-table-wrap"><table class="aq-table" id="aq-pr-table"></table></div>
-            <p class="aq-note">Correct is the number of records (of 106) where the engine matched the ground truth at that level; % is that share of the total. The All four levels (exact) row requires province, city, district and subdistrict to all match at once.</p>
+            <p class="aq-note">Correct is the number of records where the engine matched the ground truth at that level; % is that share of the total. The After column is the current run, Before is the previous run, Δ shows the change in correct count. The All four levels (exact) row requires province, city, district and subdistrict to all match at once.</p>
             <h3 class="aq-subtitle" id="aq-failures-title" hidden>Failed matches — by confidence</h3>
             <div class="aq-table-wrap" id="aq-failures-wrap" hidden>
               <table class="aq-table" id="aq-failures"></table>
@@ -368,7 +368,7 @@
 
           <section id="release" class="aq-section">
             <h2 class="aq-section-title">Release</h2>
-            <p class="aq-note">Reproducibility and traceability metadata. Set <span class="aq-mono">release</span>, <span class="aq-mono">build</span> and environment details in <span class="aq-mono">tests/api/page/metadata.json</span> and regenerate.</p>
+            <p class="aq-note">Reproducibility and traceability metadata for the current test run. Set <span class="aq-mono">release</span>, <span class="aq-mono">build</span> and environment details in <span class="aq-mono">tests/api/page/release.json</span> and regenerate. Every run is appended to <span class="aq-mono">tests/api/page/metadata.json</span> as a history entry.</p>
             <div class="aq-table-wrap"><table class="aq-table" id="aq-release"></table></div>
           </section>
         </main>
@@ -465,25 +465,57 @@
   var confs = records.filter(function (r) { return !r.error && r.confidence !== null && r.confidence !== undefined; });
   var avgConf = confs.length ? confs.reduce(function (a, r) { return a + r.confidence; }, 0) / confs.length : null;
 
+  /* ---------- current vs previous run comparison ---------- */
+  var M = D.meta || {};
+  var RUN = M.metrics || {};
+  var PREV = D.before || null;
+  var PREV_M = (PREV && PREV.metrics) || null;
+  function mDelta(key) {
+    if (!PREV_M) return null;
+    var a = RUN[key], b = PREV_M[key];
+    if (a === null || a === undefined || b === null || b === undefined) return null;
+    if (typeof a !== 'number' || typeof b !== 'number') return null;
+    return a - b;
+  }
+  function beforeSub(key, fmt, unit) {
+    if (!PREV_M) return '<span class="aq-dim">No previous run recorded</span>';
+    var b = PREV_M[key];
+    if (b === null || b === undefined) return '<span class="aq-dim">Before <span class="aq-na">N/A</span></span>';
+    var d = mDelta(key);
+    var s = '<span class="aq-dim">Before ' + fmt(b) + '</span>';
+    if (d !== null) {
+      var sign = d > 0 ? '+' : (d < 0 ? '−' : '');
+      var arrow = d > 0 ? '▲' : (d < 0 ? '▼' : '');
+      var dText = String(fmt(Math.abs(d))).replace('%', '') + (unit || '');
+      s += ' <span class="aq-dim">Δ ' + sign + dText + '</span>';
+      if (d !== 0) s += ' <span class="aq-badge ' + (d > 0 ? 'ok' : 'bad') + '">' + arrow + '</span>';
+    }
+    return s;
+  }
+
   /* ---------- header ---------- */
-  var rel = D.meta && D.meta.release;
-  var build = D.meta && D.meta.build;
+  var rel = M.release;
+  var build = M.build;
   var relParts = [];
   if (rel) relParts.push('Release <span class="aq-rel">' + esc(rel) + '</span>');
   if (build) relParts.push('Build <span class="aq-rel">#' + esc(build) + '</span>');
   document.getElementById('aq-release-line').innerHTML =
-    relParts.length ? relParts.join(' · ') + ' · <span class="aq-dim">' + esc(B.timestamp || 'benchmark date N/A') + '</span>'
-                    : '<span class="aq-dim">Release / build not set — edit tests/api/page/metadata.json</span>';
+    relParts.length ? relParts.join(' · ') + ' · <span class="aq-dim">' + esc(M.benchmark_timestamp || 'benchmark date N/A') + '</span>'
+                    : '<span class="aq-dim">Release / build not set — edit tests/api/page/release.json</span>';
   document.getElementById('aq-lede').innerHTML =
     'Public engineering benchmark for one Address Quality release. ' +
     (avgConf !== null ? 'Overall accuracy is based on full administrative-hierarchy matches across ' + num(total, 0) + ' records. ' : '') +
     'Performance numbers are from the k6 load test measured on the environment listed below.';
 
   /* ---------- summary: benchmark ---------- */
+  var runPct = function (v) { return (v === null || v === undefined) ? '<span class="aq-na">N/A</span>' : num(v, 1) + '%'; };
   document.getElementById('aq-summary-bench').innerHTML =
-    card('Overall accuracy', pct(correctCount / total, 1), correctCount + ' of ' + num(total, 0) + ' exact (province + city + district + village)') +
-    card('Dataset size', num(total, 0), B.dataset_source && B.dataset_version ? esc(B.dataset_source) + ' v' + esc(B.dataset_version) : '') +
-    card('Average confidence', avgConf === null ? '<span class="aq-na">N/A</span>' : pct(avgConf, 1), 'mean of ' + num(confs.length, 0) + ' scored records');
+    card('Overall accuracy', pct(correctCount / total, 1),
+      (correctCount + ' of ' + num(total, 0) + ' exact (province + city + district + village) · ') + beforeSub('overall_accuracy', runPct, 'pp')) +
+    card('Dataset size', num(total, 0),
+      (B.dataset_source && B.dataset_version ? esc(B.dataset_source) + ' v' + esc(B.dataset_version) + ' · ' : '') + beforeSub('dataset_size', function (v) { return num(v, 0); }, '')) +
+    card('Average confidence', avgConf === null ? '<span class="aq-na">N/A</span>' : pct(avgConf, 1),
+      ('mean of ' + num(confs.length, 0) + ' scored records · ') + beforeSub('average_confidence', runPct, 'pp'));
 
   /* ---------- summary: performance ---------- */
   document.getElementById('aq-summary-perf').innerHTML =
@@ -520,34 +552,44 @@
     '<p class="aq-note">No challenges derived for this run.</p>';
 
   /* ---------- benchmark: accuracy overview + per-level correctness ---------- */
-  var levels = [
-    { k: 'p', label: 'Province' },
-    { k: 'c', label: 'City' },
-    { k: 'd', label: 'District (Kecamatan)' },
-    { k: 's', label: 'Subdistrict (Kelurahan)' },
-  ];
-  var levelStats = levels.map(function (L) {
-    return {
-      label: L.label,
-      correct: records.filter(function (r) { return r.same[L.k] === true; }).length,
-    };
-  });
-
   document.getElementById('aq-acc-cards').innerHTML =
-    card('Overall accuracy', pct(correctCount / total, 1), 'exact match on all four levels') +
-    card('Average confidence', avgConf === null ? '<span class="aq-na">N/A</span>' : pct(avgConf, 1), 'of ' + num(confs.length, 0) + ' records') +
-    card('Dataset size', num(total, 0), 'records evaluated') +
-    card('Dataset version', B.dataset_version ? esc(B.dataset_version) : '<span class="aq-na">N/A</span>', B.dataset_source ? 'source ' + esc(B.dataset_source) : '');
+    card('Overall accuracy', pct(correctCount / total, 1), 'exact match on all four levels · ' + beforeSub('overall_accuracy', runPct, 'pp')) +
+    card('Average confidence', avgConf === null ? '<span class="aq-na">N/A</span>' : pct(avgConf, 1), 'of ' + num(confs.length, 0) + ' records · ' + beforeSub('average_confidence', runPct, 'pp')) +
+    card('Dataset size', num(total, 0), 'records evaluated · ' + beforeSub('dataset_size', function (v) { return num(v, 0); }, '')) +
+    card('Dataset version', B.dataset_version ? esc(B.dataset_version) : '<span class="aq-na">N/A</span>',
+      (B.dataset_source ? 'source ' + esc(B.dataset_source) + ' · ' : '') + (PREV_M ? 'before ' + (PREV_M.dataset_version ? esc(PREV_M.dataset_version) : '<span class="aq-na">N/A</span>') : '<span class="aq-dim">no previous run</span>'));
 
-  var prRows = '<thead><tr><th>Level</th><th>Correct</th><th>%</th></tr></thead><tbody>' +
-    levelStats.map(function (s) {
-      return '<tr><td>' + esc(s.label) + '</td>' +
-        '<td class="aq-num">' + num(s.correct, 0) + ' of ' + num(total, 0) + '</td>' +
-        '<td class="aq-num">' + pct(s.correct / total, 1) + '</td></tr>';
-    }).join('') +
-    '<tr><td><strong>All four levels (exact)</strong></td>' +
-    '<td class="aq-num"><strong>' + num(correctCount, 0) + ' of ' + num(total, 0) + '</strong></td>' +
-    '<td class="aq-num"><strong>' + pct(correctCount / total, 1) + '</strong></td></tr></tbody>';
+  function levelRow(label, cur, prev) {
+    var delta = null;
+    if (cur && prev && typeof cur.correct === 'number' && typeof prev.correct === 'number') {
+      delta = cur.correct - prev.correct;
+    }
+    var beforeCell = prev
+      ? '<td class="aq-num">' + num(prev.correct, 0) + ' of ' + num(total, 0) + '</td>' +
+        '<td class="aq-num">' + (prev.pct === null || prev.pct === undefined ? '<span class="aq-na">N/A</span>' : num(prev.pct, 1) + '%') + '</td>'
+      : '<td class="aq-num" colspan="2"><span class="aq-na">N/A</span></td>';
+    var deltaCell = delta === null
+      ? '<td class="aq-num"><span class="aq-na">N/A</span></td>'
+      : delta === 0
+        ? '<td class="aq-num">0</td>'
+        : '<td class="aq-num"><span class="aq-badge ' + (delta > 0 ? 'ok' : 'bad') + '">' + (delta > 0 ? '▲' : '▼') + ' ' + num(Math.abs(delta), 0) + '</span></td>';
+    return '<tr><td>' + esc(label) + '</td>' +
+      '<td class="aq-num">' + num(cur.correct, 0) + ' of ' + num(total, 0) + '</td>' +
+      '<td class="aq-num">' + (cur.pct === null || cur.pct === undefined ? '<span class="aq-na">N/A</span>' : num(cur.pct, 1) + '%') + '</td>' +
+      beforeCell + deltaCell + '</tr>';
+  }
+
+  var prevLevels = PREV_M && Array.isArray(PREV_M.hierarchy) ? PREV_M.hierarchy : null;
+  var curLevels = RUN.hierarchy && Array.isArray(RUN.hierarchy) ? RUN.hierarchy : null;
+  var levelNames = curLevels || prevLevels;
+  var rowsHtml = (levelNames || []).map(function (L, i) {
+    var cur = curLevels && curLevels[i];
+    var prev = prevLevels && prevLevels[i];
+    return levelRow(cur ? cur.level : (prev ? prev.level : (L.level || L)), cur || { correct: null, pct: null }, prev || null);
+  }).join('');
+
+  var prRows = '<thead><tr><th>Level</th><th class="aq-num">Correct (after)</th><th class="aq-num">% (after)</th><th class="aq-num" colspan="2">Before</th><th class="aq-num">Δ</th></tr></thead><tbody>' +
+    rowsHtml + '</tbody>';
   document.getElementById('aq-pr-table').innerHTML = prRows;
 
   /* ---------- benchmark: failed matches (full builds only) ---------- */
@@ -628,9 +670,8 @@
   document.getElementById('aq-perf-config').innerHTML = cfgRows;
 
   /* ---------- performance: environment ---------- */
-  var meta = D.meta || {};
-  var runner = meta.runner || {};
-  var server = meta.server || {};
+  var runner = M.runner || {};
+  var server = M.server || {};
   function envCell(name, value) {
     return '<div class="aq-row"><div class="aq-k">' + esc(name) + '</div><div class="aq-v">' +
       (value === null || value === undefined || value === '' ? '<span class="aq-na">N/A</span>' : esc(value)) +
@@ -653,7 +694,7 @@
   document.getElementById('aq-perf-note').innerHTML =
     'These numbers were measured with k6 on ' + (PERF.generated_at ? esc(PERF.generated_at.replace('T', ' ').slice(0, 19)) + ' UTC' : '<span class="aq-na">N/A</span>') +
     ' against the runner and server above. They describe this specific environment and are not a guarantee of universal production performance.' +
-    (envMissing ? ' Environment details are not captured in the current artifacts — add them to <span class="aq-mono">tests/api/page/metadata.json</span> before publishing.' : '');
+    (envMissing ? ' Environment details are not captured in the current artifacts — add them to <span class="aq-mono">tests/api/page/release.json</span> before publishing.' : '');
 
   /* ---------- release ---------- */
   var relRows = '<thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>';
@@ -662,16 +703,16 @@
       (v === null || v === undefined || v === '' ? '<span class="aq-na">N/A</span>' : (mono ? '<span class="aq-mono">' + esc(v) + '</span>' : esc(v))) +
       '</td></tr>';
   }
-  relRow('Release version', rel, true);
-  relRow('Build number', build === null || build === undefined ? null : '#' + build, true);
-  relRow('Git commit', meta.git_commit, true);
-  relRow('Benchmark timestamp', B.timestamp, true);
-  relRow('Dataset version', B.dataset_version, true);
-  relRow('Dataset source', B.dataset_source, true);
-  relRow('Dataset generation timestamp', null, true);
-  relRow('Load-test timestamp', PERF.generated_at, true);
-  relRow('Benchmark source', B.source, true);
-  relRow('Benchmark runner', [runner.cpu, runner.memory, runner.os].filter(Boolean).join(' · '), true);
+  relRow('Release version', M.release, true);
+  relRow('Build number', M.build === null || M.build === undefined ? null : '#' + M.build, true);
+  relRow('Git commit', M.git_commit, true);
+  relRow('Benchmark timestamp', M.benchmark_timestamp, true);
+  relRow('Dataset version', M.dataset_version, true);
+  relRow('Dataset source', M.dataset_source, true);
+  relRow('Dataset generation timestamp', M.dataset_generation_timestamp, true);
+  relRow('Load-test timestamp', M.load_test_timestamp, true);
+  relRow('Benchmark source', M.benchmark_source, true);
+  relRow('Benchmark runner', M.benchmark_runner, true);
   relRows += '</tbody>';
   document.getElementById('aq-release').innerHTML = relRows;
 
