@@ -21,7 +21,7 @@ type LocationRepository struct {
 }
 
 func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
 		return nil, logDBErr(context.Background(), "open", dbPath, err)
 	}
