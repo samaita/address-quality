@@ -86,6 +86,11 @@ Flags:
 		logger.Fatal().Err(err).Msg("open location db")
 	}
 
+	addressRepo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("open address db")
+	}
+
 	hasTables, err := repo.HasLocationTables(ctx)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("check tables")
@@ -104,6 +109,24 @@ Flags:
 			logger.Fatal().Err(err).Msg("exec schema")
 		}
 		logger.Info().Msg("schema created")
+
+		hasAddressTables, err := addressRepo.HasAddressTables(ctx)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("check address tables")
+		}
+		if !hasAddressTables {
+			logger.Info().Msg("running db/address.sql...")
+			addressSchema, err := os.ReadFile("db/address.sql")
+			if err != nil {
+				logger.Fatal().Err(err).Msg("read db/address.sql")
+			}
+			if err := addressRepo.ExecSchema(ctx, string(addressSchema)); err != nil {
+				logger.Fatal().Err(err).Msg("exec address schema")
+			}
+			logger.Info().Msg("address schema created")
+		} else {
+			logger.Info().Msg("address tables already exist")
+		}
 	} else if *dropFlag {
 		if !hasTables {
 			logger.Fatal().Msg("no tables to drop, use --init for first-time setup")
