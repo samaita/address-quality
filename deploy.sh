@@ -17,6 +17,7 @@ Usage: deploy.sh [--rollback]
 Deploys the Address Quality stack (api) with podman compose.
 
   --rollback   Redeploy the last successfully recorded image tags.
+               Any other positional argument is ignored (kept for safety).
 
 Environment:
   API_IMAGE_TAG   image tag to deploy (default: latest)
@@ -25,22 +26,30 @@ Environment:
 Prerequisites on the VPS:
   podman + a compose provider (podman-compose >= 1.0.4 or docker-compose)
   curl
-  $ENV_FILE  (backend env, copied from deploy/.env.prod.example)
+  $ENV_FILE  (backend env; auto-created from deploy/.env.prod.example if missing)
   $CONFIG_DIR owned by the user running this script
   $CONFIG_DIR/db populated manually with address.db + location.db
 EOF
 }
 
-[ -f "$ENV_FILE" ] || { echo "FATAL: missing $ENV_FILE (see deploy/.env.prod.example)" >&2; exit 1; }
 command -v podman >/dev/null || { echo "FATAL: podman not installed" >&2; exit 1; }
 command -v curl >/dev/null || { echo "FATAL: curl not installed" >&2; exit 1; }
+mkdir -p "$CONFIG_DIR"
 [ -w "$CONFIG_DIR" ] || { echo "FATAL: $CONFIG_DIR not writable by $(id -un) (chown it to the deploy user)" >&2; exit 1; }
+if [ ! -f "$ENV_FILE" ]; then
+  ENV_EXAMPLE="$SELF_DIR/deploy/.env.prod.example"
+  [ -f "$ENV_EXAMPLE" ] || { echo "FATAL: neither $ENV_FILE nor $ENV_EXAMPLE exists" >&2; exit 1; }
+  echo "WARN: $ENV_FILE not found; copying from $ENV_EXAMPLE" >&2
+  cp "$ENV_EXAMPLE" "$ENV_FILE"
+  echo "WARN: $ENV_FILE was seeded from the example; edit it now (e.g. set API_KEY) before exposing the API" >&2
+fi
 
 case "${1:-}" in
   --rollback) MODE="rollback" ;;
   -h|--help) usage; exit 0 ;;
   "") MODE="deploy" ;;
-  *) usage; exit 2 ;;
+  --*) usage; exit 2 ;;
+  *) echo "WARN: ignoring unknown argument '$1'" >&2; MODE="deploy" ;;
 esac
 
 # Serialize concurrent deploys (best effort)
