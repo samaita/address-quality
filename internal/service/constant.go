@@ -19,4 +19,5 @@ const (
 	WeightPostalCodePrefix3      = 0.07
 	WeightPostalCodePrefix4      = 0.10
 	WeightPostalCodePrefix5      = 0.20
+	WeightUsedEvidenceBonus      = 0.03
 )
