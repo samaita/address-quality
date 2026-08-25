@@ -245,6 +245,14 @@ const docTemplate = `{
         "model.GeocodeResponse": {
             "type": "object",
             "properties": {
+                "cache_status": {
+                    "type": "string",
+                    "enum": [
+                        "HIT",
+                        "MISS"
+                    ],
+                    "example": "HIT"
+                },
                 "data": {
                     "type": "object"
                 },

@@ -23,6 +23,9 @@ import (
 
 const (
 	googleMapsRequestTimeout = 10 * time.Second
+
+	cacheStatusHit  = "HIT"
+	cacheStatusMiss = "MISS"
 )
 
 var errGoogleMapsNotFound = errors.New("address not found by geocoder")
@@ -88,7 +91,7 @@ func (svc *Service) ValidateAddressV0(ctx context.Context, rawBody string, reque
 		return nil, http.StatusInternalServerError, err
 	} else if found {
 		log.Debug().Str("request_hash", hash).Msg("geocode cache hit")
-		return svc.buildGeocodeResponse(requestID, []byte(rec.Response))
+		return svc.buildGeocodeResponse(requestID, []byte(rec.Response), cacheStatusHit)
 	}
 
 	var payload []byte
@@ -116,7 +119,7 @@ func (svc *Service) ValidateAddressV0(ctx context.Context, rawBody string, reque
 	}
 	log.Debug().Str("request_hash", hash).Int("status", status).Msg("geocode response cached")
 
-	return svc.buildGeocodeResponse(requestID, payload)
+	return svc.buildGeocodeResponse(requestID, payload, cacheStatusMiss)
 }
 
 func (svc *Service) callGoogleMaps(ctx context.Context, address string) ([]byte, int, error) {
@@ -151,14 +154,15 @@ func (svc *Service) callGoogleMaps(ctx context.Context, address string) ([]byte,
 	}
 }
 
-func (svc *Service) buildGeocodeResponse(requestID string, payload []byte) (*model.GeocodeResponse, int, error) {
+func (svc *Service) buildGeocodeResponse(requestID string, payload []byte, cacheStatus string) (*model.GeocodeResponse, int, error) {
 	status := http.StatusOK
 	if responseIsNotFound(payload) {
 		status = http.StatusNotFound
 	}
 	return &model.GeocodeResponse{
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		RequestID: requestID,
-		Data:      json.RawMessage(payload),
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+		RequestID:   requestID,
+		CacheStatus: cacheStatus,
+		Data:        json.RawMessage(payload),
 	}, status, nil
 }

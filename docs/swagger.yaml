@@ -72,6 +72,12 @@ definitions:
     type: object
   model.GeocodeResponse:
     properties:
+      cache_status:
+        enum:
+        - HIT
+        - MISS
+        example: HIT
+        type: string
       data:
         type: object
       request_id:

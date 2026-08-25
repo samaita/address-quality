@@ -165,9 +165,10 @@ func (r *GeocodeRequest) Validate(maxLength int) error {
 // GeocodeResponse wraps the raw Google Maps geocoding JSON payload (mocked,
 // cached, or live) in the standard v1-style response envelope.
 type GeocodeResponse struct {
-	Timestamp string          `json:"timestamp" example:"2026-07-29T05:08:05Z"`
-	RequestID string          `json:"request_id" example:"019fac45-d6cb-7101-9159-76bd7c25867b"`
-	Data      json.RawMessage `json:"data" swaggertype:"object"`
+	Timestamp   string          `json:"timestamp" example:"2026-07-29T05:08:05Z"`
+	RequestID   string          `json:"request_id" example:"019fac45-d6cb-7101-9159-76bd7c25867b"`
+	CacheStatus string          `json:"cache_status" example:"HIT" enums:"HIT,MISS"`
+	Data        json.RawMessage `json:"data" swaggertype:"object"`
 }
 
 type EvidenceType string
