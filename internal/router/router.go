@@ -54,6 +54,7 @@ func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
 	api.Use(mw.APIKeyAuth(cfg.APIKey))
 	api.Use(mw.RateLimiter(cfg.RateLimit, cfg.RateWindow))
 	api.Use(mw.RequestID())
+	api.POST("/v0/validate", h.HandleGeocodeRequest)
 	api.POST("/v1/validate", h.HandleAddressRequest)
 
 	return e
