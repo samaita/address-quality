@@ -15,5 +15,6 @@ bin
 node_modules/
 package-lock.json
 SPECS.md
+EXAMPLE.md
 seeder
 server
