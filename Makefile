@@ -1,4 +1,4 @@
-.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed benchmark benchmark-page
+.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed benchmark benchmark-page benchmark-v0 benchmark-page-v0
 
 run:
 	go run ./cmd/server
@@ -43,3 +43,9 @@ benchmark:
 
 benchmark-page:
 	node tests/api/page/build.js
+
+benchmark-v0:
+	node tests/api/benchmark-test-v0.js --source=kemendagri --csv=tests/api/cases/address-tagged.csv
+
+benchmark-page-v0:
+	BENCH_VER=v0 node tests/api/page/build.js
