@@ -62,6 +62,25 @@ definitions:
         example: "2026-07-29T05:06:43Z"
         type: string
     type: object
+  model.GeocodeRequest:
+    properties:
+      address:
+        example: Sukarasa Sukasari Jawa Barat
+        type: string
+    required:
+    - address
+    type: object
+  model.GeocodeResponse:
+    properties:
+      data:
+        type: object
+      request_id:
+        example: 019fac45-d6cb-7101-9159-76bd7c25867b
+        type: string
+      timestamp:
+        example: "2026-07-29T05:08:05Z"
+        type: string
+    type: object
   model.HealthResponse:
     properties:
       database:
@@ -191,6 +210,41 @@ paths:
           schema:
             $ref: '#/definitions/model.HealthResponse'
       summary: Health check
+  /v0/validate:
+    post:
+      consumes:
+      - application/json
+      description: Resolve an address via Google Maps geocoding with a lazy sqlite
+        cache. Mock mode reads the cache only and fakes a 404 on a miss.
+      parameters:
+      - description: Address to geocode
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.GeocodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.GeocodeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.GeocodeResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Geocode an address
   /v1/validate:
     post:
       consumes:
