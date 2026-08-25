@@ -27,6 +27,8 @@ const (
 type AddressRepository interface {
 	InsertAddressRequest(ctx context.Context, rec *database.AddressRecord) error
 	Ping(ctx context.Context) error
+	GetGoogleMapsCache(ctx context.Context, requestHash string) (*database.GoogleMapsCacheRecord, bool, error)
+	UpsertGoogleMapsCache(ctx context.Context, requestHash, request, response string, now time.Time) error
 }
 
 type LocationRepository interface {
@@ -77,6 +79,10 @@ type Service struct {
 	enableStoreRequest bool
 	storeQueue         *queue.Queue[*database.AddressRecord]
 
+	googleMapsMock   bool
+	googleMapsAPIKey string
+	googleMapsBaseURL string
+	googleMapsMu     sync.Mutex
 	provinceCache       map[string][]*provinceEntry
 	provinceOnce        sync.Once
 	provinceErr         error
@@ -111,8 +117,18 @@ type Service struct {
 	phraseDictErr  error
 }
 
-func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string, enableStoreRequest bool) *Service {
-	svc := &Service{repo: repo, locationRepo: locationRepo, s: s, maxAddressLength: maxAddressLength, sourceCode: sourceCode, enableStoreRequest: enableStoreRequest}
+func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string, enableStoreRequest bool, googleMapsMock bool, googleMapsAPIKey string, googleMapsBaseURL string) *Service {
+	svc := &Service{
+		repo:               repo,
+		locationRepo:       locationRepo,
+		s:                  s,
+		maxAddressLength:   maxAddressLength,
+		sourceCode:         sourceCode,
+		enableStoreRequest: enableStoreRequest,
+		googleMapsMock:     googleMapsMock,
+		googleMapsAPIKey:   googleMapsAPIKey,
+		googleMapsBaseURL:  googleMapsBaseURL,
+	}
 
 	if enableStoreRequest {
 		svc.storeQueue = queue.New(storeQueueSize, storeQueueWorkers, func(ctx context.Context, rec *database.AddressRecord) {
@@ -141,6 +157,17 @@ func (svc *Service) Ping(ctx context.Context) error {
 	return svc.repo.Ping(ctx)
 }
 
+func (svc *Service) MaxAddressLength() int {
+	return svc.maxAddressLength
+}
+
 func (svc *Service) ValidateAddress(ctx context.Context, req *model.AddressRequest, requestID string) (*model.AddressResponse, error) {
 	return svc.ValidateAddressV1(ctx, req, requestID)
+}
+
+// ValidateGeocodeAddress resolves an address through the Google Maps geocoding
+// API using an sqlite lazy cache. It takes the raw request body so the cache
+// key is derived from the trimmed, single-line body.
+func (svc *Service) ValidateGeocodeAddress(ctx context.Context, rawBody string, requestID string) (*model.GeocodeResponse, int, error) {
+	return svc.ValidateAddressV0(ctx, rawBody, requestID)
 }

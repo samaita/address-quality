@@ -127,6 +127,24 @@ Flags:
 		} else {
 			logger.Info().Msg("address tables already exist")
 		}
+
+		hasGoogleMapsTable, err := addressRepo.HasGoogleMapsTable(ctx)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("check google maps table")
+		}
+		if !hasGoogleMapsTable {
+			logger.Info().Msg("running db/google_maps.sql...")
+			googleMapsSchema, err := os.ReadFile("db/google_maps.sql")
+			if err != nil {
+				logger.Fatal().Err(err).Msg("read db/google_maps.sql")
+			}
+			if err := addressRepo.ExecSchema(ctx, string(googleMapsSchema)); err != nil {
+				logger.Fatal().Err(err).Msg("exec google maps schema")
+			}
+			logger.Info().Msg("google maps schema created")
+		} else {
+			logger.Info().Msg("google maps table already exists")
+		}
 	} else if *dropFlag {
 		if !hasTables {
 			logger.Fatal().Msg("no tables to drop, use --init for first-time setup")

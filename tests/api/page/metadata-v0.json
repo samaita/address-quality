@@ -1,0 +1,60 @@
+[
+  {
+    "release": "v0.1.0-alpha",
+    "build": "v0.1.0-alpha",
+    "git_commit": "02ba28d",
+    "benchmark_timestamp": "2026-08-25",
+    "dataset_version": null,
+    "dataset_source": null,
+    "dataset_generation_timestamp": null,
+    "load_test_timestamp": null,
+    "benchmark_source": "2026-08-25_benchmark_v0_0001.json",
+    "benchmark_runner": null,
+    "runner": {
+      "cpu": null,
+      "memory": null,
+      "os": null,
+      "k6_version": null
+    },
+    "server": {
+      "cpu": null,
+      "memory": null,
+      "os": null,
+      "api_version": "v0",
+      "git_commit": "02ba28d"
+    },
+    "metrics": {
+      "overall_accuracy": 64.2,
+      "dataset_size": 106,
+      "average_confidence": null,
+      "dataset_version": null,
+      "hierarchy": [
+        {
+          "level": "Province",
+          "correct": 84,
+          "pct": 79.2
+        },
+        {
+          "level": "City",
+          "correct": 83,
+          "pct": 78.3
+        },
+        {
+          "level": "District (Kecamatan)",
+          "correct": 81,
+          "pct": 76.4
+        },
+        {
+          "level": "Subdistrict (Kelurahan)",
+          "correct": 72,
+          "pct": 67.9
+        },
+        {
+          "level": "All four levels (exact)",
+          "correct": 68,
+          "pct": 64.2
+        }
+      ]
+    }
+  }
+]

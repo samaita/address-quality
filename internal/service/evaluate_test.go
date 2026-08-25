@@ -337,7 +337,7 @@ func TestScoreConfidence(t *testing.T) {
 			}
 			candidate.Location.Conflicts = tt.conflicts
 
-			got := scoreConfidence(candidate)
+			got := scoreConfidence(candidate, nil, false)
 			if got != tt.want {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
@@ -445,8 +445,8 @@ func TestEvaluateCandidate_FullPipeline(t *testing.T) {
 		if eval.Status != model.StatusValid {
 			t.Errorf("Status = %v, want VALID", eval.Status)
 		}
-		if eval.Confidence != 0.37 {
-			t.Errorf("Confidence = %v, want 0.37", eval.Confidence)
+		if eval.Confidence != 0.40 {
+			t.Errorf("Confidence = %v, want 0.40", eval.Confidence)
 		}
 	})
 
@@ -754,7 +754,7 @@ func TestScoreConfidence_MultiEvidenceIntegration(t *testing.T) {
 			}
 			candidate.Location.Conflicts = tt.conflicts
 
-			got := scoreConfidence(candidate)
+			got := scoreConfidence(candidate, nil, false)
 			if got != tt.want {
 				t.Errorf("scoreConfidence = %v, want %v", got, tt.want)
 			}

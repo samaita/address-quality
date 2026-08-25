@@ -27,6 +27,9 @@ type Config struct {
 	LogLevel           string
 	AllowedOrigins     []string
 	EnableStoreRequest bool
+	GoogleMapsAPIMock  bool
+	GoogleMapsAPIKey   string
+	GoogleMapsBaseURL  string
 }
 
 func Load() *Config {
@@ -50,6 +53,9 @@ func Load() *Config {
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("CORS_ALLOWED_ORIGINS", "https://samaita.com")
 	viper.SetDefault("ENABLE_STORE_REQUEST", false)
+	viper.SetDefault("GOOGLE_MAPS_API_MOCK", true)
+	viper.SetDefault("GOOGLE_MAPS_API_KEY", "")
+	viper.SetDefault("GOOGLE_MAPS_BASE_URL", "https://geocode.googleapis.com/v4/geocode/address")
 
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Warn().Err(err).Msg(".env not found, using defaults")
@@ -71,12 +77,16 @@ func Load() *Config {
 		LogLevel:           viper.GetString("LOG_LEVEL"),
 		AllowedOrigins:     strings.Split(viper.GetString("CORS_ALLOWED_ORIGINS"), ","),
 		EnableStoreRequest: viper.GetBool("ENABLE_STORE_REQUEST"),
+		GoogleMapsAPIMock:  viper.GetBool("GOOGLE_MAPS_API_MOCK"),
+		GoogleMapsAPIKey:   viper.GetString("GOOGLE_MAPS_API_KEY"),
+		GoogleMapsBaseURL:  viper.GetString("GOOGLE_MAPS_BASE_URL"),
 	}
 
 	logger.Info().
 		Int("port", cfg.Port).
 		Int("rate_limit", cfg.RateLimit).
 		Int("rate_window", cfg.RateWindow).
+		Bool("google_maps_api_mock", cfg.GoogleMapsAPIMock).
 		Msg("config loaded")
 	return cfg
 }

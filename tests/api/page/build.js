@@ -25,13 +25,15 @@ const fs = require('fs');
 const path = require('path');
 
 const PAGE_DIR = __dirname;
-const BENCH_DIR = path.join(PAGE_DIR, '..', 'benchmark');
+const BENCH_VER = process.env.BENCH_VER || 'v1';
+const BENCH_DIR = path.join(PAGE_DIR, '..', BENCH_VER === 'v0' ? 'benchmark-v0' : 'benchmark');
 const RESULT_DIR = path.join(PAGE_DIR, '..', 'result');
 const TEMPLATE = path.join(PAGE_DIR, 'template.html');
-const OUTPUT = path.join(PAGE_DIR, 'benchmark.html');
-const FULL_OUTPUT = path.join(PAGE_DIR, 'full-benchmark.html');
-const META_FILE = path.join(PAGE_DIR, 'metadata.json');
+const OUTPUT = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'benchmark-v0.html' : 'benchmark.html');
+const FULL_OUTPUT = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'full-benchmark-v0.html' : 'full-benchmark.html');
+const META_FILE = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'metadata-v0.json' : 'metadata.json');
 const RELEASE_FILE = path.join(PAGE_DIR, 'release.json');
+const BENCH_PATTERN = new RegExp(`_benchmark_${BENCH_VER}_\\d{4}\\.json$`);
 
 function latestFile(dir, pattern) {
   if (!fs.existsSync(dir)) return null;
@@ -238,7 +240,7 @@ function buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows) {
   const perf = perfFile ? readJson(path.join(RESULT_DIR, perfFile)) : null;
   const dataset = datasetVersionOf(benchmarkRows);
   const runner = releaseConfig.runner || {};
-  const server = releaseConfig.server || {};
+  const server = Object.assign({}, releaseConfig.server || {}, { api_version: BENCH_VER });
 
   const metrics = computeMetrics(benchmarkRows);
   metrics.dataset_version = dataset.version;
@@ -382,14 +384,16 @@ function main() {
     console.warn('release.json not found; using empty release config.');
   }
 
-  const benchmarkFile = latestFile(BENCH_DIR, /_benchmark_v\d+_\d{4}\.json$/);
+  const benchmarkFile = latestFile(BENCH_DIR, BENCH_PATTERN);
   if (!benchmarkFile) {
     console.error(
-      'No benchmark JSON found in tests/api/benchmark (expected *_benchmark_v1_0000.json).'
+      `No benchmark JSON found in ${BENCH_DIR} (expected *_benchmark_${BENCH_VER}_0000.json).`
     );
     process.exit(1);
   }
-  const perfFile = latestFile(RESULT_DIR, /_load-test_\d{4}\.json$/);
+  const perfFile = BENCH_VER === 'v0'
+    ? null
+    : latestFile(RESULT_DIR, /_load-test_\d{4}\.json$/);
   if (!perfFile) {
     console.warn('No load-test JSON found in tests/api/result; performance section will show N/A.');
   }
@@ -418,7 +422,7 @@ function main() {
     `  performance: ${perfFile || 'N/A'} (${perfFile ? 'load-test summary' : 'missing'})`
   );
   console.log(
-    `  metadata:   ${entries.length} test run(s) in metadata.json${before ? ' (before = ' + entryKey(before) + ')' : ' (no previous run)'}`
+    `  metadata:   ${entries.length} test run(s) in ${path.basename(META_FILE)}${before ? ' (before = ' + entryKey(before) + ')' : ' (no previous run)'}`
   );
 }
 

@@ -4,6 +4,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -145,6 +146,29 @@ type AddressResponse struct {
 	Timestamp string       `json:"timestamp" example:"2026-07-29T05:08:05Z"`
 	RequestID string       `json:"request_id" example:"019fac45-d6cb-7101-9159-76bd7c25867b"`
 	Data      ResponseData `json:"data"`
+}
+
+type GeocodeRequest struct {
+	Address string `json:"address" validate:"required" example:"Sukarasa Sukasari Jawa Barat"`
+}
+
+func (r *GeocodeRequest) Validate(maxLength int) error {
+	if r.Address == "" {
+		return errors.New("address is required")
+	}
+	if len(r.Address) > maxLength {
+		return fmt.Errorf("address exceeds maximum length of %d characters", maxLength)
+	}
+	return nil
+}
+
+// GeocodeResponse wraps the raw Google Maps geocoding JSON payload (mocked,
+// cached, or live) in the standard v1-style response envelope.
+type GeocodeResponse struct {
+	Timestamp   string          `json:"timestamp" example:"2026-07-29T05:08:05Z"`
+	RequestID   string          `json:"request_id" example:"019fac45-d6cb-7101-9159-76bd7c25867b"`
+	CacheStatus string          `json:"cache_status" example:"HIT" enums:"HIT,MISS"`
+	Data        json.RawMessage `json:"data" swaggertype:"object"`
 }
 
 type EvidenceType string

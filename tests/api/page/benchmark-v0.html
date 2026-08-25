@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Address Quality — Benchmark</title>
+<style>
+/* Everything is scoped under .aq-benchmark so it cannot leak into (or be
+   affected by) the parent page when embedded. No global selectors. */
+.aq-benchmark {
+  --aq-bg: #f7f7f8;
+  --aq-surface: #ffffff;
+  --aq-surface-50: #fafafa;
+  --aq-border: #e4e4e7;
+  --aq-border-strong: #d4d4d8;
+  --aq-text: #18181b;
+  --aq-muted: #71717a;
+  --aq-faint: #a1a1aa;
+  --aq-accent: #4f46e5;
+  --aq-accent-soft: #4f46e50f;
+  --aq-green: #16a34a;
+  --aq-red: #dc2626;
+  --aq-amber: #b45309;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  line-height: 1.6;
+  color: var(--aq-text);
+  background: var(--aq-bg);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+.aq-benchmark *,
+.aq-benchmark *::before,
+.aq-benchmark *::after { box-sizing: border-box; }
+.aq-benchmark a { color: var(--aq-accent); text-decoration: none; }
+.aq-benchmark a:hover { text-decoration: underline; }
+.aq-benchmark :where(h1, h2, h3, p, ul, li, table, th, td, button) {
+  margin: 0;
+  padding: 0;
+}
+
+.aq-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 64px 32px 80px;
+}
+.aq-header { margin-bottom: 56px; }
+.aq-kicker {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--aq-faint);
+  margin-bottom: 8px;
+}
+.aq-title {
+  font-size: 44px;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+  color: var(--aq-text);
+  margin-bottom: 16px;
+}
+.aq-release {
+  font-size: 17px;
+  color: var(--aq-muted);
+  margin-bottom: 8px;
+}
+.aq-release .aq-rel { color: var(--aq-text); font-weight: 600; }
+.aq-lede { max-width: 640px; color: var(--aq-muted); font-size: 15px; }
+
+.aq-grid {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+}
+.aq-nav { position: sticky; top: 32px; font-size: 14px; }
+.aq-nav-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--aq-faint);
+  margin-bottom: 12px;
+}
+.aq-nav a {
+  display: block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--aq-muted);
+  font-size: 14px;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.aq-nav a:hover {
+  color: var(--aq-text);
+  background: #f4f4f5;
+  text-decoration: none;
+}
+.aq-nav a.active {
+  color: var(--aq-accent);
+  background: #eef2ff;
+  font-weight: 600;
+}
+
+.aq-main { min-width: 0; }
+.aq-section { margin-bottom: 72px; scroll-margin-top: 24px; }
+.aq-section-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--aq-text);
+  margin-bottom: 20px;
+}
+.aq-subtitle {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--aq-text);
+  margin: 36px 0 16px;
+}
+.aq-section-title + .aq-subtitle { margin-top: 0; }
+
+/* Performance content hidden until load-test config data is available. */
+.aq-nav a[href="#performance"],
+#aq-summary-perf-title,
+#aq-summary-perf,
+#performance { display: none; }
+
+/* Full (untrimmed) builds expose the performance run. */
+.aq-benchmark.aq-full .aq-nav a[href="#performance"],
+.aq-benchmark.aq-full #aq-summary-perf-title,
+.aq-benchmark.aq-full #aq-summary-perf { display: grid; }
+.aq-benchmark.aq-full #performance { display: block; }
+
+.aq-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+}
+.aq-card {
+  background: var(--aq-surface);
+  border: 1px solid var(--aq-border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+}
+.aq-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aq-muted);
+  margin-bottom: 10px;
+}
+.aq-card-value {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.aq-card-sub { margin-top: 6px; font-size: 13px; color: var(--aq-muted); }
+
+.aq-na { color: var(--aq-faint); font-weight: 500; }
+.aq-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--aq-border-strong);
+  color: var(--aq-muted);
+  white-space: nowrap;
+}
+.aq-badge.ok { color: var(--aq-green); border-color: #16a34a55; background: #16a34a0d; }
+.aq-badge.bad { color: var(--aq-red); border-color: #dc262655; background: #dc26260d; }
+.aq-badge.warn { color: var(--aq-amber); border-color: #b4530955; background: #b453090d; }
+
+.aq-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--aq-border);
+  border-radius: 12px;
+  background: var(--aq-surface);
+}
+.aq-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+.aq-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--aq-muted);
+  padding: 10px 16px;
+  background: var(--aq-surface-50);
+  border-bottom: 1px solid var(--aq-border-strong);
+  white-space: nowrap;
+}
+.aq-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--aq-border);
+  vertical-align: top;
+  word-break: break-word;
+}
+.aq-table tr:last-child td { border-bottom: none; }
+.aq-table .aq-num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.aq-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.aq-dim { color: var(--aq-muted); font-size: 13px; }
+
+.aq-challenge {
+  background: var(--aq-surface);
+  border: 1px solid var(--aq-border);
+  border-radius: 12px;
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+.aq-challenge-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.aq-challenge h3 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.aq-challenge-count { font-size: 13px; color: var(--aq-faint); font-weight: 600; }
+.aq-challenge p { color: var(--aq-muted); font-size: 14px; margin-bottom: 12px; }
+.aq-challenge p:last-child { margin-bottom: 0; }
+.aq-example {
+  background: var(--aq-bg);
+  border: 1px solid var(--aq-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  margin: 8px 0 12px;
+  word-break: break-word;
+}
+.aq-example .aq-dim { display: block; margin-top: 4px; }
+.aq-example-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--aq-faint);
+}
+.aq-rows { display: grid; gap: 2px; margin-top: 8px; }
+.aq-row { display: grid; grid-template-columns: 84px 1fr; gap: 12px; }
+.aq-row .aq-k { color: var(--aq-muted); font-size: 13px; }
+.aq-row .aq-v { font-size: 13px; word-break: break-word; }
+
+.aq-toggle {
+  margin-top: 16px;
+  background: transparent;
+  border: 1px solid var(--aq-border-strong);
+  color: var(--aq-accent);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.aq-toggle:hover { background: var(--aq-accent-soft); }
+
+.aq-note { font-size: 13.5px; color: var(--aq-muted); margin: 12px 0 20px; }
+.aq-note a { color: var(--aq-accent); }
+
+.aq-env-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.aq-env h3 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aq-faint);
+  margin-bottom: 12px;
+}
+.aq-env .aq-row { grid-template-columns: 110px 1fr; }
+
+.aq-footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--aq-border);
+  font-size: 13px;
+  color: var(--aq-muted);
+}
+.aq-footer .aq-mono { color: var(--aq-faint); }
+
+.aq-loading { padding: 80px 0; text-align: center; color: var(--aq-muted); }
+.aq-error {
+  max-width: 560px;
+  margin: 60px auto;
+  border: 1px solid var(--aq-border);
+  background: var(--aq-surface);
+  border-radius: 12px;
+  padding: 24px 28px;
+}
+.aq-error h2 { font-size: 18px; margin-bottom: 8px; }
+
+@media (max-width: 900px) {
+  .aq-shell { padding: 40px 20px 64px; }
+  .aq-grid { grid-template-columns: 1fr; gap: 32px; }
+  .aq-nav { position: static; }
+  .aq-nav a { display: inline-block; padding: 4px 10px; margin: 0 4px 8px 0; font-size: 13px; }
+  .aq-nav-title { margin-bottom: 8px; }
+  .aq-title { font-size: 34px; }
+}
+</style>
+</head>
+<body>
+<div class="aq-benchmark">
+  <div class="aq-shell">
+    <div id="aq-loading" class="aq-loading">Loading benchmark data…</div>
+    <div id="aq-error" class="aq-error" hidden>
+      <h2>Benchmark data unavailable</h2>
+      <p class="aq-dim">The page could not be rendered. Regenerate it with <span class="aq-mono">make benchmark-page</span> once benchmark and load-test JSON artifacts exist.</p>
+    </div>
+
+    <div id="aq-app" hidden>
+      <header class="aq-header">
+        <div class="aq-kicker">Address Quality</div>
+        <h1 class="aq-title">Benchmark</h1>
+        <div class="aq-release" id="aq-release-line"></div>
+        <p class="aq-lede" id="aq-lede"></p>
+      </header>
+
+      <div class="aq-grid">
+        <nav class="aq-nav" aria-label="On this page">
+          <div class="aq-nav-title">On this page</div>
+          <a href="#summary">Summary</a>
+          <a href="#benchmark">Benchmark</a>
+          <a href="#performance">Performance</a>
+          <a href="#release">Release</a>
+        </nav>
+
+        <main class="aq-main">
+          <section id="summary" class="aq-section">
+            <h2 class="aq-section-title">Summary</h2>
+            <h3 class="aq-subtitle">Benchmark</h3>
+            <div class="aq-cards" id="aq-summary-bench"></div>
+            <h3 class="aq-subtitle" id="aq-summary-perf-title">Performance</h3>
+            <div class="aq-cards" id="aq-summary-perf"></div>
+            <h3 class="aq-subtitle">Top 3 challenges</h3>
+            <div id="aq-summary-challenges"></div>
+          </section>
+
+          <section id="benchmark" class="aq-section">
+            <h2 class="aq-section-title">Benchmark</h2>
+            <h3 class="aq-subtitle">Accuracy overview</h3>
+            <div class="aq-cards" id="aq-acc-cards"></div>
+            <h3 class="aq-subtitle">Correct by hierarchy level</h3>
+            <div class="aq-table-wrap"><table class="aq-table" id="aq-pr-table"></table></div>
+            <p class="aq-note">Correct is the number of records where the engine matched the ground truth at that level; % is that share of the total. The After column is the current run, Before is the previous run, Δ shows the change in correct count. The All four levels (exact) row requires province, city, district and subdistrict to all match at once.</p>
+            <h3 class="aq-subtitle" id="aq-failures-title" hidden>Failed matches — by confidence</h3>
+            <div class="aq-table-wrap" id="aq-failures-wrap" hidden>
+              <table class="aq-table" id="aq-failures"></table>
+            </div>
+            <p class="aq-note" id="aq-failures-note" hidden></p>
+          </section>
+
+          <section id="performance" class="aq-section">
+            <h2 class="aq-section-title">Performance</h2>
+            <div class="aq-cards" id="aq-perf-cards"></div>
+            <h3 class="aq-subtitle">Test configuration</h3>
+            <div class="aq-table-wrap"><table class="aq-table" id="aq-perf-config"></table></div>
+            <h3 class="aq-subtitle">Environment</h3>
+            <div class="aq-env-grid" id="aq-perf-env"></div>
+            <p class="aq-note" id="aq-perf-note"></p>
+          </section>
+
+          <section id="release" class="aq-section">
+            <h2 class="aq-section-title">Release</h2>
+            <p class="aq-note">Reproducibility and traceability metadata for the current test run. Set <span class="aq-mono">release</span>, <span class="aq-mono">build</span> and environment details in <span class="aq-mono">tests/api/page/release.json</span> and regenerate. Every run is appended to <span class="aq-mono">tests/api/page/metadata.json</span> as a history entry.</p>
+            <div class="aq-table-wrap"><table class="aq-table" id="aq-release"></table></div>
+          </section>
+        </main>
+      </div>
+
+      <footer class="aq-footer">
+        <p>Address Quality — public engineering benchmark. Generated from <span class="aq-mono" id="aq-sources"></span>.</p>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script id="aq-data" type="application/json">{"meta":{"release":"v0.1.0-alpha","build":"v0.1.0-alpha","git_commit":"02ba28d","benchmark_timestamp":"2026-08-25","dataset_version":null,"dataset_source":null,"dataset_generation_timestamp":null,"load_test_timestamp":null,"benchmark_source":"2026-08-25_benchmark_v0_0001.json","benchmark_runner":null,"runner":{"cpu":null,"memory":null,"os":null,"k6_version":null},"server":{"cpu":null,"memory":null,"os":null,"api_version":"v0","git_commit":"02ba28d"},"metrics":{"overall_accuracy":64.2,"dataset_size":106,"average_confidence":null,"dataset_version":null,"hierarchy":[{"level":"Province","correct":84,"pct":79.2},{"level":"City","correct":83,"pct":78.3},{"level":"District (Kecamatan)","correct":81,"pct":76.4},{"level":"Subdistrict (Kelurahan)","correct":72,"pct":67.9},{"level":"All four levels (exact)","correct":68,"pct":64.2}]}},"before":null,"benchmark":{"source":"2026-08-25_benchmark_v0_0001.json","timestamp":"2026-08-25","dataset_size":106,"dataset_version":null,"dataset_source":null,"exact_matches":68,"records":[{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Prof. Dr. Sutami No.56, Sukarasa, Kec. Sukasari, Kota Bandung, Jawa Barat 40152, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukasari","sub_district":"Sukarasa","latitude":-6.8777336,"longitude":107.5875887,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukasari","subdistrict":"Sukarasa"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Gatot Subroto No.86, Lkr. Sel., Kec. Lengkong, Kota Bandung, Jawa Barat 40263, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Lengkong","sub_district":"Lingkar Selatan","latitude":-6.9246837,"longitude":107.6272832,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Lengkong","subdistrict":"Lingkar Selatan"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Sukarasa, Kec. Sukasari, Kota Bandung, Jawa Barat, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukasari","sub_district":"Sukarasa","latitude":-6.873835799999999,"longitude":107.5845418,"granularity":"APPROXIMATE"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukasari","subdistrict":"Sukarasa"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Braga No.6, Braga, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40111, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sumur Bandung","sub_district":"Braga","latitude":-6.921166299999999,"longitude":107.60998409999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Braga"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Supratman No.72, Cihaur Geulis, Kec. Cibeunying Kaler, Kota Bandung, Jawa Barat 40122, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Cibeunying Kaler","sub_district":"Cihaur Geulis","latitude":-6.9042072,"longitude":107.62879199999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cibeunying Kaler","subdistrict":"Cihaur Geulis"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Dr. Hatta Jl. Cihampelas No.7A, Tamansari, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40116, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Tamansari","latitude":-6.9022689999999995,"longitude":107.60373519999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cicendo","subdistrict":"Pasir Kaliki"},"same":{"p":true,"c":true,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Margahayu Kencana Raya Jl. Raya Kopo No.7, Sayati, Kec. Margahayu, Kabupaten Bandung, Jawa Barat 40228, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Margahayu","sub_district":"Sayati","latitude":-6.966314,"longitude":107.57606899999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Margahayu","subdistrict":"Margahayu Tengah"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. AH. Nasution No.126, Sukamiskin, Kec. Arcamanik, Kota Bandung, Jawa Barat 40293, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Arcamanik","sub_district":"Sukamiskin","latitude":-6.9049065999999995,"longitude":107.6774817,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Arcamanik","subdistrict":"Sukamiskin"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Ir. H. Juanda No.69, Tamansari, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40116, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Tamansari","latitude":-6.900386,"longitude":107.6120545,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Tamansari"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Pasir Kaliki No.235, Sukabungah, Kec. Sukajadi, Kota Bandung, Jawa Barat 40162, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Sukabungah","latitude":-6.8973289,"longitude":107.59709319999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Sukabungah"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Purwakarta No.162, Antapani Kidul, Kec. Antapani, Kota Bandung, Jawa Barat 40291, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Antapani","sub_district":"Antapani Kidul","latitude":-6.917514499999999,"longitude":107.65792289999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Antapani","subdistrict":"Antapani Kidul"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Raya Cimareme No.296, Cimareme, Kec. Ngamprah, Kabupaten Bandung Barat, Jawa Barat 40552, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung Barat","district":"Kecamatan Ngamprah","sub_district":"Cimareme","latitude":-6.8623129,"longitude":107.5020498,"granularity":"RANGE_INTERPOLATED"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung Barat","district":"Ngamprah","subdistrict":"Cimareme"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Padang Golf Sulaiman, Jl. Terusan Kopo No.KM, RW.4, Sulaiman, Kec. Margahayu, Kabupaten Bandung, Jawa Barat 40229, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Margahayu","sub_district":"Sulaiman","latitude":-6.9808039,"longitude":107.5854749,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Katapang","subdistrict":"Cilampeni"},"same":{"p":true,"c":true,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Lemah Neundeut No.1E, Sukawarna, Kec. Sukajadi, Kota Bandung, Jawa Barat 40164, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Sukawarna","latitude":-6.882644600000001,"longitude":107.581031,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Sukawarna"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Grand Hotel No.23, Lembang, Kec. Lembang, Kabupaten Bandung Barat, Jawa Barat 40391, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung Barat","district":"Kecamatan Lembang","sub_district":"Lembang","latitude":-6.8171251999999996,"longitude":107.6211987,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung Barat","district":"Lembang","subdistrict":"Lembang"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Siliwangi No.4, Dago, Kecamatan Coblong, Kota Bandung, Jawa Barat 40135, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Coblong","sub_district":"Dago","latitude":-6.8848636,"longitude":107.61297760000001,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Tamansari"},"same":{"p":true,"c":true,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Batununggal Indah Raya No.150, Batununggal, Kec. Bandung Kidul, Kota Bandung, Jawa Barat 40267, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Kidul","sub_district":"Batununggal","latitude":-6.9546546,"longitude":107.6297597,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Kidul","subdistrict":"Batununggal"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Khp Hasan Mustopa No.33, Neglasari, Kec. Cibeunying Kaler, Kota Bandung, Jawa Barat 40124, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Cibeunying Kaler","sub_district":"Neglasari","latitude":-6.8983358,"longitude":107.63836429999999,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cibeunying Kaler","subdistrict":"Neglasari"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cihampelas No.160, Cipaganti, Kecamatan Coblong, Kota Bandung, Jawa Barat 40131, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Coblong","sub_district":"Cipaganti","latitude":-6.8934399,"longitude":107.60498009999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Coblong","subdistrict":"Cipaganti"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Raya Jatinangor No.150, Cikeruh, Kec. Jatinangor, Kabupaten Sumedang, Jawa Barat 45363, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Sumedang","district":"Kecamatan Jatinangor","sub_district":"Cikeruh","latitude":-6.9346894,"longitude":107.7718812,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Sumedang","district":"Jatinangor","subdistrict":"Cikeruh"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"SMKN 7 Kota Bandung, Sekejati, Kec. Buahbatu, Kota Bandung, Jawa Barat, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Buahbatu","sub_district":"Sekejati","latitude":-6.9399551,"longitude":107.6598422,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Buahbatu","subdistrict":"Sekejati"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Paris Van Java, Jl. Sukajadi No.131-139, Cipedes, Kec. Sukajadi, Kota Bandung, Jawa Barat 40162, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Cipedes","latitude":-6.8891632,"longitude":107.5960083,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Cipedes"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Terusan Jakarta No.95c, Antapani Kulon, Kec. Antapani, Kota Bandung, Jawa Barat 40291, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Antapani","sub_district":"Antapani Kulon","latitude":-6.9124152,"longitude":107.6527764,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Antapani","subdistrict":"Antapani Kulon"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cibaduyut No.144, Cibaduyut, Kec. Bojongloa Kidul, Kota Bandung, Jawa Barat 40343, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bojongloa Kidul","sub_district":"Cibaduyut","latitude":-6.9565945,"longitude":107.59298989999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bojongloa Kidul","subdistrict":"Cibaduyut"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Komplek Ruko, Jl. Raya Gading Tutuka No.1, Cingcin, Kec. Soreang, Kabupaten Bandung, Jawa Barat 40921, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Soreang","sub_district":"Cingcin","latitude":-7.0277141,"longitude":107.54220079999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Soreang","subdistrict":"Cingcin"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Dr. Setiabudi No.34, Hegarmanah, Kec. Cidadap, Kota Bandung, Jawa Barat 40153, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Cidadap","sub_district":"Hegarmanah","latitude":-6.8771827,"longitude":107.597543,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cidadap","subdistrict":"Hegarmanah"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Terusan Kopo, Pangauban, Kec. Katapang, Kabupaten Bandung, Jawa Barat, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Katapang","sub_district":"Pangauban","latitude":-7.0018824,"longitude":107.5528719,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Katapang","subdistrict":"Pangauban"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Ruko Pancawarna, Jl. Parahyangan Raya No.33, Kertajaya, Kec. Padalarang, Kabupaten Bandung Barat, Jawa Barat 40553, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung Barat","district":"Kecamatan Padalarang","sub_district":"Kertajaya","latitude":-6.8683499,"longitude":107.4671245,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung Barat","district":"Padalarang","subdistrict":"Kertajaya"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"No Jl. Margacinta No.99, Margasari, Kec. Buahbatu, Kota Bandung, Jawa Barat 40286, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Buahbatu","sub_district":"Margasari","latitude":-6.9551346,"longitude":107.6521897,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Buahbatu","subdistrict":"Margasari"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Jend. H. Amir Machmud No.462, Setiamanah, Kec. Cimahi Tengah, Kota Cimahi, Jawa Barat 40525, Indonesia","location":{"province":"Jawa Barat","city":"Kota Cimahi","district":"Kecamatan Cimahi Tengah","sub_district":"Setiamanah","latitude":-6.8697094,"longitude":107.535046,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Cimahi","district":"Cimahi Tengah","subdistrict":"Setiamanah"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Paskal Hyper Square, Jl. Pasir Kaliki No.25 - 27, Ciroyom, Kec. Andir, Kota Bandung, Jawa Barat 40181, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Andir","sub_district":"Ciroyom","latitude":-6.9161581,"longitude":107.5945431,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Andir","subdistrict":"Kebon Jeruk"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Raya Dangdeur No.145, Bojongloa, Kec. Rancaekek, Kabupaten Bandung, Jawa Barat 40394, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Rancaekek","sub_district":"Bojongloa","latitude":-6.956822799999999,"longitude":107.7686422,"granularity":"RANGE_INTERPOLATED"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Sumedang","district":"Jatinangor","subdistrict":"Mekargalih"},"same":{"p":true,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Prof. drg. Soeria Soemantri No.23, Sukawarna, Kec. Sukajadi, Kota Bandung, Jawa Barat 40164, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Sukawarna","latitude":-6.8903568,"longitude":107.5812559,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Sukawarna"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Ruko Taman Kopo Indah, Jl. Taman Kopo Indah 1 No.14, Sayati, Kec. Margahayu, Kabupaten Bandung, Jawa Barat 40228, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Margahayu","sub_district":"Sayati","latitude":-6.966367399999999,"longitude":107.5741508,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Margahayu","subdistrict":"Margahayu Selatan"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"3P9G+2C4, Jl. Raya Cibiru, Cibiru Wetan, Kec. Cileunyi, Kabupaten Bandung, Jawa Barat 40615, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Cileunyi","sub_district":"Cibiru Wetan","latitude":-6.9324947,"longitude":107.7260632,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Cileunyi","subdistrict":"Cileunyi Kulon"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Raya Cicalengka Timur No.424 34 4014, Cicalengka Wetan, Kec. Cicalengka, Kabupaten Bandung, Jawa Barat 40395, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Cicalengka","sub_district":"Cicalengka Wetan","latitude":-6.992972399999999,"longitude":107.8432182,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Cicalengka","subdistrict":"Cicalengka Wetan"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"XJV7+HWG, Jl. Raya Banjaran Barat, Andir, Kec. Baleendah, Kabupaten Bandung, Jawa Barat 40375, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Baleendah","sub_district":"Andir","latitude":-7.006059100000001,"longitude":107.6148202,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Baleendah","subdistrict":"Andir"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Raya Kamasan Banjaran No.280, Banjaran, Kec. Banjaran, Kabupaten Bandung, Jawa Barat 40377, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Banjaran","sub_district":"Banjaran","latitude":-7.0472801,"longitude":107.5816674,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Banjaran","subdistrict":"Kamasan"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Spbu Pertamina (Cibabat), Jl. Jend. H. Amir Machmud No.294, Cibabat, Kec. Cimahi Utara, Kota Cimahi, Jawa Barat 40513, Indonesia","location":{"province":"Jawa Barat","city":"Kota Cimahi","district":"Kecamatan Cimahi Utara","sub_district":"Cibabat","latitude":-6.8885011,"longitude":107.55593950000001,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Cimahi","district":"Cimahi Utara","subdistrict":"Cibabat"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Transmart Buah Batu Bandung, Jl. Raya Bojongsoang No.321, Cipagalo, Kec. Bojongsoang, Kabupaten Bandung, Jawa Barat 40287, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Kecamatan Bojongsoang","sub_district":"Cipagalo","latitude":-6.9662812,"longitude":107.6381124,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bojongsoang","subdistrict":"Cipagalo"},"same":{"p":true,"c":false,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Kepatihan No.18, Balonggede, Kec. Regol, Kota Bandung, Jawa Barat 40115, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Regol","sub_district":"Balonggede","latitude":-6.923667999999999,"longitude":107.6058319,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Regol","subdistrict":"Balonggede"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Sunda No.60, Kb. Pisang, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40112, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sumur Bandung","sub_district":"Kebon Pisang","latitude":-6.9180844,"longitude":107.6185043,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Kebon Pisang"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Peta No.241, Suka Asih, Kec. Bojongloa Kaler, Kota Bandung, Jawa Barat 40232, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bojongloa Kaler","sub_district":"Suka Asih","latitude":-6.9296019,"longitude":107.58656119999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bojongloa Kaler","subdistrict":"Suka Asih"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Lenteng Agung Raya Gg. H. Ali No.7, RT.7/RW.5, Lenteng Agung, Kec. Jagakarsa, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta 12610, Indonesia","location":{"province":"Daerah Khusus Ibukota Jakarta","city":"Kota Jakarta Selatan","district":"Kecamatan Jagakarsa","sub_district":"Lenteng Agung","latitude":-6.3267549,"longitude":106.83293289999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"DKI Jakarta","city":"Kota Jakarta Selatan","district":"Jagakarta","subdistrict":"Lenteng Agung"},"same":{"p":false,"c":true,"d":false,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Patriot No.48, RT.002/RW.003, Jakasampurna, Kec. Bekasi Bar., Kota Bks, Jawa Barat 17145, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bekasi","district":"Kecamatan Bekasi Barat","sub_district":"Jakasampurna","latitude":-6.2457401,"longitude":106.9671295,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bekasi","district":"Bekasi Barat","subdistrict":"Jakasampurna"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Hayam Wuruk No.108, RT.14/RW.5, Maphar, Kec. Taman Sari, Kota Jakarta Barat, Daerah Khusus Ibukota Jakarta 11140, Indonesia","location":{"province":"Daerah Khusus Ibukota Jakarta","city":"Kota Jakarta Barat","district":"Kecamatan Taman Sari","sub_district":"Maphar","latitude":-6.1544754,"longitude":106.8182752,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"DKI Jakarta","city":"Kota Jakarta Barat","district":"Taman Sari","subdistrict":"Maphar"},"same":{"p":false,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Lengkong Gudang Timur Raya No.98, Lengkong Gudang Tim., Kec. Serpong, Kota Tangerang Selatan, Banten 15310, Indonesia","location":{"province":"Banten","city":"Kota Tangerang Selatan","district":"Kecamatan Serpong","sub_district":"Lengkong Gudang Timur","latitude":-6.296903599999999,"longitude":106.6847667,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Banten","city":"Tangerang Selatan","district":"Serpong","subdistrict":"Lengkong Gudang Timur"},"same":{"p":true,"c":false,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Asia Afrika No.16, Balonggede, Kec. Regol, Kota Bandung, Jawa Barat, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Regol","sub_district":"Balonggede","latitude":-6.9208596,"longitude":107.6045879,"granularity":"RANGE_INTERPOLATED"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Regol","subdistrict":"Balonggede"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Merdeka No.56, Babakan Ciamis, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40117, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sumur Bandung","sub_district":"Babakan Ciamis","latitude":-6.9082295,"longitude":107.6115327,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Babakan Ciamis"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Peta No.241 09c 10, Suka Asih, Kec. Bojongloa Kaler, Kota Bandung, Jawa Barat 40231, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bojongloa Kaler","sub_district":"Suka Asih","latitude":-6.934717999999999,"longitude":107.59196449999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bojongloa Kaler","subdistrict":"Sukasari"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Sukajadi No.131-139, Cipedes, Kec. Sukajadi, Kota Bandung, Jawa Barat 40162, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Cipedes","latitude":-6.889564099999999,"longitude":107.5960068,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Cipedes"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"`Trans Studio Mall, Jl. Gatot Subroto No.289, Cibangkong, Kec. Batununggal, Kota Bandung, Jawa Barat 40273, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Batununggal","sub_district":"Cibangkong","latitude":-6.9268089999999995,"longitude":107.635262,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Batununggal","subdistrict":"Cibangkong"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Peta No.176, Suka Asih, Kec. Bojongloa Kaler, Kota Bandung, Jawa Barat 40231, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bojongloa Kaler","sub_district":"Suka Asih","latitude":-6.932475999999999,"longitude":107.59066399999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bojongloa Kaler","subdistrict":"Sukasari"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cilaki No.41, Cihapit, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40114, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Cihapit","latitude":-6.9054478999999995,"longitude":107.62710729999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Cihapit"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Diponegoro No.3, Citarum, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40115, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Citarum","latitude":-6.9002083999999995,"longitude":107.6133476,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Paris Van Java, Jl. Sukajadi, Cipedes, Kec. Sukajadi, Kota Bandung, Jawa Barat 40162, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Cipedes","latitude":-6.8889664999999995,"longitude":107.5960616,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Cipedes"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"NOT_FOUND","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Andir","subdistrict":"Kebon Jeruk"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cilaki No.25, Cihapit, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40114, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Cihapit","latitude":-6.9059401,"longitude":107.6281143,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Cihapit"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Kecamatan Batununggal, Trans Studio Mall, Jl. Gatot Subroto No.289A, Cibangkong, Kec. Batununggal, Kota Bandung, Jawa Barat 40273, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Batununggal","sub_district":"Cibangkong","latitude":-6.9255416,"longitude":107.6362786,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Batununggal","subdistrict":"Cibangkong"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Prof. Dr. Sutami No.62, Sukarasa, Kec. Sukasari, Kota Bandung, Jawa Barat 40152, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukasari","sub_district":"Sukarasa","latitude":-6.878018,"longitude":107.5868077,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukasari","subdistrict":"Sukarasa"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. L. L. R.E. Martadinata No.149, Cihapit, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40114, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Cihapit","latitude":-6.9090644,"longitude":107.62535989999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Cihapit"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Mayor S.L. Tobing No.44, Tugujaya, Kec. Cihideung, Kab. Tasikmalaya, Jawa Barat 46126, Indonesia","location":{"province":"Jawa Barat","city":"Kabupaten Tasikmalaya","district":"Kecamatan Cihideung","sub_district":"Tugujaya","latitude":-7.3487436,"longitude":108.21144849999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Tasikmalaya","district":"Cihideung","subdistrict":"Tugujaya"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Karangsari No.14, Pasteur, Kec. Sukajadi, Kota Bandung, Jawa Barat 40161, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Pasteur","latitude":-6.880618,"longitude":107.5977277,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Pasteur"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Purnawarman No.2, Babakan Ciamis, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40117, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sumur Bandung","sub_district":"Babakan Ciamis","latitude":-6.9093181999999995,"longitude":107.6085387,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Babakan Ciamis"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Sukawangi No.2, Gegerkalong, Kec. Sukasari, Kota Bandung, Jawa Barat 40111, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukasari","sub_district":"Gegerkalong","latitude":-6.8779879,"longitude":107.5969331,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukasari","subdistrict":"Gegerkalong"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Talaga Bodas No.54, Malabar, Kec. Lengkong, Kota Bandung, Jawa Barat 40262, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Lengkong","sub_district":"Malabar","latitude":-6.9287279999999996,"longitude":107.6227806,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Lengkong","subdistrict":"Malabar"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cilaki No.33, Cihapit, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40114, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Cihapit","latitude":-6.9056706,"longitude":107.62766140000001,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Cihapit"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cimanuk No.14, Citarum, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40115, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Citarum","latitude":-6.9043513999999995,"longitude":107.620746,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Dr. Setiabudi No.156A, Hegarmanah, Kec. Cidadap, Kota Bandung, Jawa Barat 40141, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Cidadap","sub_district":"Hegarmanah","latitude":-6.8735219,"longitude":107.5958836,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cidadap","subdistrict":"Hegarmanah"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. L. L. R.E. Martadinata No.97, Cihapit, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40113, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Cihapit","latitude":-6.9060369999999995,"longitude":107.6197749,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Braga No.99-101, Braga, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40111, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sumur Bandung","sub_district":"Braga","latitude":-6.9170896,"longitude":107.6083075,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Braga"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Komplek Paskal Hypersquare, Jl. Pasir Kaliki No.25-27, Kb. Jeruk, Kec. Andir, Kota Bandung, Jawa Barat 40241, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Andir","sub_district":"Kebon Jeruk","latitude":-6.915083800000001,"longitude":107.597611,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Andir","subdistrict":"Kebon Jeruk"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Morce No.8, Braga, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40111, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sumur Bandung","sub_district":"Braga","latitude":-6.9173279,"longitude":107.6098639,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Braga"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Gatot Subroto No.83, Malabar, Kec. Lengkong, Kota Bandung, Jawa Barat 40262, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Lengkong","sub_district":"Malabar","latitude":-6.9231456,"longitude":107.62375809999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Lengkong","subdistrict":"Malabar"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Pasir Kaliki No.25-27 Blok D. 50-58, Ciroyom, Kec. Andir, Kota Bandung, Jawa Barat 40181, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Andir","sub_district":"Ciroyom","latitude":-6.914178799999999,"longitude":107.59324919999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Andir","subdistrict":"Kebon Jeruk"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Dr. Setiabudi No.323-325, Isola, Kec. Sukasari, Kota Bandung, Jawa Barat 40154, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukasari","sub_district":"Isola","latitude":-6.8460396999999995,"longitude":107.59947609999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukasari","subdistrict":"Isola"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Supratman No.66, Cihaur Geulis, Kec. Cibeunying Kaler, Kota Bandung, Jawa Barat 40122, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Cibeunying Kaler","sub_district":"Cihaur Geulis","latitude":-6.905917499999999,"longitude":107.6299845,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cibeunying Kaler","subdistrict":"Cihaur Geulis"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Sumatera No.52 - 54, Citarum, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40115, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Citarum","latitude":-6.9076176,"longitude":107.61197609999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Wastukencana No.48, RT.01/RW.17, Tamansari, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40116, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Tamansari","latitude":-6.903774899999999,"longitude":107.60525760000002,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Tamansari"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Arcamanik No.2, Pasir Impun, Kec. Mandalajati, Kota Bandung, Jawa Barat 40293, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Mandalajati","sub_district":"Pasir Impun","latitude":-6.8999083,"longitude":107.6810028,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Mandalajati","subdistrict":"Pasir Impun"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"NOT_FOUND","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Braga No.99-101, Braga, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40111, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sumur Bandung","sub_district":"Braga","latitude":-6.9170896,"longitude":107.6083075,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Braga"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cihampelas No.23 25, Pasir Kaliki, Kec. Cicendo, Kota Bandung, Jawa Barat 40171, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Cicendo","sub_district":"Pasir Kaliki","latitude":-6.9049499,"longitude":107.604203,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cicendo","subdistrict":"Pasir Kaliki"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Cihampelas No.171, Cipaganti, Kecamatan Coblong, Kota Bandung, Jawa Barat 40131, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Coblong","sub_district":"Cipaganti","latitude":-6.8902374,"longitude":107.603759,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Coblong","subdistrict":"Cipaganti"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Dr. Djunjunan No.162, Sukagalih, Kec. Sukajadi, Kota Bandung, Jawa Barat 40173, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Sukajadi","sub_district":"Sukagalih","latitude":-6.8933579,"longitude":107.58730109999999,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukajadi","subdistrict":"Sukagalih"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jalan Laks Jl. L. L. R.E. Martadinata No.68, Citarum, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40115, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Citarum","latitude":-6.9062955,"longitude":107.6205444,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Lengkong Besar No.8, Cikawao, Kec. Lengkong, Kota Bandung, Jawa Barat 40261, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Lengkong","sub_district":"Cikawao","latitude":-6.9238539,"longitude":107.6114838,"granularity":"ROOFTOP"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Lengkong","subdistrict":"Lingkar Selatan"},"same":{"p":true,"c":true,"d":true,"s":false},"note":null},{"error":false,"id":null,"status":"FOUND","confidence":null,"formatted":"Jl. Lombok No.45, Citarum, Kec. Bandung Wetan, Kota Bandung, Jawa Barat 40115, Indonesia","location":{"province":"Jawa Barat","city":"Kota Bandung","district":"Kecamatan Bandung Wetan","sub_district":"Citarum","latitude":-6.9070021,"longitude":107.6197749,"granularity":"GEOMETRIC_CENTER"},"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":true,"c":true,"d":true,"s":true},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Gedebage","subdistrict":"Cimenerang"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Braga"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Cihapit"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cicendo","subdistrict":"Pasir Kaliki"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Merdeka"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Sumedang","district":"Jatinangor","subdistrict":"Sayang"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Lengkong","subdistrict":"Malabar"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Babakan Ciamis"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sukasari","subdistrict":"Isola"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cidadap","subdistrict":"Ledeng"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Babakan Ciamis"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kabupaten Garut","district":"Tarogong Kaler","subdistrict":"Panjaling"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cicendo","subdistrict":"Pasir Kaliki"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Cidadap","subdistrict":"Ciumbuleuit"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Braga"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Braga"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Bandung Wetan","subdistrict":"Citarum"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null},{"error":false,"id":null,"status":"FAILED","confidence":null,"formatted":null,"location":null,"missing":[],"conflicts":[],"ambiguous":[],"actual":{"province":"Jawa Barat","city":"Kota Bandung","district":"Sumur Bandung","subdistrict":"Babakan Ciamis"},"same":{"p":false,"c":false,"d":false,"s":false},"note":null}],"challenges":[{"id":"village","title":"Village (kelurahan / desa) resolution","count":10,"why":"In 10 of 106 records (9.4%), the village (kelurahan / desa) was resolved incorrectly or left empty even though province, city and district were correct.","expected":"Resolve the correct village for the matched district (ground truth: Margahayu Tengah).","current":"Resolved to Jl. Margahayu Kencana Raya Jl. Raya Kopo No.7, Sayati, Kec. Margahayu, Kabupaten Bandung, Jawa Barat 40228, Indonesia with 0% confidence (status FOUND).","example":{"raw":"JL. Raya Kopo No.7, Margahayu Tengah, Kec. Margahayu, Kabupaten Bandung, Jawa Barat 40227","id":null,"formatted":"Jl. Margahayu Kencana Raya Jl. Raya Kopo No.7, Sayati, Kec. Margahayu, Kabupaten Bandung, Jawa Barat 40228, Indonesia","status":"FOUND","confidence":null,"actual":{"province":"Jawa Barat","city":"Kabupaten Bandung","district":"Margahayu","subdistrict":"Margahayu Tengah"}}},{"id":"city","title":"Ambiguous city / regency names","count":23,"why":"In 23 of 106 records (21.7%), the address resolved to the wrong city or regency. Many city and regency names are shared across provinces (e.g. Bandung, Sukasari, Sukarasa), so a short or incomplete input can match a wrong location with high confidence.","expected":"Resolve to the correct city / regency (ground truth: Kabupaten Sumedang).","current":"Resolved to Jl. Raya Dangdeur No.145, Bojongloa, Kec. Rancaekek, Kabupaten Bandung, Jawa Barat 40394, Indonesia with 0% confidence (status FOUND).","example":{"raw":"JL. RAYA DANGDEUR NO.145 RT.02 RW.11 DESA MEKAR GALIH KEC. CIKERUH, MEKAR GALIH JATINANGOR KAB. SUMEDANG, JAWA BARAT","id":null,"formatted":"Jl. Raya Dangdeur No.145, Bojongloa, Kec. Rancaekek, Kabupaten Bandung, Jawa Barat 40394, Indonesia","status":"FOUND","confidence":null,"actual":{"province":"Jawa Barat","city":"Kabupaten Sumedang","district":"Jatinangor","subdistrict":"Mekargalih"}}},{"id":"road","title":"Road-level data is not resolved","count":22,"why":"In 22 of 106 records (20.8%), a road-based address could not be resolved to the correct location. Street-level data is not part of the reference dataset, so road names are recognized but not validated (the benchmark output records INSUFFICIENT_DATA_ROAD for these cases).","expected":"Use road / street context to pin the correct location (ground truth: Kabupaten Sumedang / Jatinangor).","current":"Resolved to Jl. Raya Dangdeur No.145, Bojongloa, Kec. Rancaekek, Kabupaten Bandung, Jawa Barat 40394, Indonesia with 0% confidence (status FOUND).","example":{"raw":"JL. RAYA DANGDEUR NO.145 RT.02 RW.11 DESA MEKAR GALIH KEC. CIKERUH, MEKAR GALIH JATINANGOR KAB. SUMEDANG, JAWA BARAT","id":null,"formatted":"Jl. Raya Dangdeur No.145, Bojongloa, Kec. Rancaekek, Kabupaten Bandung, Jawa Barat 40394, Indonesia","status":"FOUND","confidence":null,"actual":{"province":"Jawa Barat","city":"Kabupaten Sumedang","district":"Jatinangor","subdistrict":"Mekargalih"}}}]},"performance":{"source":null}}</script>
+<script>
+(function () {
+  'use strict';
+
+  var D;
+  try {
+    D = JSON.parse(document.getElementById('aq-data').textContent || 'null');
+  } catch (e) {
+    D = null;
+  }
+
+  if (!D || !D.benchmark || !D.benchmark.records || !D.benchmark.records.length) {
+    document.getElementById('aq-loading').hidden = true;
+    document.getElementById('aq-error').hidden = false;
+    return;
+  }
+  document.getElementById('aq-loading').hidden = true;
+  document.getElementById('aq-app').hidden = false;
+
+  if (D.benchmark.full) {
+    document.querySelector('.aq-benchmark').classList.add('aq-full');
+  }
+
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/[&<>"']/g, function (m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+  function num(v, digits) {
+    if (v === null || v === undefined || v === '' || isNaN(Number(v))) return null;
+    return Number(v).toLocaleString('en-US', {
+      minimumFractionDigits: digits || 0,
+      maximumFractionDigits: digits || 0,
+    });
+  }
+  function na(v, digits) {
+    var f = num(v, digits);
+    return f === null ? '<span class="aq-na">N/A</span>' : f;
+  }
+  function pct(v, digits) {
+    if (v === null || v === undefined || isNaN(Number(v))) return '<span class="aq-na">N/A</span>';
+    var d = digits === undefined ? 1 : digits;
+    return Number(v * 100).toFixed(d) + '%';
+  }
+  function ms(v) {
+    if (v === null || v === undefined || isNaN(Number(v))) return '<span class="aq-na">N/A</span>';
+    return num(v, 2) + ' ms';
+  }
+  function secs(v) {
+    if (v === null || v === undefined || isNaN(Number(v))) return '<span class="aq-na">N/A</span>';
+    return num(v / 1000, 1) + ' s';
+  }
+  function card(label, value, sub) {
+    return '<div class="aq-card"><div class="aq-card-label">' + esc(label) + '</div>' +
+      '<div class="aq-card-value">' + value + '</div>' +
+      (sub ? '<div class="aq-card-sub">' + sub + '</div>' : '') + '</div>';
+  }
+  function badge(kind, text) {
+    return '<span class="aq-badge ' + kind + '">' + esc(text) + '</span>';
+  }
+
+  var B = D.benchmark;
+  var records = B.records;
+  var total = B.dataset_size || records.length;
+  var PERF = D.performance || {};
+  var METRICS = PERF.metrics || {};
+
+  function trend(name) {
+    var t = METRICS[name];
+    return (t && t.values) ? t.values : {};
+  }
+  var dur = trend('http_req_duration');
+  var reqs = (METRICS.http_reqs && METRICS.http_reqs.values) || {};
+  var failed = (METRICS.http_req_failed && METRICS.http_req_failed.values) || {};
+  var vus = (METRICS.vus_max && METRICS.vus_max.values) || {};
+
+  function sameAll(r) { return r.same.p && r.same.c && r.same.d && r.same.s; }
+
+  var correctCount = records.filter(sameAll).length;
+  var confs = records.filter(function (r) { return !r.error && r.confidence !== null && r.confidence !== undefined; });
+  var avgConf = confs.length ? confs.reduce(function (a, r) { return a + r.confidence; }, 0) / confs.length : null;
+
+  /* ---------- current vs previous run comparison ---------- */
+  var M = D.meta || {};
+  var RUN = M.metrics || {};
+  var PREV = D.before || null;
+  var PREV_M = (PREV && PREV.metrics) || null;
+  function mDelta(key) {
+    if (!PREV_M) return null;
+    var a = RUN[key], b = PREV_M[key];
+    if (a === null || a === undefined || b === null || b === undefined) return null;
+    if (typeof a !== 'number' || typeof b !== 'number') return null;
+    return a - b;
+  }
+  function beforeSub(key, fmt, unit) {
+    if (!PREV_M) return '<span class="aq-dim">No previous run recorded</span>';
+    var b = PREV_M[key];
+    if (b === null || b === undefined) return '<span class="aq-dim">Before <span class="aq-na">N/A</span></span>';
+    var d = mDelta(key);
+    var s = '<span class="aq-dim">Before ' + fmt(b) + '</span>';
+    if (d !== null) {
+      var sign = d > 0 ? '+' : (d < 0 ? '−' : '');
+      var arrow = d > 0 ? '▲' : (d < 0 ? '▼' : '');
+      var dText = String(fmt(Math.abs(d))).replace('%', '') + (unit || '');
+      s += ' <span class="aq-dim">Δ ' + sign + dText + '</span>';
+      if (d !== 0) s += ' <span class="aq-badge ' + (d > 0 ? 'ok' : 'bad') + '">' + arrow + '</span>';
+    }
+    return s;
+  }
+
+  /* ---------- header ---------- */
+  var rel = M.release;
+  var build = M.build;
+  var relParts = [];
+  if (rel) relParts.push('Release <span class="aq-rel">' + esc(rel) + '</span>');
+  if (build) relParts.push('Build <span class="aq-rel">#' + esc(build) + '</span>');
+  document.getElementById('aq-release-line').innerHTML =
+    relParts.length ? relParts.join(' · ') + ' · <span class="aq-dim">' + esc(M.benchmark_timestamp || 'benchmark date N/A') + '</span>'
+                    : '<span class="aq-dim">Release / build not set — edit tests/api/page/release.json</span>';
+  document.getElementById('aq-lede').innerHTML =
+    'Public engineering benchmark for one Address Quality release. ' +
+    (avgConf !== null ? 'Overall accuracy is based on full administrative-hierarchy matches across ' + num(total, 0) + ' records. ' : '') +
+    'Performance numbers are from the k6 load test measured on the environment listed below.';
+
+  /* ---------- summary: benchmark ---------- */
+  var runPct = function (v) { return (v === null || v === undefined) ? '<span class="aq-na">N/A</span>' : num(v, 1) + '%'; };
+  document.getElementById('aq-summary-bench').innerHTML =
+    card('Overall accuracy', pct(correctCount / total, 1),
+      (correctCount + ' of ' + num(total, 0) + ' exact (province + city + district + village) · ') + beforeSub('overall_accuracy', runPct, 'pp')) +
+    card('Dataset size', num(total, 0),
+      (B.dataset_source && B.dataset_version ? esc(B.dataset_source) + ' v' + esc(B.dataset_version) + ' · ' : '') + beforeSub('dataset_size', function (v) { return num(v, 0); }, '')) +
+    card('Average confidence', avgConf === null ? '<span class="aq-na">N/A</span>' : pct(avgConf, 1),
+      ('mean of ' + num(confs.length, 0) + ' scored records · ') + beforeSub('average_confidence', runPct, 'pp'));
+
+  /* ---------- summary: performance ---------- */
+  document.getElementById('aq-summary-perf').innerHTML =
+    card('RPS', na(reqs.rate, 1), 'throughput') +
+    card('P95 latency', ms(dur['p(95)']), 'of ' + num(reqs.count, 0) + ' requests') +
+    card('P99 latency', ms(dur['p(99)']), 'captured in load-test output') +
+    card('Error rate', pct(failed.rate, 2), 'http_req_failed');
+
+  /* ---------- summary: top 3 challenges ---------- */
+  function challengeRow(k, v) {
+    return '<div class="aq-row"><div class="aq-k">' + esc(k) + '</div><div class="aq-v">' + (v === null || v === undefined || v === '' ? '<span class="aq-na">N/A</span>' : esc(v)) + '</div></div>';
+  }
+  function challengeHtml(c) {
+    var ex = c.example;
+    var exHtml = '';
+    if (ex) {
+      var rows = challengeRow('Address ID', ex.id);
+      if (ex.raw) rows += challengeRow('Input', ex.raw);
+      rows += challengeRow('Formatted', ex.formatted);
+      rows += challengeRow('Actual address', [ex.actual.province, ex.actual.city, ex.actual.district, ex.actual.subdistrict].filter(Boolean).join(', '));
+      rows += challengeRow('Confidence', ex.confidence === null || ex.confidence === undefined ? null : pct(ex.confidence, 0));
+      rows += challengeRow('Status', ex.status);
+      exHtml = '<div class="aq-example"><div class="aq-example-label">Example</div><div class="aq-rows">' + rows + '</div></div>';
+    }
+    return '<article class="aq-challenge">' +
+      '<div class="aq-challenge-head"><h3>' + esc(c.title) + '</h3><span class="aq-challenge-count">' + num(c.count, 0) + ' of ' + num(B.dataset_size, 0) + ' records</span></div>' +
+      '<p>' + esc(c.why) + '</p>' + exHtml +
+      '<p><strong>Expected:</strong> ' + esc(c.expected) + '</p>' +
+      '<p><strong>Current:</strong> ' + esc(c.current) + '</p>' +
+      '</article>';
+  }
+  document.getElementById('aq-summary-challenges').innerHTML =
+    (B.challenges || []).map(challengeHtml).join('') ||
+    '<p class="aq-note">No challenges derived for this run.</p>';
+
+  /* ---------- benchmark: accuracy overview + per-level correctness ---------- */
+  document.getElementById('aq-acc-cards').innerHTML =
+    card('Overall accuracy', pct(correctCount / total, 1), 'exact match on all four levels · ' + beforeSub('overall_accuracy', runPct, 'pp')) +
+    card('Average confidence', avgConf === null ? '<span class="aq-na">N/A</span>' : pct(avgConf, 1), 'of ' + num(confs.length, 0) + ' records · ' + beforeSub('average_confidence', runPct, 'pp')) +
+    card('Dataset size', num(total, 0), 'records evaluated · ' + beforeSub('dataset_size', function (v) { return num(v, 0); }, '')) +
+    card('Dataset version', B.dataset_version ? esc(B.dataset_version) : '<span class="aq-na">N/A</span>',
+      (B.dataset_source ? 'source ' + esc(B.dataset_source) + ' · ' : '') + (PREV_M ? 'before ' + (PREV_M.dataset_version ? esc(PREV_M.dataset_version) : '<span class="aq-na">N/A</span>') : '<span class="aq-dim">no previous run</span>'));
+
+  function levelRow(label, cur, prev) {
+    var delta = null;
+    if (cur && prev && typeof cur.correct === 'number' && typeof prev.correct === 'number') {
+      delta = cur.correct - prev.correct;
+    }
+    var beforeCell = prev
+      ? '<td class="aq-num">' + num(prev.correct, 0) + ' of ' + num(total, 0) + '</td>' +
+        '<td class="aq-num">' + (prev.pct === null || prev.pct === undefined ? '<span class="aq-na">N/A</span>' : num(prev.pct, 1) + '%') + '</td>'
+      : '<td class="aq-num" colspan="2"><span class="aq-na">N/A</span></td>';
+    var deltaCell = delta === null
+      ? '<td class="aq-num"><span class="aq-na">N/A</span></td>'
+      : delta === 0
+        ? '<td class="aq-num">0</td>'
+        : '<td class="aq-num"><span class="aq-badge ' + (delta > 0 ? 'ok' : 'bad') + '">' + (delta > 0 ? '▲' : '▼') + ' ' + num(Math.abs(delta), 0) + '</span></td>';
+    return '<tr><td>' + esc(label) + '</td>' +
+      '<td class="aq-num">' + num(cur.correct, 0) + ' of ' + num(total, 0) + '</td>' +
+      '<td class="aq-num">' + (cur.pct === null || cur.pct === undefined ? '<span class="aq-na">N/A</span>' : num(cur.pct, 1) + '%') + '</td>' +
+      beforeCell + deltaCell + '</tr>';
+  }
+
+  var prevLevels = PREV_M && Array.isArray(PREV_M.hierarchy) ? PREV_M.hierarchy : null;
+  var curLevels = RUN.hierarchy && Array.isArray(RUN.hierarchy) ? RUN.hierarchy : null;
+  var levelNames = curLevels || prevLevels;
+  var rowsHtml = (levelNames || []).map(function (L, i) {
+    var cur = curLevels && curLevels[i];
+    var prev = prevLevels && prevLevels[i];
+    return levelRow(cur ? cur.level : (prev ? prev.level : (L.level || L)), cur || { correct: null, pct: null }, prev || null);
+  }).join('');
+
+  var prRows = '<thead><tr><th>Level</th><th class="aq-num">Correct (after)</th><th class="aq-num">% (after)</th><th class="aq-num" colspan="2">Before</th><th class="aq-num">Δ</th></tr></thead><tbody>' +
+    rowsHtml + '</tbody>';
+  document.getElementById('aq-pr-table').innerHTML = prRows;
+
+  /* ---------- benchmark: failed matches (full builds only) ---------- */
+  if (B.full && Array.isArray(B.failures) && B.failures.length) {
+    var failRows = '<thead><tr><th>#</th><th>Confidence</th><th>Status</th><th>Raw input</th><th>Resolved to</th><th>Actual address</th><th>Assessment flags</th></tr></thead><tbody>';
+    B.failures.forEach(function (f, i) {
+      var flags = [];
+      if (f.same) {
+        if (!f.same.p) flags.push('province mismatch');
+        if (!f.same.c) flags.push('city mismatch');
+        if (!f.same.d) flags.push('district mismatch');
+        if (!f.same.s) flags.push('village mismatch');
+      }
+      if (f.missing && f.missing.length) flags.push('missing: ' + f.missing.join(', '));
+      if (f.conflicts && f.conflicts.length) flags.push('conflicts: ' + f.conflicts.join(', '));
+      var actual = [f.actual.province, f.actual.city, f.actual.district, f.actual.subdistrict].filter(Boolean).join(', ');
+      failRows += '<tr><td class="aq-num">' + num(i + 1, 0) + '</td>' +
+        '<td class="aq-num">' + (f.confidence === null || f.confidence === undefined ? '<span class="aq-na">N/A</span>' : pct(f.confidence, 0)) + '</td>' +
+        '<td>' + esc(f.status || '') + '</td>' +
+        '<td class="aq-mono">' + esc(f.raw || '') + '</td>' +
+        '<td>' + esc(f.formatted || '') + '</td>' +
+        '<td>' + esc(actual) + '</td>' +
+        '<td>' + (flags.length ? esc(flags.join('; ')) : '—') + '</td></tr>';
+    });
+    failRows += '</tbody>';
+    document.getElementById('aq-failures').innerHTML = failRows;
+    document.getElementById('aq-failures-title').hidden = false;
+    document.getElementById('aq-failures-wrap').hidden = false;
+    document.getElementById('aq-failures-note').innerHTML =
+      esc(B.failure_total) + ' of ' + esc(total) + ' records failed to match all four hierarchy levels. Shown: ' + esc(B.failures.length) +
+      (B.failure_total > B.failures.length ? ' (limited to the top ' + esc(B.failures.length) + ' by confidence).' : ', ranked by confidence from high to low.');
+    document.getElementById('aq-failures-note').hidden = false;
+  }
+
+  /* ---------- performance ---------- */
+  var perfCards =
+    card('RPS', na(reqs.rate, 1), 'requests / second') +
+    card('Average latency', ms(dur.avg), '') +
+    card('P50 latency', ms(dur.med), '') +
+    card('P95 latency', ms(dur['p(95)']), '') +
+    card('P99 latency', ms(dur['p(99)']), '') +
+    card('Max latency', ms(dur.max), '') +
+    card('Error rate', pct(failed.rate, 2), 'http_req_failed') +
+    card('Total requests', na(reqs.count, 0), '') +
+    card('Test duration', secs(PERF.test_run_duration_ms), '') +
+    card('VUs (max)', na(vus.max, 0), '');
+  document.getElementById('aq-perf-cards').innerHTML = perfCards;
+
+  var opt = PERF.options || null;
+  var cfgRows = '<thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>';
+  if (opt && Array.isArray(opt.stages) && opt.stages.length) {
+    cfgRows += '<tr><td>Load profile (stages)</td><td>' + opt.stages.map(function (s) {
+      return esc(s.target) + ' VUs for ' + esc(s.duration);
+    }).join('<br>') + '</td></tr>';
+  } else {
+    cfgRows += '<tr><td>Load profile</td><td>' +
+      (vus.max !== undefined ? esc(num(vus.max, 0)) + ' VUs' : '<span class="aq-na">N/A</span>') +
+      (PERF.test_run_duration_ms ? ' over ' + secs(PERF.test_run_duration_ms) : '') +
+      ' <span class="aq-dim">(stages not captured in this artifact)</span></td></tr>';
+  }
+  if (opt && opt.summaryTrendStats) {
+    cfgRows += '<tr><td>Summary percentiles</td><td>' + esc(opt.summaryTrendStats.join(', ')) + '</td></tr>';
+  }
+  var thresholds = PERF.thresholds || {};
+  var tKeys = Object.keys(thresholds);
+  if (tKeys.length) {
+    cfgRows += tKeys.map(function (k) {
+      var t = thresholds[k];
+      var detail = Object.keys(t.thresholds || {}).map(function (ab) {
+        return esc(ab) + ' — ' + (t.thresholds[ab].ok ? badge('ok', 'pass') : badge('bad', 'fail'));
+      }).join(' &nbsp; ');
+      return '<tr><td>Threshold: ' + esc(k) + '</td><td>' + detail + '</td></tr>';
+    }).join('');
+  } else {
+    cfgRows += '<tr><td>Thresholds</td><td><span class="aq-na">N/A</span></td></tr>';
+  }
+  cfgRows += '</tbody>';
+  document.getElementById('aq-perf-config').innerHTML = cfgRows;
+
+  /* ---------- performance: environment ---------- */
+  var runner = M.runner || {};
+  var server = M.server || {};
+  function envCell(name, value) {
+    return '<div class="aq-row"><div class="aq-k">' + esc(name) + '</div><div class="aq-v">' +
+      (value === null || value === undefined || value === '' ? '<span class="aq-na">N/A</span>' : esc(value)) +
+      '</div></div>';
+  }
+  var envHtml =
+    '<div class="aq-env"><h3>Runner (k6)</h3>' +
+      envCell('CPU', runner.cpu) + envCell('Memory', runner.memory) +
+      envCell('OS', runner.os) + envCell('k6 version', runner.k6_version) +
+    '</div>' +
+    '<div class="aq-env"><h3>Server under test</h3>' +
+      envCell('CPU', server.cpu) + envCell('Memory', server.memory) +
+      envCell('OS', server.os) + envCell('API version', server.api_version) +
+      envCell('Git commit', server.git_commit) +
+    '</div>';
+  document.getElementById('aq-perf-env').innerHTML = envHtml;
+
+  var envMissing = !runner.cpu && !runner.memory && !runner.os && !runner.k6_version &&
+                   !server.cpu && !server.memory && !server.os;
+  document.getElementById('aq-perf-note').innerHTML =
+    'These numbers were measured with k6 on ' + (PERF.generated_at ? esc(PERF.generated_at.replace('T', ' ').slice(0, 19)) + ' UTC' : '<span class="aq-na">N/A</span>') +
+    ' against the runner and server above. They describe this specific environment and are not a guarantee of universal production performance.' +
+    (envMissing ? ' Environment details are not captured in the current artifacts — add them to <span class="aq-mono">tests/api/page/release.json</span> before publishing.' : '');
+
+  /* ---------- release ---------- */
+  var relRows = '<thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>';
+  function relRow(k, v, mono) {
+    relRows += '<tr><td>' + esc(k) + '</td><td>' +
+      (v === null || v === undefined || v === '' ? '<span class="aq-na">N/A</span>' : (mono ? '<span class="aq-mono">' + esc(v) + '</span>' : esc(v))) +
+      '</td></tr>';
+  }
+  relRow('Release version', M.release, true);
+  relRow('Build number', M.build === null || M.build === undefined ? null : '#' + M.build, true);
+  relRow('Git commit', M.git_commit, true);
+  relRow('Benchmark timestamp', M.benchmark_timestamp, true);
+  relRow('Dataset version', M.dataset_version, true);
+  relRow('Dataset source', M.dataset_source, true);
+  relRow('Dataset generation timestamp', M.dataset_generation_timestamp, true);
+  relRow('Load-test timestamp', M.load_test_timestamp, true);
+  relRow('Benchmark source', M.benchmark_source, true);
+  relRow('Benchmark runner', M.benchmark_runner, true);
+  relRows += '</tbody>';
+  document.getElementById('aq-release').innerHTML = relRows;
+
+  /* ---------- on this page: active section ---------- */
+  var navLinks = document.querySelectorAll('.aq-nav a');
+  function setActive(id) {
+    for (var i = 0; i < navLinks.length; i++) {
+      var link = navLinks[i];
+      if (link.getAttribute('href') === '#' + id) link.classList.add('active');
+      else link.classList.remove('active');
+    }
+  }
+  var sections = [].slice.call(document.querySelectorAll('.aq-section'));
+  if ('IntersectionObserver' in window && sections.length && navLinks.length) {
+    var observer = new IntersectionObserver(function (entries) {
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].isIntersecting) setActive(entries[i].target.id);
+      }
+    }, { rootMargin: '-80px 0px -60% 0px' });
+    sections.forEach(function (s) { observer.observe(s); });
+  } else {
+    setActive(sections.length ? sections[0].id : 'summary');
+  }
+
+  /* ---------- footer ---------- */
+  document.getElementById('aq-sources').textContent =
+    (B.source || 'benchmark.json') + ' · ' + (PERF.source || 'performance.json');
+})();
+</script>
+</body>
+</html>
