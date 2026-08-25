@@ -4,7 +4,9 @@
 package handler
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -74,4 +76,46 @@ func (h *Handler) HandleAddressRequest(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, resp)
+}
+
+// HandleGeocodeRequest geocodes an address through Google Maps with an sqlite
+// lazy cache. When GOOGLE_MAPS_API_MOCK is enabled it reads from the cache and
+// fakes a 404 when the request is not cached instead of calling the API.
+// @Summary      Geocode an address
+// @Description  Resolve an address via Google Maps geocoding with a lazy sqlite cache. Mock mode reads the cache only and fakes a 404 on a miss.
+// @Accept       json
+// @Produce      json
+// @Param        request  body  model.GeocodeRequest  true  "Address to geocode"
+// @Success      200  {object}  model.GeocodeResponse
+// @Failure      400  {object}  model.ErrorResponse
+// @Failure      404  {object}  model.GeocodeResponse
+// @Failure      500  {object}  model.ErrorResponse
+// @Security     ApiKeyAuth
+// @Router       /v0/validate [post]
+func (h *Handler) HandleGeocodeRequest(c echo.Context) error {
+	requestID := mw.GetRequestID(c.Request().Context())
+
+	rawBody, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return errorResponse(c, http.StatusBadRequest, "invalid request body", requestID)
+	}
+	c.Request().Body = io.NopCloser(bytes.NewReader(rawBody))
+
+	var req model.GeocodeRequest
+	if err := c.Bind(&req); err != nil {
+		return errorResponse(c, http.StatusBadRequest, "invalid request body", requestID)
+	}
+	if err := req.Validate(h.svc.MaxAddressLength()); err != nil {
+		return errorResponse(c, http.StatusBadRequest, err.Error(), requestID)
+	}
+
+	resp, status, err := h.svc.ValidateGeocodeAddress(c.Request().Context(), string(rawBody), requestID)
+	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			return errorResponse(c, http.StatusBadRequest, err.Error(), requestID)
+		}
+		return errorResponse(c, http.StatusInternalServerError, "failed to geocode address", requestID)
+	}
+
+	return c.JSON(status, resp)
 }
