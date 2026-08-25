@@ -15,7 +15,7 @@ func EvaluateCandidate(candidate *model.AdminCandidate, hierarchy *database.Hier
 	evaluateCompleteness(candidate)
 	unused := evaluateEvidenceCoverage(candidate, allEvidence)
 	detectConflicts(candidate, hierarchy)
-	confidence := scoreConfidence(candidate)
+	confidence := scoreConfidence(candidate, unused, len(allEvidence) > 0)
 
 	status := assessQuality(candidate)
 
@@ -234,7 +234,7 @@ func getMatchedLevels(candidate *model.AdminCandidate) map[string]bool {
 	return levels
 }
 
-func scoreConfidence(candidate *model.AdminCandidate) float64 {
+func scoreConfidence(candidate *model.AdminCandidate, unused []model.Evidence, hasEvidence bool) float64 {
 	var score float64
 
 	hasExactMatch := false
@@ -280,6 +280,10 @@ func scoreConfidence(candidate *model.AdminCandidate) float64 {
 	}
 
 	score += multiEvidenceBonus(candidate)
+
+	if hasEvidence && len(unused) == 0 {
+		score += WeightUsedEvidenceBonus
+	}
 
 	if score > 1.0 {
 		score = 1.0
