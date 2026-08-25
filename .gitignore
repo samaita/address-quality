@@ -5,10 +5,12 @@ db/*.db
 tests/api/result/
 tests/api/benchmark/*.csv
 tests/api/benchmark/*.json
+tests/api/benchmark-v0/*.json
 tests/api/**/*.xlsx
 tests/api/cases/*.csv
 !tests/api/cases/example.csv
 tests/api/page/full-benchmark.html
+tests/api/page/full-benchmark-v0.html
 docs/ISSUES.md
 bin
 .DS_Store
