@@ -29,6 +29,60 @@
                 }
             }
         },
+        "/v0/validate": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Resolve an address via Google Maps geocoding with a lazy sqlite cache. Mock mode reads the cache only and fakes a 404 on a miss.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Geocode an address",
+                "parameters": [
+                    {
+                        "description": "Address to geocode",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.GeocodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.GeocodeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.GeocodeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/validate": {
             "post": {
                 "security": [
@@ -167,6 +221,34 @@
                 "timestamp": {
                     "type": "string",
                     "example": "2026-07-29T05:06:43Z"
+                }
+            }
+        },
+        "model.GeocodeRequest": {
+            "type": "object",
+            "required": [
+                "address"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "Sukarasa Sukasari Jawa Barat"
+                }
+            }
+        },
+        "model.GeocodeResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object"
+                },
+                "request_id": {
+                    "type": "string",
+                    "example": "019fac45-d6cb-7101-9159-76bd7c25867b"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2026-07-29T05:08:05Z"
                 }
             }
         },
