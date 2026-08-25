@@ -281,13 +281,14 @@ async function main() {
           raw_address: row.address,
           quality: {
             address_id: null,
-            status: result.statusCode === 404 ? 'NOT_FOUND' : 'FAILED',
+            status: 'FAILED',
             confidence: null,
             formatted_address: null,
             location: null,
             assessment: { missing: [], conflicts: [], ambiguous: [] },
             cache_status: cacheStatus,
             place_id: null,
+            note: result.statusCode === 404 ? 'NOT_FOUND' : `HTTP ${result.statusCode}`,
           },
           comparison: {
             actual_province: row.actualProvince,
@@ -300,8 +301,8 @@ async function main() {
             same_subdistrict: false,
           },
         });
-        succeeded++;
-        console.log(`NOT_FOUND (${result.statusCode}, ${cacheStatus || '?'})`);
+        failed++;
+        console.log(`FAIL (${result.statusCode === 404 ? 'NOT_FOUND' : `HTTP ${result.statusCode}`}, ${cacheStatus || '?'})`);
       }
 
       if (cacheStatus === 'MISS') {
@@ -316,7 +317,17 @@ async function main() {
       outRows.push({
         source: SOURCE,
         raw_address: row.address,
-        quality: null,
+        quality: {
+          address_id: null,
+          status: 'FAILED',
+          confidence: null,
+          formatted_address: null,
+          location: null,
+          assessment: { missing: [], conflicts: [], ambiguous: [] },
+          cache_status: null,
+          place_id: null,
+          note: result.error,
+        },
         comparison: {
           actual_province: row.actualProvince,
           actual_city: row.actualCity,
