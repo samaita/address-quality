@@ -281,8 +281,8 @@ func scoreConfidence(candidate *model.AdminCandidate, unused []model.Evidence, h
 
 	score += multiEvidenceBonus(candidate)
 
-	if hasEvidence && len(unused) == 0 {
-		score += WeightUsedEvidenceBonus
+	if hasEvidence && len(unused) > 0 {
+		score -= float64(len(unused)) * WeightUsedEvidenceBonus
 	}
 
 	if score > 1.0 {
