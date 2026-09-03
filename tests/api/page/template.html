@@ -495,10 +495,10 @@
 
   /* ---------- header ---------- */
   var rel = M.release;
-  var build = M.build;
+  var build = M.benchmark_build;
   var relParts = [];
   if (rel) relParts.push('Release <span class="aq-rel">' + esc(rel) + '</span>');
-  if (build) relParts.push('Build <span class="aq-rel">#' + esc(build) + '</span>');
+  if (build) relParts.push('Benchmark Build <span class="aq-rel">#' + esc(build) + '</span>');
   document.getElementById('aq-release-line').innerHTML =
     relParts.length ? relParts.join(' · ') + ' · <span class="aq-dim">' + esc(M.benchmark_timestamp || 'benchmark date N/A') + '</span>'
                     : '<span class="aq-dim">Release / build not set — edit tests/api/page/release.json</span>';

@@ -42,10 +42,10 @@ benchmark:
 	node tests/api/benchmark-test.js --source=kemendagri --csv=tests/api/cases/address-tagged.csv
 
 benchmark-page:
-	node tests/api/page/build.js
+	@printf 'benchmark_build: '; read b; [ -n "$$b" ] || { echo 'error: benchmark_build is required'; exit 1; }; node tests/api/page/build.js "$$b"
 
 benchmark-v0:
 	node tests/api/benchmark-test-v0.js --source=kemendagri --csv=tests/api/cases/address-tagged.csv
 
 benchmark-page-v0:
-	BENCH_VER=v0 node tests/api/page/build.js
+	@printf 'benchmark_build: '; read b; [ -n "$$b" ] || { echo 'error: benchmark_build is required'; exit 1; }; BENCH_VER=v0 node tests/api/page/build.js "$$b"

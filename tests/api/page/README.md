@@ -7,6 +7,11 @@ The only artifact is **`benchmark.html`** — a single HTML file with the data i
 It renders standalone and inside an `<iframe>`, with no external dependencies, no
 CORS, and scoped CSS that cannot affect the host page.
 
+Each generated page is tied to a **`benchmark_build`** label (prompted by `make
+benchmark-page`). `release` identifies the underlying binary; `benchmark_build`
+identifies a specific benchmark run, so one release can carry multiple
+benchmarks under different `benchmark_build` values.
+
 The build also writes **`full-benchmark.html`** — the same page but untrimmed:
 it keeps the raw address input for every record, renders the top-100 failed
 matches ranked by confidence (high to low) and always shows the performance run.
@@ -18,6 +23,10 @@ and intended only for local inspection, never for publishing.
 ```bash
 make benchmark-page
 ```
+
+The target prompts for a `benchmark_build` label (required — empty input aborts
+with an error). It is passed to `build.js` as its first argument and recorded as
+the entry's `benchmark_build`.
 
 `tests/api/page/build.js` reads the **latest** benchmark and load-test JSON from:
 
@@ -40,21 +49,27 @@ Two files live in `tests/api/page`:
   }
   ```
 
+  `release` is the binary version. `build` is kept for the binary build number.
+  Each benchmark run additionally takes a `benchmark_build` label prompted by
+  `make benchmark-page`.
+
   Optional fields: `git_commit`, and `runner` / `server` environment specs (CPU,
   memory, OS, k6 version, API version, git commit). Any missing field is shown
   as `N/A` on the page. Nothing is fabricated — metrics always come from the
   JSON artifacts.
 
 - **`metadata.json`** — an auto-appended history array with one entry per test
-  run (keyed by `release` + `build`). Each entry stores the full release table
-  (release, build, git commit, benchmark timestamp, dataset version/source,
-  dataset generation timestamp, load-test timestamp, benchmark source, benchmark
-  runner, runner/server env) plus the computed run metrics:
+  run (keyed by `release` + `benchmark_build`). Each entry stores the full
+  release table (release, build, benchmark_build, git commit, benchmark
+  timestamp, dataset version/source, dataset generation timestamp, load-test
+  timestamp, benchmark source, benchmark runner, runner/server env) plus the
+  computed run metrics:
 
   ```json
   {
     "release": "v0.3.0",
     "build": "42",
+    "benchmark_build": "ABCD-2026-08-11",
     "git_commit": "02ba28d",
     "benchmark_timestamp": "2026-08-11",
     "dataset_version": "2025",
@@ -82,8 +97,9 @@ Two files live in `tests/api/page`:
   ```
 
   `build.js` computes the metrics from the latest benchmark JSON and appends the
-  entry on every run. If an entry with the same `release` + `build` already
-  exists it is replaced in place instead of duplicated.
+  entry only when `release` or `benchmark_build` is new. If an entry with the
+  same `release` + `benchmark_build` already exists it is replaced in place
+  instead of duplicated.
 
 ## Before / After comparison
 
@@ -110,7 +126,8 @@ excluded from git (`.gitignore`) and must not be published.
 1. Run the benchmark: `make benchmark` (writes `tests/api/benchmark/…json`)
 2. Run the load test: `make test-api-load` (writes `tests/api/result/…json`)
 3. Update `release.json` (release / build / environment)
-4. `make benchmark-page` (appends the new run to `metadata.json`)
+4. `make benchmark-page` and enter the `benchmark_build` label (appends or
+   replaces the run in `metadata.json`, keyed by `release` + `benchmark_build`)
 5. Publish the new `benchmark.html`
 
 ## Embedding from the external website
