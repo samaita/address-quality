@@ -8,9 +8,16 @@
  *   - latest tests/api/benchmark/*_benchmark_v1_*.json
  *   - latest tests/api/result/*_load-test_*.json
  *
- * Computes run metrics, appends (or replaces, keyed by release+build) a new
- * entry to metadata.json, and exposes the previous entry as "before" so the
- * page can render a before/after comparison.
+ * Computes run metrics, appends (or replaces, keyed by release+benchmark_build)
+ * a new entry to metadata.json, and exposes the previous entry as "before" so
+ * the page can render a before/after comparison. It only appends (never
+ * duplicates) when release or benchmark_build is new; re-running the same
+ * release+benchmark_build replaces that entry in place.
+ *
+ * The benchmark_build label is required and passed as argv[2] (the Makefile
+ * target prompts for it). release stays the binary version from release.json;
+ * benchmark_build identifies this specific benchmark run, so one release can
+ * hold many entries under different benchmark_build values.
  *
  * Writes two self-contained HTML files with all data inlined:
  *   - benchmark.html       trimmed (public): raw_address only for the three
@@ -236,7 +243,7 @@ function computeMetrics(rows) {
   };
 }
 
-function buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows) {
+function buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows, benchmarkBuild) {
   const perf = perfFile ? readJson(path.join(RESULT_DIR, perfFile)) : null;
   const dataset = datasetVersionOf(benchmarkRows);
   const runner = releaseConfig.runner || {};
@@ -248,6 +255,7 @@ function buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows) {
   return {
     release: releaseConfig.release || null,
     build: releaseConfig.build || null,
+    benchmark_build: benchmarkBuild || null,
     git_commit: releaseConfig.git_commit || null,
     benchmark_timestamp: benchmarkFile ? benchmarkFile.slice(0, 10) : null,
     dataset_version: dataset.version,
@@ -354,7 +362,7 @@ function renderTemplate(payload) {
 }
 
 function entryKey(entry) {
-  return `${entry.release || ''}|${entry.build || ''}`;
+  return `${entry.release || ''}|${entry.benchmark_build || ''}`;
 }
 
 function upsertEntry(entries, entry) {
@@ -377,6 +385,12 @@ function readMetadataEntries() {
 }
 
 function main() {
+  const benchmarkBuild = (process.argv[2] || '').trim();
+  if (!benchmarkBuild) {
+    console.error('benchmark_build is required: pass it via `make benchmark-page` (it prompts) or `node tests/api/page/build.js <benchmark_build>`.');
+    process.exit(1);
+  }
+
   let releaseConfig = {};
   if (fs.existsSync(RELEASE_FILE)) {
     releaseConfig = readJson(RELEASE_FILE);
@@ -399,7 +413,7 @@ function main() {
   }
 
   const benchmarkRows = readJson(path.join(BENCH_DIR, benchmarkFile));
-  const entry = buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows);
+  const entry = buildEntry(releaseConfig, benchmarkFile, perfFile, benchmarkRows, benchmarkBuild);
 
   const { entries, before } = upsertEntry(readMetadataEntries(), entry);
   fs.writeFileSync(META_FILE, JSON.stringify(entries, null, 2) + '\n');
