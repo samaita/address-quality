@@ -40,7 +40,7 @@ The `kode` field encodes the administrative tree using dot-separated levels:
 | Level | Length   | Example          | Description                |
 |-------|----------|------------------|----------------------------|
 | 1     | 2 chars  | `11`             | Province                   |
-| 2     | 5 chars  | `11.01`          | City / Regency             |
+| 2     | 5 chars  | `11.01`          | City                       |
 | 3     | 8 chars  | `11.01.01`       | District (Kecamatan)       |
 | 4     | 13 chars | `11.01.01.2001`  | SubDistrict (Kelurahan/Desa)   |
 

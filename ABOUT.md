@@ -31,7 +31,7 @@
 
 **Current scope**
 
-- Indonesian administrative hierarchy: province, city/regency, district, subdistrict (kelurahan/desa), and postal code.
+- Indonesian administrative hierarchy: province, city, district, subdistrict (kelurahan/desa), and postal code.
 - FACT — internal/model/model.go:37-73; db/location.sql:1-16.
 - A single validation endpoint (`POST /v1/validate`) plus health check and Swagger UI.
 - FACT — internal/router/router.go:49-57.
@@ -279,7 +279,7 @@ All concepts are defined in `internal/model/model.go` unless noted.
 ## Administrative hierarchy
 
 - **Province** — top level (level_id 2). Model: `Province{ID, Name, NormalizedName}`. model.go:189-193.
-- **City / Regency** — level_id 3, includes `PostalCode`. `City{ID, Name, NormalizedName, PostalCode}`. model.go:195-201. Includes both Kota and Kabupaten types; the normalizer strips both `kota` and `kabupaten` prefixes. normalizer.go:11-27.
+- **City** — level_id 3, includes `PostalCode`. `City{ID, Name, NormalizedName, PostalCode}`. model.go:195-201. Includes both Kota and Kabupaten types; the normalizer strips both `kota` and `kabupaten` prefixes. normalizer.go:11-27.
 - **District** (kecamatan) — level_id 4. `District{ID, Name, NormalizedName}`. model.go:203-207.
 - **Subdistrict** (kelurahan/desa) — level_id 5, carries the postal code. `SubDistrict{ID, Name, NormalizedName, PostalCode}`. model.go:208-213. (git commit ff45967 renamed "Village" → "SubDistrict".)
 - **Postal Code** — 5-digit; attached to subdistricts in data, but also modeled as its own entity. model.go:215-219; db/location.sql:48.
