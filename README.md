@@ -103,7 +103,7 @@ flowchart TD
     E["Administrative Hierarchy Validation"]
 
     E --> F1["Province"]
-    E --> F2["City / Regency"]
+    E --> F2["City"]
     E --> F3["District"]
     E --> F4["Subdistrict"]
     E --> F5["Postal Code"]
