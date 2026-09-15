@@ -170,12 +170,12 @@ function buildChallenges(rows, trimmed) {
     },
     {
       id: 'city',
-      title: 'Ambiguous city / regency names',
+      title: 'Ambiguous city names',
       count: cityIdx.length,
-      why: `In ${cityIdx.length} of ${total} records (${pct(cityIdx.length, total)}%), the address resolved to the wrong city or regency. Many city and regency names are shared across provinces (e.g. Bandung, Sukasari, Sukarasa), so a short or incomplete input can match a wrong location with high confidence.`,
+      why: `In ${cityIdx.length} of ${total} records (${pct(cityIdx.length, total)}%), the address resolved to the wrong city. Many city names are shared across provinces (e.g. Bandung, Sukasari, Sukarasa), so a short or incomplete input can match a wrong location with high confidence.`,
       expected: cityEx
-        ? `Resolve to the correct city / regency (ground truth: ${cityEx.actual.city}).`
-        : 'Resolve to the correct city / regency.',
+        ? `Resolve to the correct city (ground truth: ${cityEx.actual.city}).`
+        : 'Resolve to the correct city.',
       current: cityEx
         ? `Resolved to ${cityEx.formatted || 'an empty location'} with ${Math.round((cityEx.confidence || 0) * 100)}% confidence (status ${cityEx.status}).`
         : 'No example available for this run.',

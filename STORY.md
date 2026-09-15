@@ -91,7 +91,7 @@ Requests carry an address and an optional data source; responses include the req
 Validation runs against the Indonesian administrative hierarchy, sourced from a Kemendagri administrative dataset:
 
 - **Province** (top level)
-- **City / Regency** (kota and kabupaten)
+- **City** (kota / kabupaten)
 - **District** (kecamatan)
 - **Subdistrict** (kelurahan/desa) — carries the postal code
 - **Postal code** — 5-digit
