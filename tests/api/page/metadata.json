@@ -24,7 +24,7 @@
       "git_commit": "02ba28d"
     },
     "metrics": {
-      "overall_accuracy": 52.8,
+      "overall_accuracy": 49.1,
       "dataset_size": 106,
       "average_confidence": 72.8,
       "dataset_version": "2025",
@@ -36,23 +36,23 @@
         },
         {
           "level": "City",
-          "correct": 83,
-          "pct": 78.3
+          "correct": 81,
+          "pct": 76.4
         },
         {
           "level": "District (Kecamatan)",
-          "correct": 78,
-          "pct": 73.6
+          "correct": 76,
+          "pct": 71.7
         },
         {
           "level": "Subdistrict (Kelurahan)",
-          "correct": 57,
-          "pct": 53.8
+          "correct": 55,
+          "pct": 51.9
         },
         {
           "level": "All four levels (exact)",
-          "correct": 56,
-          "pct": 52.8
+          "correct": 52,
+          "pct": 49.1
         }
       ]
     }
