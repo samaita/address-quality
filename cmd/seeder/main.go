@@ -196,37 +196,60 @@ Flags:
 	}
 	logger.Info().Int("count", postalCount).Msg("joined postal codes")
 
+	// Assign explicit, shared ids so SQLite and Postgres store the same ids.
+	// The primary target (SQLite, or Postgres under --postgres-only) sets the
+	// offset; every target receives the same rows in the same order.
+	baseID, err := targets[0].MaxLocationCodeID(ctx)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("read max location code id")
+	}
+	for i := range rows {
+		rows[i].ID = baseID + int64(i) + 1
+	}
+
+	sourceID, err := targets[0].NextLocationSourceID(ctx)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("read next source id")
+	}
+
 	batchSize := 500
 	total := len(rows)
 	for _, t := range targets {
-		sourceID, err := t.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
+		storedSourceID, err := t.InsertLocationSource(ctx, sourceID, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
 		if err != nil {
 			logger.Fatal().Err(err).Msg("insert source")
 		}
-		logger.Info().Int64("location_source_id", sourceID).Bool("postgres", t.IsPostgres()).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
+		if storedSourceID != sourceID {
+			logger.Warn().Int64("expected", sourceID).Int64("stored", storedSourceID).Msg("source id differs across targets")
+		}
+		logger.Info().Int64("location_source_id", storedSourceID).Bool("postgres", t.IsPostgres()).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
 
 		for i := 0; i < total; i += batchSize {
 			end := i + batchSize
 			if end > total {
 				end = total
 			}
-			if err := t.InsertLocationCodeBatch(ctx, sourceID, rows[i:end]); err != nil {
+			if err := t.InsertLocationCodeBatch(ctx, storedSourceID, rows[i:end]); err != nil {
 				logger.Fatal().Err(err).Int("start", i).Int("end", end).Msg("batch insert")
 			}
 			logger.Info().Int("inserted", end).Int("total", total).Msg("batch progress")
 		}
 
 		logger.Info().Msg("rebuilding location hierarchy...")
-		if err := t.RebuildLocationHierarchy(ctx, sourceID); err != nil {
+		if err := t.RebuildLocationHierarchy(ctx, storedSourceID); err != nil {
 			logger.Fatal().Err(err).Msg("rebuild hierarchy")
 		}
 		logger.Info().Msg("hierarchy rebuild complete")
 
 		logger.Info().Msg("rebuilding city priority lookup...")
-		if err := t.RebuildCityPriority(ctx, sourceID); err != nil {
+		if err := t.RebuildCityPriority(ctx, storedSourceID); err != nil {
 			logger.Fatal().Err(err).Msg("rebuild city priority")
 		}
 		logger.Info().Msg("city priority rebuild complete")
+
+		if err := t.ResetSequences(ctx); err != nil {
+			logger.Fatal().Err(err).Msg("reset sequences")
+		}
 	}
 
 	logger.Info().Msg("seeding complete")
