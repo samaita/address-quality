@@ -273,6 +273,14 @@ const docTemplate = `{
                     "type": "string",
                     "example": "ok"
                 },
+                "location_database": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "postgres": {
+                    "type": "string",
+                    "example": "disabled"
+                },
                 "status": {
                     "type": "string",
                     "example": "ok"
