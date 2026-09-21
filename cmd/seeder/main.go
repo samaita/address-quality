@@ -29,7 +29,7 @@ func main() {
 	initFlag := flag.Bool("init", false, "Create schema from db/location.sql (only when no tables exist)")
 	truncateFlag := flag.Bool("truncate", false, "Truncate all data rows (keep schema) before seeding")
 	normalizeFlag := flag.Bool("normalize", false, "Rebuild lowercase_normalized column for all existing location_codes")
-	dbPathFlag := flag.String("db", "", "Path to location.db (default from config)")
+	dbPathFlag := flag.String("db", "", "Path to location.db (default from config); Postgres is seeded too when POSTGRES_DSN is set")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: seeder [flags]
@@ -86,6 +86,17 @@ Flags:
 		logger.Fatal().Err(err).Msg("open location db")
 	}
 
+	// SQLite is always a target; Postgres is added when configured.
+	targets := []*database.LocationRepository{repo}
+	pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("open postgres")
+	}
+	if pgRepo != nil {
+		targets = append(targets, pgRepo)
+		logger.Info().Msg("postgres target enabled")
+	}
+
 	addressRepo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("open address db")
@@ -100,15 +111,9 @@ Flags:
 		if hasTables {
 			logger.Fatal().Msg("tables already exist, use --drop to recreate")
 		}
-		logger.Info().Msg("running db/location.sql...")
-		schema, err := os.ReadFile("db/location.sql")
-		if err != nil {
-			logger.Fatal().Err(err).Msg("read db/location.sql")
+		for _, t := range targets {
+			execLocationSchema(ctx, t)
 		}
-		if err := repo.ExecSchema(ctx, string(schema)); err != nil {
-			logger.Fatal().Err(err).Msg("exec schema")
-		}
-		logger.Info().Msg("schema created")
 
 		hasAddressTables, err := addressRepo.HasAddressTables(ctx)
 		if err != nil {
@@ -154,8 +159,10 @@ Flags:
 			os.Exit(1)
 		}
 		logger.Info().Msg("dropping all tables...")
-		if err := repo.DropAll(ctx); err != nil {
-			logger.Fatal().Err(err).Msg("drop all")
+		for _, t := range targets {
+			if err := t.DropAll(ctx); err != nil {
+				logger.Fatal().Err(err).Msg("drop all")
+			}
 		}
 		logger.Info().Msg("tables dropped")
 		return
@@ -164,16 +171,20 @@ Flags:
 			logger.Fatal().Msg("no tables found, use --init for first-time setup")
 		}
 		logger.Info().Msg("truncating all data...")
-		if err := repo.TruncateAll(ctx); err != nil {
-			logger.Fatal().Err(err).Msg("truncate")
+		for _, t := range targets {
+			if err := t.TruncateAll(ctx); err != nil {
+				logger.Fatal().Err(err).Msg("truncate")
+			}
 		}
 	} else if *normalizeFlag {
 		if !hasTables {
 			logger.Fatal().Msg("no tables found, use --init for first-time setup")
 		}
 		logger.Info().Msg("rebuilding lowercase_normalized...")
-		if err := repo.RebuildNormalized(ctx); err != nil {
-			logger.Fatal().Err(err).Msg("rebuild normalized")
+		for _, t := range targets {
+			if err := t.RebuildNormalized(ctx); err != nil {
+				logger.Fatal().Err(err).Msg("rebuild normalized")
+			}
 		}
 		logger.Info().Msg("normalize rebuild complete")
 		return
@@ -182,12 +193,6 @@ Flags:
 		fmt.Fprintln(os.Stderr, "  bin/seeder --init")
 		os.Exit(1)
 	}
-
-	sourceID, err := repo.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("insert source")
-	}
-	logger.Info().Int64("location_source_id", sourceID).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
 
 	logger.Info().Msg("parsing db/source/wilayah.sql...")
 	rows, err := parseWilayah("db/source/wilayah.sql")
@@ -215,30 +220,55 @@ Flags:
 
 	batchSize := 500
 	total := len(rows)
-	for i := 0; i < total; i += batchSize {
-		end := i + batchSize
-		if end > total {
-			end = total
+	for _, t := range targets {
+		sourceID, err := t.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("insert source")
 		}
-		if err := repo.InsertLocationCodeBatch(ctx, sourceID, rows[i:end]); err != nil {
-			logger.Fatal().Err(err).Int("start", i).Int("end", end).Msg("batch insert")
+		logger.Info().Int64("location_source_id", sourceID).Bool("postgres", t.IsPostgres()).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
+
+		for i := 0; i < total; i += batchSize {
+			end := i + batchSize
+			if end > total {
+				end = total
+			}
+			if err := t.InsertLocationCodeBatch(ctx, sourceID, rows[i:end]); err != nil {
+				logger.Fatal().Err(err).Int("start", i).Int("end", end).Msg("batch insert")
+			}
+			logger.Info().Int("inserted", end).Int("total", total).Msg("batch progress")
 		}
-		logger.Info().Int("inserted", end).Int("total", total).Msg("batch progress")
+
+		logger.Info().Msg("rebuilding location hierarchy...")
+		if err := t.RebuildLocationHierarchy(ctx, sourceID); err != nil {
+			logger.Fatal().Err(err).Msg("rebuild hierarchy")
+		}
+		logger.Info().Msg("hierarchy rebuild complete")
+
+		logger.Info().Msg("rebuilding city priority lookup...")
+		if err := t.RebuildCityPriority(ctx, sourceID); err != nil {
+			logger.Fatal().Err(err).Msg("rebuild city priority")
+		}
+		logger.Info().Msg("city priority rebuild complete")
 	}
 
 	logger.Info().Msg("seeding complete")
+}
 
-	logger.Info().Msg("rebuilding location hierarchy...")
-	if err := repo.RebuildLocationHierarchy(ctx, sourceID); err != nil {
-		logger.Fatal().Err(err).Msg("rebuild hierarchy")
+// execLocationSchema runs the location schema for the target's dialect.
+func execLocationSchema(ctx context.Context, t *database.LocationRepository) {
+	file := "db/location.sql"
+	if t.IsPostgres() {
+		file = "db/location_postgres.sql"
 	}
-	logger.Info().Msg("hierarchy rebuild complete")
-
-	logger.Info().Msg("rebuilding city priority lookup...")
-	if err := repo.RebuildCityPriority(ctx, sourceID); err != nil {
-		logger.Fatal().Err(err).Msg("rebuild city priority")
+	logger.Info().Str("file", file).Msg("running location schema...")
+	schema, err := os.ReadFile(file)
+	if err != nil {
+		logger.Fatal().Err(err).Str("file", file).Msg("read location schema")
 	}
-	logger.Info().Msg("city priority rebuild complete")
+	if err := t.ExecSchema(ctx, string(schema)); err != nil {
+		logger.Fatal().Err(err).Str("file", file).Msg("exec location schema")
+	}
+	logger.Info().Str("file", file).Msg("location schema created")
 }
 
 func parseWilayah(path string) ([]database.LocationCodeRow, error) {
