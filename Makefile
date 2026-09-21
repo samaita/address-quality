@@ -1,4 +1,4 @@
-.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed benchmark benchmark-page benchmark-v0 benchmark-page-v0
+.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed seed-init seed-drop seed-truncate seed-normalize benchmark benchmark-page benchmark-v0 benchmark-page-v0
 
 run:
 	go run ./cmd/server
@@ -32,8 +32,23 @@ test-api-load-prod:
 build-seed:
 	go build -o bin/seeder ./cmd/seeder
 
+# Seed into existing tables (update data). Pass seeder flags via ARGS, e.g.
+#   make seed ARGS=--init
+# Or use the dedicated targets below.
 seed:
+	go run ./cmd/seeder $(ARGS)
+
+seed-init:
 	go run ./cmd/seeder --init
+
+seed-drop:
+	go run ./cmd/seeder --drop
+
+seed-truncate:
+	go run ./cmd/seeder --truncate
+
+seed-normalize:
+	go run ./cmd/seeder --normalize
 
 swagger:
 	swag init -g cmd/server/main.go -o docs

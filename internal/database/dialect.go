@@ -50,3 +50,17 @@ func (d *sqlDB) ExecContext(ctx context.Context, query string, args ...any) (sql
 func (d *sqlDB) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
 	return d.DB.PrepareContext(ctx, d.rebind(query))
 }
+
+// stripSQLComments removes full-line SQL comments so statement splitting on
+// ";" is not confused by semicolons inside comments.
+func stripSQLComments(sqlContent string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(sqlContent, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}

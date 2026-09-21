@@ -92,6 +92,12 @@ definitions:
       database:
         example: ok
         type: string
+      location_database:
+        example: ok
+        type: string
+      postgres:
+        example: disabled
+        type: string
       status:
         example: ok
         type: string

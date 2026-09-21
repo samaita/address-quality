@@ -17,3 +17,11 @@ func TestRebind(t *testing.T) {
 		t.Fatalf("sqlite rebind = %q, want unchanged %q", got, q)
 	}
 }
+
+func TestStripSQLComments(t *testing.T) {
+	in := "-- header; with semicolon\nSELECT 1;\n  -- indented\nSELECT 2;\n"
+	want := "SELECT 1;\nSELECT 2;\n\n"
+	if got := stripSQLComments(in); got != want {
+		t.Fatalf("stripSQLComments = %q, want %q", got, want)
+	}
+}
