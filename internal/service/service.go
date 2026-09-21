@@ -48,6 +48,7 @@ type LocationRepository interface {
 // is not configured; the app runs on SQLite alone in that case.
 type PostgresRepository interface {
 	Ping(ctx context.Context) error
+	FindSimilarLocations(ctx context.Context, sourceID int64, token string, limit int, minSimilarity float64) ([]model.Entity, error)
 }
 
 // DBStatus is the per-connection health status.

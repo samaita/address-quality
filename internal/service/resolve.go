@@ -156,6 +156,80 @@ func (svc *Service) resolveRoadNameEntity(ev model.Evidence) []model.Entity {
 	return nil
 }
 
+const (
+	fuzzyMinSimilarity = 0.6
+	fuzzyMaxResults    = 5
+)
+
+// AppendFuzzyEvidence adds evidence for place-name tokens that exact matching
+// left unresolved (likely typos, e.g. "cihuar" in an address containing the
+// kelurahan "Cihaur Geulis"). Each token is fuzzy-matched against Postgres
+// (pg_trgm word_similarity over the GIN trigram index) and the matched rows
+// are returned as pre-resolved evidence — the original tokens stay untouched.
+// Existing evidence is never replaced: a matched name that is already evidence
+// only absorbs the new candidates. Dedup happens here by normalized value.
+// Returns the extended list plus corrections (typo token -> matched name).
+// A no-op without a Postgres connection.
+func (svc *Service) AppendFuzzyEvidence(ctx context.Context, sourceID int64, resolved []model.ResolvedEvidence) ([]model.ResolvedEvidence, map[string]string) {
+	if svc.postgresRepo == nil {
+		return resolved, nil
+	}
+
+	var corrections map[string]string
+	seenValues := make(map[string]bool, len(resolved))
+	for _, re := range resolved {
+		seenValues[strings.ToLower(re.Evidence.Value)] = true
+	}
+
+	for i := range resolved {
+		re := &resolved[i]
+		if re.Evidence.Type != model.EvidencePlaceName || len(re.Candidates) > 0 {
+			continue
+		}
+		entities, err := svc.postgresRepo.FindSimilarLocations(ctx, sourceID, strings.ToLower(re.Evidence.Value), fuzzyMaxResults, fuzzyMinSimilarity)
+		if err != nil || len(entities) == 0 {
+			continue
+		}
+
+		name := entities[0].Name
+		if corrections == nil {
+			corrections = make(map[string]string)
+		}
+		corrections[re.Evidence.Value] = name
+
+		// dedup: the matched name is already evidence (e.g. another token of
+		// the same phrase resolved first) — merge candidates, add nothing.
+		if seenValues[strings.ToLower(name)] {
+			for j := range resolved {
+				if strings.EqualFold(resolved[j].Evidence.Value, name) {
+					resolved[j].Candidates = dedupeEntitiesByID(append(resolved[j].Candidates, entities...))
+					break
+				}
+			}
+			continue
+		}
+		seenValues[strings.ToLower(name)] = true
+		resolved = append(resolved, model.ResolvedEvidence{
+			Evidence:   model.Evidence{Type: model.EvidencePlaceName, Value: name},
+			Candidates: dedupeEntitiesByID(entities),
+		})
+	}
+	return resolved, corrections
+}
+
+func dedupeEntitiesByID(entities []model.Entity) []model.Entity {
+	seen := make(map[int64]bool, len(entities))
+	var unique []model.Entity
+	for _, e := range entities {
+		if seen[e.ID] {
+			continue
+		}
+		seen[e.ID] = true
+		unique = append(unique, e)
+	}
+	return unique
+}
+
 func (svc *Service) ensureEntitiesCachesLoaded(ctx context.Context, sourceID int64) error {
 	if err := ensureProvincesLoaded(svc, ctx); err != nil {
 		return err
