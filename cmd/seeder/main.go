@@ -29,8 +29,7 @@ func main() {
 	initFlag := flag.Bool("init", false, "Create schema from db/location.sql (only when no tables exist)")
 	truncateFlag := flag.Bool("truncate", false, "Truncate all data rows (keep schema) before seeding")
 	normalizeFlag := flag.Bool("normalize", false, "Rebuild lowercase_normalized column for all existing location_codes")
-	postgresOnlyFlag := flag.Bool("postgres-only", false, "Operate on the Postgres connection only (requires POSTGRES_DSN)")
-	dbPathFlag := flag.String("db", "", "Path to location.db (default from config); Postgres is seeded too when POSTGRES_DSN is set")
+	dbPathFlag := flag.String("db", "", "Path to location.db (default from config)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: seeder [flags]
@@ -39,15 +38,14 @@ Seeds location.db from db/source/wilayah.sql and db/source/wilayah_kodepos.sql.
 
 The source files are MySQL dumps of Indonesian administrative regions and postal codes.
 The seeder parses them, determines hierarchy levels from kode patterns, normalizes names,
-and batch-inserts into location_codes.
+and batch-inserts into location_codes. When POSTGRES_DSN is configured, PostgreSQL is
+automatically replaced with an exact COPY of the completed SQLite location database.
 
 First run:   seeder --init
 Reset:        seeder --drop && seeder --init
 Retry:        seeder --truncate
 Recalc:       seeder --normalize
 Update data:  seeder            (tables must already exist)
-
-Postgres only: seeder --init --postgres-only   (requires POSTGRES_DSN)
 
 Flags:
 `)
@@ -84,35 +82,12 @@ Flags:
 
 	ctx := context.Background()
 
-	var targets []*database.LocationRepository
-	if *postgresOnlyFlag {
-		pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("open postgres")
-		}
-		if pgRepo == nil {
-			logger.Fatal().Msg("--postgres-only requires POSTGRES_DSN")
-		}
-		targets = []*database.LocationRepository{pgRepo}
-	} else {
-		repo, err := database.NewLocationDB(dbPath, cfg.DBMaxOpenConns)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("open location db")
-		}
-		targets = []*database.LocationRepository{repo}
-
-		// Postgres is an additional target when configured.
-		pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("open postgres")
-		}
-		if pgRepo != nil {
-			targets = append(targets, pgRepo)
-			logger.Info().Msg("postgres target enabled")
-		}
+	repo, err := database.NewLocationDB(dbPath, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("open location db")
 	}
 
-	hasTables, err := targets[0].HasLocationTables(ctx)
+	hasTables, err := repo.HasLocationTables(ctx)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("check tables")
 	}
@@ -121,13 +96,8 @@ Flags:
 		if hasTables {
 			logger.Fatal().Msg("tables already exist, use --drop to recreate")
 		}
-		for _, t := range targets {
-			execLocationSchema(ctx, t)
-		}
-
-		if !*postgresOnlyFlag {
-			initAddressSchemas(ctx, cfg)
-		}
+		execLocationSchema(ctx, repo)
+		initAddressSchemas(ctx, cfg)
 	} else if *dropFlag {
 		if !hasTables {
 			logger.Fatal().Msg("no tables to drop, use --init for first-time setup")
@@ -136,11 +106,19 @@ Flags:
 			fmt.Fprintln(os.Stderr, "aborted")
 			os.Exit(1)
 		}
-		logger.Info().Msg("dropping all tables...")
-		for _, t := range targets {
-			if err := t.DropAll(ctx); err != nil {
-				logger.Fatal().Err(err).Msg("drop all")
+		if cfg.PostgresEnabled() {
+			logger.Info().Msg("dropping postgres location tables before sqlite...")
+			pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+			if err != nil {
+				logger.Fatal().Err(err).Msg("open postgres before drop; sqlite was not changed")
 			}
+			if err := pgRepo.DropAll(ctx); err != nil {
+				logger.Fatal().Err(err).Msg("drop postgres; sqlite was not changed")
+			}
+		}
+		logger.Info().Msg("dropping sqlite location tables...")
+		if err := repo.DropAll(ctx); err != nil {
+			logger.Fatal().Err(err).Msg("drop sqlite")
 		}
 		logger.Info().Msg("tables dropped")
 		return
@@ -149,22 +127,19 @@ Flags:
 			logger.Fatal().Msg("no tables found, use --init for first-time setup")
 		}
 		logger.Info().Msg("truncating all data...")
-		for _, t := range targets {
-			if err := t.TruncateAll(ctx); err != nil {
-				logger.Fatal().Err(err).Msg("truncate")
-			}
+		if err := repo.TruncateAll(ctx); err != nil {
+			logger.Fatal().Err(err).Msg("truncate sqlite")
 		}
 	} else if *normalizeFlag {
 		if !hasTables {
 			logger.Fatal().Msg("no tables found, use --init for first-time setup")
 		}
 		logger.Info().Msg("rebuilding lowercase_normalized...")
-		for _, t := range targets {
-			if err := t.RebuildNormalized(ctx); err != nil {
-				logger.Fatal().Err(err).Msg("rebuild normalized")
-			}
+		if err := repo.RebuildNormalized(ctx); err != nil {
+			logger.Fatal().Err(err).Msg("rebuild normalized")
 		}
 		logger.Info().Msg("normalize rebuild complete")
+		syncPostgres(ctx, cfg, repo)
 		return
 	} else if !hasTables {
 		fmt.Fprintln(os.Stderr, "Location tables not found. Initialize the schema by running:")
@@ -196,71 +171,44 @@ Flags:
 	}
 	logger.Info().Int("count", postalCount).Msg("joined postal codes")
 
-	// Assign explicit, shared ids so SQLite and Postgres store the same ids.
-	// The primary target (SQLite, or Postgres under --postgres-only) sets the
-	// offset; every target receives the same rows in the same order.
-	baseID, err := targets[0].MaxLocationCodeID(ctx)
+	sourceID, err := repo.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("read max location code id")
+		logger.Fatal().Err(err).Msg("insert source")
 	}
-	for i := range rows {
-		rows[i].ID = baseID + int64(i) + 1
-	}
-
-	sourceID, err := targets[0].NextLocationSourceID(ctx)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("read next source id")
-	}
+	logger.Info().Int64("location_source_id", sourceID).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
 
 	batchSize := 500
 	total := len(rows)
-	for _, t := range targets {
-		storedSourceID, err := t.InsertLocationSource(ctx, sourceID, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("insert source")
+	for i := 0; i < total; i += batchSize {
+		end := i + batchSize
+		if end > total {
+			end = total
 		}
-		if storedSourceID != sourceID {
-			logger.Warn().Int64("expected", sourceID).Int64("stored", storedSourceID).Msg("source id differs across targets")
+		if err := repo.InsertLocationCodeBatch(ctx, sourceID, rows[i:end]); err != nil {
+			logger.Fatal().Err(err).Int("start", i).Int("end", end).Msg("batch insert")
 		}
-		logger.Info().Int64("location_source_id", storedSourceID).Bool("postgres", t.IsPostgres()).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
-
-		for i := 0; i < total; i += batchSize {
-			end := i + batchSize
-			if end > total {
-				end = total
-			}
-			if err := t.InsertLocationCodeBatch(ctx, storedSourceID, rows[i:end]); err != nil {
-				logger.Fatal().Err(err).Int("start", i).Int("end", end).Msg("batch insert")
-			}
-			logger.Info().Int("inserted", end).Int("total", total).Msg("batch progress")
-		}
-
-		logger.Info().Msg("rebuilding location hierarchy...")
-		if err := t.RebuildLocationHierarchy(ctx, storedSourceID); err != nil {
-			logger.Fatal().Err(err).Msg("rebuild hierarchy")
-		}
-		logger.Info().Msg("hierarchy rebuild complete")
-
-		logger.Info().Msg("rebuilding city priority lookup...")
-		if err := t.RebuildCityPriority(ctx, storedSourceID); err != nil {
-			logger.Fatal().Err(err).Msg("rebuild city priority")
-		}
-		logger.Info().Msg("city priority rebuild complete")
-
-		if err := t.ResetSequences(ctx); err != nil {
-			logger.Fatal().Err(err).Msg("reset sequences")
-		}
+		logger.Info().Int("inserted", end).Int("total", total).Msg("batch progress")
 	}
+
+	logger.Info().Msg("rebuilding location hierarchy...")
+	if err := repo.RebuildLocationHierarchy(ctx, sourceID); err != nil {
+		logger.Fatal().Err(err).Msg("rebuild hierarchy")
+	}
+	logger.Info().Msg("hierarchy rebuild complete")
+
+	logger.Info().Msg("rebuilding city priority lookup...")
+	if err := repo.RebuildCityPriority(ctx, sourceID); err != nil {
+		logger.Fatal().Err(err).Msg("rebuild city priority")
+	}
+	logger.Info().Msg("city priority rebuild complete")
 
 	logger.Info().Msg("seeding complete")
+	syncPostgres(ctx, cfg, repo)
 }
 
-// execLocationSchema runs the location schema for the target's dialect.
+// execLocationSchema creates only the SQLite source-of-truth schema.
 func execLocationSchema(ctx context.Context, t *database.LocationRepository) {
-	file := "db/location.sql"
-	if t.IsPostgres() {
-		file = "db/location_postgres.sql"
-	}
+	const file = "db/location.sql"
 	logger.Info().Str("file", file).Msg("running location schema...")
 	schema, err := os.ReadFile(file)
 	if err != nil {
@@ -270,6 +218,30 @@ func execLocationSchema(ctx context.Context, t *database.LocationRepository) {
 		logger.Fatal().Err(err).Str("file", file).Msg("exec location schema")
 	}
 	logger.Info().Str("file", file).Msg("location schema created")
+}
+
+func syncPostgres(ctx context.Context, cfg *config.Config, sqliteRepo *database.LocationRepository) {
+	if !cfg.PostgresEnabled() {
+		return
+	}
+
+	logger.Info().Msg("rebuilding postgres from sqlite snapshot...")
+	pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("open postgres; sqlite succeeded but postgres is not synchronized")
+	}
+	schema, err := os.ReadFile("db/location_postgres.sql")
+	if err != nil {
+		logger.Fatal().Err(err).Msg("read db/location_postgres.sql; sqlite succeeded but postgres is not synchronized")
+	}
+	indexes, err := os.ReadFile("db/location_postgres_indexes.sql")
+	if err != nil {
+		logger.Fatal().Err(err).Msg("read db/location_postgres_indexes.sql; sqlite succeeded but postgres is not synchronized")
+	}
+	if err := pgRepo.ReplaceFromSQLite(ctx, sqliteRepo, string(schema), string(indexes)); err != nil {
+		logger.Fatal().Err(err).Msg("copy sqlite snapshot to postgres; sqlite succeeded but postgres is not synchronized")
+	}
+	logger.Info().Msg("postgres snapshot synchronized")
 }
 
 // initAddressSchemas creates the SQLite address and google_maps schemas.

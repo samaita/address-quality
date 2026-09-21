@@ -99,7 +99,7 @@ func (r *Repository) HasAddressTables(ctx context.Context) (bool, error) {
 }
 
 func (r *Repository) ExecSchema(ctx context.Context, sqlContent string) error {
-	for _, stmt := range strings.Split(sqlContent, ";") {
+	for _, stmt := range strings.Split(stripSQLComments(sqlContent), ";") {
 		lines := strings.Split(stmt, "\n")
 		start := 0
 		for start < len(lines) {
