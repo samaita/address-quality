@@ -8,7 +8,9 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 
 	"address-quality/internal/logger"
@@ -17,9 +19,10 @@ import (
 )
 
 type LocationRepository struct {
-	db *sql.DB
+	db *sqlDB
 }
 
+// NewLocationDB opens the mandatory SQLite location database.
 func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error) {
 	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
@@ -33,14 +36,53 @@ func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error)
 	}
 
 	logger.Info().Str("db_path", dbPath).Msg("location database initialized")
-	return &LocationRepository{db: db}, nil
+	return &LocationRepository{db: &sqlDB{DB: db}}, nil
+}
+
+// NewPostgresDB opens the optional Postgres connection. When dsn is empty it
+// returns (nil, nil): Postgres is not configured and the app runs without it.
+// On a ping failure it still returns the repository alongside the error so the
+// caller can keep running and surface the failure via /health.
+func NewPostgresDB(dsn string, maxOpenConns int) (*LocationRepository, error) {
+	if dsn == "" {
+		logger.Info().Msg("postgres not configured, skipping")
+		return nil, nil
+	}
+
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, logDBErr(context.Background(), "open", dsn, err)
+	}
+
+	db.SetMaxOpenConns(maxOpenConns)
+	repo := &LocationRepository{db: &sqlDB{DB: db, pg: true}}
+
+	if err = db.Ping(); err != nil {
+		return repo, logDBErr(context.Background(), "ping", dsn, err)
+	}
+
+	logger.Info().Msg("postgres connection initialized")
+	return repo, nil
 }
 
 func (r *LocationRepository) Ping(ctx context.Context) error {
+	if r == nil || r.db == nil {
+		return logDBErr(ctx, "ping", "", fmt.Errorf("location repository not initialized"))
+	}
 	return logDBErr(ctx, "ping", "", r.db.PingContext(ctx))
 }
 
+// IsPostgres reports whether this repository is backed by Postgres.
+func (r *LocationRepository) IsPostgres() bool {
+	return r.db.pg
+}
+
 func (r *LocationRepository) HasLocationTables(ctx context.Context) (bool, error) {
+	if r.db.pg {
+		var exists bool
+		err := r.db.QueryRowContext(ctx, `SELECT to_regclass('location_sources') IS NOT NULL`).Scan(&exists)
+		return exists, logDBErr(ctx, "has_location_tables", "", err)
+	}
 	var name string
 	err := r.db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='location_sources'`).Scan(&name)
 	if err == sql.ErrNoRows {
@@ -139,9 +181,13 @@ type LocationCodeRow struct {
 }
 
 func (r *LocationRepository) DropAll(ctx context.Context) error {
-	tables := []string{"location_hierarchy", "location_alias", "location_codes", "location_sources", "location_levels"}
+	tables := []string{"location_hierarchy", "location_alias", "location_codes", "location_sources", "location_city_priority", "location_levels"}
+	suffix := ""
+	if r.db.pg {
+		suffix = " CASCADE"
+	}
 	for _, t := range tables {
-		if _, err := r.db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", t)); err != nil {
+		if _, err := r.db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s%s", t, suffix)); err != nil {
 			return logDBErr(ctx, "drop_all", t, fmt.Errorf("drop %s: %w", t, err))
 		}
 	}
@@ -179,6 +225,11 @@ func (r *LocationRepository) TruncateAll(ctx context.Context) error {
 		"DELETE FROM location_codes",
 		"DELETE FROM location_sources",
 		"DELETE FROM sqlite_sequence WHERE name IN ('location_hierarchy', 'location_alias', 'location_codes', 'location_sources')",
+	}
+	if r.db.pg {
+		queries = []string{
+			"TRUNCATE location_hierarchy, location_alias, location_codes, location_sources, location_city_priority RESTART IDENTITY CASCADE",
+		}
 	}
 	for _, q := range queries {
 		if _, err := r.db.ExecContext(ctx, q); err != nil {
@@ -229,10 +280,11 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT OR IGNORE INTO location_hierarchy (location_source_id, province_id, city_id, district_id, subdistrict_id)
+	stmt, err := tx.PrepareContext(ctx, r.db.rebind(`
+		INSERT INTO location_hierarchy (location_source_id, province_id, city_id, district_id, subdistrict_id)
 		VALUES (?, ?, ?, ?, ?)
-	`)
+		ON CONFLICT DO NOTHING
+	`))
 	if err != nil {
 		return logDBErr(ctx, "rebuild_hierarchy_prepare", sourceID, fmt.Errorf("prepare: %w", err))
 	}
@@ -304,15 +356,16 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `
-		UPDATE location_codes SET lowercase_normalized = ?, updated_at = datetime('now') WHERE id = ?
-	`)
+	stmt, err := tx.PrepareContext(ctx, r.db.rebind(`
+		UPDATE location_codes SET lowercase_normalized = ?, updated_at = ? WHERE id = ?
+	`))
 	if err != nil {
 		return logDBErr(ctx, "rebuild_normalized_prepare", "", fmt.Errorf("prepare: %w", err))
 	}
 	defer stmt.Close()
 
 	var count int
+	now := time.Now().UTC().Format(time.RFC3339)
 	for rows.Next() {
 		var id int64
 		var name string
@@ -320,7 +373,7 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 			return logDBErr(ctx, "rebuild_normalized_scan", id, fmt.Errorf("scan: %w", err))
 		}
 		normalized := normalizer.Normalize(name)
-		if _, err := stmt.ExecContext(ctx, normalized, id); err != nil {
+		if _, err := stmt.ExecContext(ctx, normalized, now, id); err != nil {
 			return logDBErr(ctx, "rebuild_normalized_update", id, fmt.Errorf("update %d: %w", id, err))
 		}
 		count++
@@ -338,24 +391,37 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 }
 
 func (r *LocationRepository) InsertLocationSource(ctx context.Context, code, version, name, codeDate, desc string) (int64, error) {
-	result, err := r.db.ExecContext(ctx, `
-		INSERT OR IGNORE INTO location_sources (code, version, name, code_date, desc)
+	query := `
+		INSERT INTO location_sources (code, version, name, code_date, desc)
 		VALUES (?, ?, ?, ?, ?)
-	`, code, version, name, codeDate, desc)
-	if err != nil {
-		return 0, logDBErr(ctx, "insert_source", map[string]any{"code": code, "version": version, "name": name}, fmt.Errorf("insert source: %w", err))
+		ON CONFLICT DO NOTHING`
+
+	var id int64
+	if r.db.pg {
+		// pgx does not support LastInsertId; RETURNING gives the new id, or no
+		// rows on conflict (handled by the lookup below).
+		err := r.db.QueryRowContext(ctx, query+" RETURNING id", code, version, name, codeDate, desc).Scan(&id)
+		if err != nil && err != sql.ErrNoRows {
+			return 0, logDBErr(ctx, "insert_source", map[string]any{"code": code, "version": version, "name": name}, fmt.Errorf("insert source: %w", err))
+		}
+		if id > 0 {
+			return id, nil
+		}
+	} else {
+		result, err := r.db.ExecContext(ctx, query, code, version, name, codeDate, desc)
+		if err != nil {
+			return 0, logDBErr(ctx, "insert_source", map[string]any{"code": code, "version": version, "name": name}, fmt.Errorf("insert source: %w", err))
+		}
+		id, err = result.LastInsertId()
+		if err != nil {
+			return 0, logDBErr(ctx, "insert_source_last_insert_id", code, fmt.Errorf("last insert id: %w", err))
+		}
+		if id > 0 {
+			return id, nil
+		}
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, logDBErr(ctx, "insert_source_last_insert_id", code, fmt.Errorf("last insert id: %w", err))
-	}
-
-	if id > 0 {
-		return id, nil
-	}
-
-	err = r.db.QueryRowContext(ctx, `
+	err := r.db.QueryRowContext(ctx, `
 		SELECT id FROM location_sources WHERE code = ? AND version = ? AND deleted_at IS NULL
 	`, code, version).Scan(&id)
 	if err != nil {
@@ -371,10 +437,11 @@ func (r *LocationRepository) InsertLocationCodeBatch(ctx context.Context, source
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT OR IGNORE INTO location_codes (location_source_id, kode, name, lowercase_normalized, level_id, postal_code)
+	stmt, err := tx.PrepareContext(ctx, r.db.rebind(`
+		INSERT INTO location_codes (location_source_id, kode, name, lowercase_normalized, level_id, postal_code)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`)
+		ON CONFLICT DO NOTHING
+	`))
 	if err != nil {
 		return logDBErr(ctx, "insert_code_batch_prepare", sourceID, fmt.Errorf("prepare: %w", err))
 	}
@@ -629,10 +696,11 @@ func (r *LocationRepository) RebuildCityPriority(ctx context.Context, sourceID i
 		return logDBErr(ctx, "rebuild_city_priority_delete", sourceID, fmt.Errorf("delete city priority: %w", err))
 	}
 
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT OR IGNORE INTO location_city_priority (location_source_id, lowercase_normalized, city_type)
+	stmt, err := tx.PrepareContext(ctx, r.db.rebind(`
+		INSERT INTO location_city_priority (location_source_id, lowercase_normalized, city_type)
 		VALUES (?, ?, ?)
-	`)
+		ON CONFLICT DO NOTHING
+	`))
 	if err != nil {
 		return logDBErr(ctx, "rebuild_city_priority_prepare", sourceID, fmt.Errorf("prepare: %w", err))
 	}

@@ -44,6 +44,19 @@ type LocationRepository interface {
 	FindAllCityPriority(ctx context.Context, sourceID int64) ([]database.CityPriorityRow, error)
 }
 
+// PostgresRepository is the optional second connection. It is nil when Postgres
+// is not configured; the app runs on SQLite alone in that case.
+type PostgresRepository interface {
+	Ping(ctx context.Context) error
+}
+
+// DBStatus is the per-connection health status.
+type DBStatus struct {
+	Database         string // SQLite address DB (mandatory)
+	LocationDatabase string // SQLite location DB (mandatory)
+	Postgres         string // Postgres (optional): "ok" | "error" | "disabled"
+}
+
 type provinceEntry struct {
 	ID   int64
 	Name string
@@ -73,6 +86,7 @@ type subDistrictEntry struct {
 type Service struct {
 	repo               AddressRepository
 	locationRepo       LocationRepository
+	postgresRepo       PostgresRepository
 	s                  *sanitizer.Sanitizer
 	maxAddressLength   int
 	sourceCode         string
@@ -117,10 +131,11 @@ type Service struct {
 	phraseDictErr  error
 }
 
-func New(repo AddressRepository, locationRepo LocationRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string, enableStoreRequest bool, googleMapsMock bool, googleMapsAPIKey string, googleMapsBaseURL string) *Service {
+func New(repo AddressRepository, locationRepo LocationRepository, postgresRepo PostgresRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string, enableStoreRequest bool, googleMapsMock bool, googleMapsAPIKey string, googleMapsBaseURL string) *Service {
 	svc := &Service{
 		repo:               repo,
 		locationRepo:       locationRepo,
+		postgresRepo:       postgresRepo,
 		s:                  s,
 		maxAddressLength:   maxAddressLength,
 		sourceCode:         sourceCode,
@@ -153,8 +168,29 @@ func (svc *Service) Shutdown(ctx context.Context) error {
 	return svc.storeQueue.Shutdown(ctx)
 }
 
-func (svc *Service) Ping(ctx context.Context) error {
-	return svc.repo.Ping(ctx)
+// Ping checks every configured connection. The SQLite databases are mandatory,
+// so a failure there is returned as err. Postgres is optional: its status is
+// reported but never returned as err.
+func (svc *Service) Ping(ctx context.Context) (DBStatus, error) {
+	status := DBStatus{Database: "ok", LocationDatabase: "ok", Postgres: "disabled"}
+	var err error
+
+	if e := svc.repo.Ping(ctx); e != nil {
+		status.Database, err = "error", e
+	}
+	if e := svc.locationRepo.Ping(ctx); e != nil {
+		status.LocationDatabase = "error"
+		if err == nil {
+			err = e
+		}
+	}
+	if svc.postgresRepo != nil {
+		status.Postgres = "ok"
+		if e := svc.postgresRepo.Ping(ctx); e != nil {
+			status.Postgres = "error"
+		}
+	}
+	return status, err
 }
 
 func (svc *Service) MaxAddressLength() int {

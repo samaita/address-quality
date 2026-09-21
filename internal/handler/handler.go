@@ -33,10 +33,18 @@ func New(svc *service.Service) *Handler {
 // @Router       /health [get]
 func (h *Handler) HandleHealthCheck(c echo.Context) error {
 	ctx := c.Request().Context()
-	if err := h.svc.Ping(ctx); err != nil {
-		return c.JSON(http.StatusServiceUnavailable, model.HealthResponse{Status: "error"})
+	status, err := h.svc.Ping(ctx)
+	resp := model.HealthResponse{
+		Status:           "ok",
+		Database:         status.Database,
+		LocationDatabase: status.LocationDatabase,
+		Postgres:         status.Postgres,
 	}
-	return c.JSON(http.StatusOK, model.HealthResponse{Status: "ok", Database: "ok"})
+	if err != nil {
+		resp.Status = "error"
+		return c.JSON(http.StatusServiceUnavailable, resp)
+	}
+	return c.JSON(http.StatusOK, resp)
 }
 
 func errorResponse(c echo.Context, status int, msg string, requestID string) error {

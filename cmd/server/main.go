@@ -45,8 +45,21 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to initialize location database")
 	}
 
+	// Optional second connection; the app runs on SQLite alone when Postgres
+	// is not configured or unreachable.
+	postgresRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Warn().Err(err).Msg("postgres unavailable, continuing without it")
+	}
+	// Avoid the typed-nil-in-interface trap: only set the interface when a real
+	// connection exists.
+	var postgresSvc service.PostgresRepository
+	if postgresRepo != nil {
+		postgresSvc = postgresRepo
+	}
+
 	s := sanitizer.New(sanitizer.DefaultPolicy())
-	svc := service.New(repo, locationRepo, s, cfg.MaxAddressLength, cfg.LocationSourceCode, cfg.EnableStoreRequest, cfg.GoogleMapsAPIMock, cfg.GoogleMapsAPIKey, cfg.GoogleMapsBaseURL)
+	svc := service.New(repo, locationRepo, postgresSvc, s, cfg.MaxAddressLength, cfg.LocationSourceCode, cfg.EnableStoreRequest, cfg.GoogleMapsAPIMock, cfg.GoogleMapsAPIKey, cfg.GoogleMapsBaseURL)
 	h := handler.New(svc)
 
 	e := router.Setup(h, cfg)
