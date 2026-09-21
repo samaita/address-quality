@@ -62,6 +62,15 @@ definitions:
         example: "2026-07-29T05:06:43Z"
         type: string
     type: object
+  model.FuzzyCorrection:
+    properties:
+      from:
+        example: cihuar
+        type: string
+      to:
+        example: Cihaur Geulis
+        type: string
+    type: object
   model.GeocodeRequest:
     properties:
       address:
@@ -122,6 +131,10 @@ definitions:
     type: object
   model.Metadata:
     properties:
+      fuzzy_corrections:
+        items:
+          $ref: '#/definitions/model.FuzzyCorrection'
+        type: array
       location_source:
         example: kemendagri
         type: string

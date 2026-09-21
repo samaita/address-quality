@@ -564,6 +564,47 @@ func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode st
 	return results, nil
 }
 
+// FindSimilarLocations returns up to limit location rows whose
+// lowercase_normalized is word-similar (pg_trgm) to the given token, strongest
+// first, across all admin levels. Postgres only: trigram matching does not
+// exist on SQLite, so it returns (nil, nil) there and callers skip fuzzy
+// resolution. The `%>` form keeps the GIN trigram index usable.
+func (r *LocationRepository) FindSimilarLocations(ctx context.Context, sourceID int64, token string, limit int, minSimilarity float64) ([]model.Entity, error) {
+	if r == nil || r.db == nil || !r.db.pg {
+		return nil, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, name, level_id, COALESCE(postal_code, '')
+		FROM location_codes
+		WHERE location_source_id = ? AND deleted_at IS NULL
+		  AND level_id BETWEEN 2 AND 5
+		  AND lowercase_normalized %> ?
+		  AND word_similarity(?, lowercase_normalized) >= ?
+		ORDER BY word_similarity(?, lowercase_normalized) DESC
+		LIMIT ?
+	`, sourceID, token, token, minSimilarity, token, limit)
+	if err != nil {
+		return nil, logDBErr(ctx, "find_similar_locations", map[string]any{"source_id": sourceID, "token": token}, err)
+	}
+	defer rows.Close()
+
+	levelNames := map[int]string{2: "PROVINCE", 3: "CITY", 4: "DISTRICT", 5: "SUBDISTRICT"}
+	var entities []model.Entity
+	for rows.Next() {
+		var e model.Entity
+		var levelID int
+		if err := rows.Scan(&e.ID, &e.Name, &levelID, &e.PostalCode); err != nil {
+			return nil, logDBErr(ctx, "find_similar_locations_scan", map[string]any{"source_id": sourceID, "token": token}, err)
+		}
+		e.Level = levelNames[levelID]
+		entities = append(entities, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logDBErr(ctx, "find_similar_locations_rows", map[string]any{"source_id": sourceID, "token": token}, err)
+	}
+	return entities, nil
+}
+
 type DistrictRow struct {
 	ID                  int64
 	SourceID            int64

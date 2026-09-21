@@ -49,7 +49,8 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 
 	roadTokens := detectRoadContextTokens(sanitized)
 	resolved := svc.ResolveEvidence(ctx, sourceID, evidence, normalized, roadTokens)
-	log.Debug().Int("resolved_count", len(resolved)).Msg("entity resolution")
+	resolved, fuzzyCorrections := svc.AppendFuzzyEvidence(ctx, sourceID, resolved)
+	log.Debug().Int("resolved_count", len(resolved)).Int("fuzzy_corrections", len(fuzzyCorrections)).Msg("entity resolution")
 
 	candidates := svc.DiscoverCandidates(resolved, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
 	candidates = DeduplicateCandidates(candidates)
@@ -57,8 +58,9 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	candidates = BuildConclusions(candidates, svc.hierarchyCache, resolved)
 
 	var scored []scoredCandidate
+	evalEvidence := evidenceWithoutValues(evidenceAsSlice(evidence), fuzzyCorrections)
 	for _, c := range candidates {
-		eval := EvaluateCandidate(&c, svc.hierarchyCache, evidenceAsSlice(evidence))
+		eval := EvaluateCandidate(&c, svc.hierarchyCache, evalEvidence)
 		scored = append(scored, scoredCandidate{candidate: c, eval: eval})
 	}
 
@@ -149,6 +151,8 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		unusedStrs[i] = u.Value
 	}
 
+	fuzzyMetadata := sortedFuzzyCorrections(fuzzyCorrections)
+
 	data := model.ResponseData{
 		AddressID:       addressID,
 		Status:          status,
@@ -169,8 +173,9 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 			Candidates:     resolutionCands,
 		},
 		Metadata: model.Metadata{
-			LocationSource:  sourceCode,
-			LocationVersion: sourceVersion,
+			LocationSource:   sourceCode,
+			LocationVersion:  sourceVersion,
+			FuzzyCorrections: fuzzyMetadata,
 		},
 	}
 
@@ -245,6 +250,35 @@ func formatLocation(location model.Location) string {
 
 func evidenceAsSlice(evidence []model.Evidence) []model.Evidence {
 	return evidence
+}
+
+// evidenceWithoutValues drops evidence whose values were corrected by fuzzy
+// matching, so typo tokens do not surface as unused evidence and drag the
+// winning candidate's confidence down.
+func evidenceWithoutValues(evidence []model.Evidence, corrections map[string]string) []model.Evidence {
+	if len(corrections) == 0 {
+		return evidence
+	}
+	filtered := make([]model.Evidence, 0, len(evidence))
+	for _, ev := range evidence {
+		if _, corrected := corrections[ev.Value]; corrected {
+			continue
+		}
+		filtered = append(filtered, ev)
+	}
+	return filtered
+}
+
+func sortedFuzzyCorrections(corrections map[string]string) []model.FuzzyCorrection {
+	if len(corrections) == 0 {
+		return nil
+	}
+	out := make([]model.FuzzyCorrection, 0, len(corrections))
+	for from, to := range corrections {
+		out = append(out, model.FuzzyCorrection{From: from, To: to})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].From < out[j].From })
+	return out
 }
 
 type scoredCandidate struct {
