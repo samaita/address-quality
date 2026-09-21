@@ -10,8 +10,10 @@ import (
 )
 
 type HealthResponse struct {
-	Status   string `json:"status" example:"ok"`
-	Database string `json:"database,omitempty" example:"ok"`
+	Status           string `json:"status" example:"ok"`
+	Database         string `json:"database,omitempty" example:"ok"`
+	LocationDatabase string `json:"location_database,omitempty" example:"ok"`
+	Postgres         string `json:"postgres,omitempty" example:"disabled"`
 }
 
 type ErrorResponse struct {
