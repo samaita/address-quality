@@ -29,6 +29,7 @@ func main() {
 	initFlag := flag.Bool("init", false, "Create schema from db/location.sql (only when no tables exist)")
 	truncateFlag := flag.Bool("truncate", false, "Truncate all data rows (keep schema) before seeding")
 	normalizeFlag := flag.Bool("normalize", false, "Rebuild lowercase_normalized column for all existing location_codes")
+	postgresOnlyFlag := flag.Bool("postgres-only", false, "Operate on the Postgres connection only (requires POSTGRES_DSN)")
 	dbPathFlag := flag.String("db", "", "Path to location.db (default from config); Postgres is seeded too when POSTGRES_DSN is set")
 
 	flag.Usage = func() {
@@ -45,6 +46,8 @@ Reset:        seeder --drop && seeder --init
 Retry:        seeder --truncate
 Recalc:       seeder --normalize
 Update data:  seeder            (tables must already exist)
+
+Postgres only: seeder --init --postgres-only   (requires POSTGRES_DSN)
 
 Flags:
 `)
@@ -81,28 +84,35 @@ Flags:
 
 	ctx := context.Background()
 
-	repo, err := database.NewLocationDB(dbPath, cfg.DBMaxOpenConns)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("open location db")
+	var targets []*database.LocationRepository
+	if *postgresOnlyFlag {
+		pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("open postgres")
+		}
+		if pgRepo == nil {
+			logger.Fatal().Msg("--postgres-only requires POSTGRES_DSN")
+		}
+		targets = []*database.LocationRepository{pgRepo}
+	} else {
+		repo, err := database.NewLocationDB(dbPath, cfg.DBMaxOpenConns)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("open location db")
+		}
+		targets = []*database.LocationRepository{repo}
+
+		// Postgres is an additional target when configured.
+		pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("open postgres")
+		}
+		if pgRepo != nil {
+			targets = append(targets, pgRepo)
+			logger.Info().Msg("postgres target enabled")
+		}
 	}
 
-	// SQLite is always a target; Postgres is added when configured.
-	targets := []*database.LocationRepository{repo}
-	pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("open postgres")
-	}
-	if pgRepo != nil {
-		targets = append(targets, pgRepo)
-		logger.Info().Msg("postgres target enabled")
-	}
-
-	addressRepo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("open address db")
-	}
-
-	hasTables, err := repo.HasLocationTables(ctx)
+	hasTables, err := targets[0].HasLocationTables(ctx)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("check tables")
 	}
@@ -115,40 +125,8 @@ Flags:
 			execLocationSchema(ctx, t)
 		}
 
-		hasAddressTables, err := addressRepo.HasAddressTables(ctx)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("check address tables")
-		}
-		if !hasAddressTables {
-			logger.Info().Msg("running db/address.sql...")
-			addressSchema, err := os.ReadFile("db/address.sql")
-			if err != nil {
-				logger.Fatal().Err(err).Msg("read db/address.sql")
-			}
-			if err := addressRepo.ExecSchema(ctx, string(addressSchema)); err != nil {
-				logger.Fatal().Err(err).Msg("exec address schema")
-			}
-			logger.Info().Msg("address schema created")
-		} else {
-			logger.Info().Msg("address tables already exist")
-		}
-
-		hasGoogleMapsTable, err := addressRepo.HasGoogleMapsTable(ctx)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("check google maps table")
-		}
-		if !hasGoogleMapsTable {
-			logger.Info().Msg("running db/google_maps.sql...")
-			googleMapsSchema, err := os.ReadFile("db/google_maps.sql")
-			if err != nil {
-				logger.Fatal().Err(err).Msg("read db/google_maps.sql")
-			}
-			if err := addressRepo.ExecSchema(ctx, string(googleMapsSchema)); err != nil {
-				logger.Fatal().Err(err).Msg("exec google maps schema")
-			}
-			logger.Info().Msg("google maps schema created")
-		} else {
-			logger.Info().Msg("google maps table already exists")
+		if !*postgresOnlyFlag {
+			initAddressSchemas(ctx, cfg)
 		}
 	} else if *dropFlag {
 		if !hasTables {
@@ -269,6 +247,50 @@ func execLocationSchema(ctx context.Context, t *database.LocationRepository) {
 		logger.Fatal().Err(err).Str("file", file).Msg("exec location schema")
 	}
 	logger.Info().Str("file", file).Msg("location schema created")
+}
+
+// initAddressSchemas creates the SQLite address and google_maps schemas.
+func initAddressSchemas(ctx context.Context, cfg *config.Config) {
+	addressRepo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("open address db")
+	}
+
+	hasAddressTables, err := addressRepo.HasAddressTables(ctx)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("check address tables")
+	}
+	if !hasAddressTables {
+		logger.Info().Msg("running db/address.sql...")
+		addressSchema, err := os.ReadFile("db/address.sql")
+		if err != nil {
+			logger.Fatal().Err(err).Msg("read db/address.sql")
+		}
+		if err := addressRepo.ExecSchema(ctx, string(addressSchema)); err != nil {
+			logger.Fatal().Err(err).Msg("exec address schema")
+		}
+		logger.Info().Msg("address schema created")
+	} else {
+		logger.Info().Msg("address tables already exist")
+	}
+
+	hasGoogleMapsTable, err := addressRepo.HasGoogleMapsTable(ctx)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("check google maps table")
+	}
+	if !hasGoogleMapsTable {
+		logger.Info().Msg("running db/google_maps.sql...")
+		googleMapsSchema, err := os.ReadFile("db/google_maps.sql")
+		if err != nil {
+			logger.Fatal().Err(err).Msg("read db/google_maps.sql")
+		}
+		if err := addressRepo.ExecSchema(ctx, string(googleMapsSchema)); err != nil {
+			logger.Fatal().Err(err).Msg("exec google maps schema")
+		}
+		logger.Info().Msg("google maps schema created")
+	} else {
+		logger.Info().Msg("google maps table already exists")
+	}
 }
 
 func parseWilayah(path string) ([]database.LocationCodeRow, error) {
