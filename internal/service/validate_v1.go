@@ -49,16 +49,28 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 
 	roadTokens := detectRoadContextTokens(sanitized)
 	resolved := svc.ResolveEvidence(ctx, sourceID, evidence, normalized, roadTokens)
-	resolved, fuzzyCorrections := svc.AppendFuzzyEvidence(ctx, sourceID, resolved)
+
+	buildCandidates := func(res []model.ResolvedEvidence) []model.AdminCandidate {
+		cands := svc.DiscoverCandidates(res, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
+		cands = DeduplicateCandidates(cands)
+		cands = svc.EnrichCandidates(cands)
+		return BuildConclusions(cands, svc.hierarchyCache, res)
+	}
+
+	candidates := buildCandidates(resolved)
+
+	// Second-pass contextual recovery: exact-resolution candidates provide the
+	// context; unexplained input spans are fuzzy-matched against their
+	// in-memory neighborhood; recovered evidence triggers a single rebuild.
+	recovered, fuzzyCorrections, fuzzyExplained := svc.RecoverContextualEvidence(candidates, resolved, normalized, roadTokens)
+	if len(recovered) > 0 {
+		resolved = append(resolved, recovered...)
+		candidates = buildCandidates(resolved)
+	}
 	log.Debug().Int("resolved_count", len(resolved)).Int("fuzzy_corrections", len(fuzzyCorrections)).Msg("entity resolution")
 
-	candidates := svc.DiscoverCandidates(resolved, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
-	candidates = DeduplicateCandidates(candidates)
-	candidates = svc.EnrichCandidates(candidates)
-	candidates = BuildConclusions(candidates, svc.hierarchyCache, resolved)
-
 	var scored []scoredCandidate
-	evalEvidence := evidenceWithoutValues(evidenceAsSlice(evidence), fuzzyCorrections)
+	evalEvidence := evidenceWithoutValues(evidence, fuzzyExplained)
 	for _, c := range candidates {
 		eval := EvaluateCandidate(&c, svc.hierarchyCache, evalEvidence)
 		scored = append(scored, scoredCandidate{candidate: c, eval: eval})
@@ -252,16 +264,16 @@ func evidenceAsSlice(evidence []model.Evidence) []model.Evidence {
 	return evidence
 }
 
-// evidenceWithoutValues drops evidence whose values were corrected by fuzzy
-// matching, so typo tokens do not surface as unused evidence and drag the
+// evidenceWithoutValues drops evidence tokens consumed by contextual fuzzy
+// recovery, so typo tokens do not surface as unused evidence and drag the
 // winning candidate's confidence down.
-func evidenceWithoutValues(evidence []model.Evidence, corrections map[string]string) []model.Evidence {
-	if len(corrections) == 0 {
+func evidenceWithoutValues(evidence []model.Evidence, explained map[string]bool) []model.Evidence {
+	if len(explained) == 0 {
 		return evidence
 	}
 	filtered := make([]model.Evidence, 0, len(evidence))
 	for _, ev := range evidence {
-		if _, corrected := corrections[ev.Value]; corrected {
+		if explained[ev.Value] {
 			continue
 		}
 		filtered = append(filtered, ev)

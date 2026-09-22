@@ -130,6 +130,13 @@ type Service struct {
 	phraseDict     map[string]map[string][]model.Entity
 	phraseDictOnce sync.Once
 	phraseDictErr  error
+
+	// Lazily built parent->children indexes for contextual fuzzy recovery
+	// (in-memory neighborhood, no DB round trips).
+	childrenOnce           sync.Once
+	citiesByProvince       map[int64][]*cityEntry
+	districtsByCity        map[int64][]*districtEntry
+	subDistrictsByDistrict map[int64][]*subDistrictEntry
 }
 
 func New(repo AddressRepository, locationRepo LocationRepository, postgresRepo PostgresRepository, s *sanitizer.Sanitizer, maxAddressLength int, sourceCode string, enableStoreRequest bool, googleMapsMock bool, googleMapsAPIKey string, googleMapsBaseURL string) *Service {
