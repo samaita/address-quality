@@ -12,6 +12,8 @@ import (
 )
 
 var roadPrefixPattern = regexp.MustCompile(`\b(jl|jalan|gg|gang)\b`)
+var roadContextPattern = regexp.MustCompile(`(?i)\b(jl\.?|jalan|gg\.?|gang)\s+([a-z][a-z\s]*)`)
+var roadContextCutPattern = regexp.MustCompile(`(?i)\b(no\.?|rt\.?|rw\.?|\d+|,)\b`)
 
 // detectRoadContextTokens returns the set of normalized tokens that follow a
 // road prefix (jl/jalan/gg/gang) in the raw (pre-normalization) text. Such
@@ -20,13 +22,11 @@ var roadPrefixPattern = regexp.MustCompile(`\b(jl|jalan|gg|gang)\b`)
 func detectRoadContextTokens(raw string) map[string]bool {
 	tokens := make(map[string]bool)
 	lower := strings.ToLower(raw)
-	re := regexp.MustCompile(`\b(jl\.?|jalan|gg\.?|gang)\s+([a-z][a-z\s]*)`)
-	for _, m := range re.FindAllStringSubmatch(lower, -1) {
+	for _, m := range roadContextPattern.FindAllStringSubmatch(lower, -1) {
 		if len(m) > 2 && m[2] != "" {
 			phrase := strings.TrimSpace(m[2])
 			// cut at common road-name terminators: numbers, "no", "rt", "rw", comma
-			cut := regexp.MustCompile(`\b(no\.?|rt\.?|rw\.?|\d+|,)\b`)
-			if idx := cut.FindStringIndex(phrase); idx != nil {
+			if idx := roadContextCutPattern.FindStringIndex(phrase); idx != nil {
 				phrase = phrase[:idx[0]]
 			}
 			phrase = strings.TrimSpace(phrase)
@@ -39,6 +39,24 @@ func detectRoadContextTokens(raw string) map[string]bool {
 		}
 	}
 	return tokens
+}
+
+// stripRoadContext removes road prefixes and their following road-name span
+// while retaining the rest of the address. It is used only by compact exact
+// matching, so a road name cannot become a whitespace-normalized location
+// alias while a later administrative occurrence remains available.
+func stripRoadContext(raw string) string {
+	return roadContextPattern.ReplaceAllStringFunc(raw, func(match string) string {
+		parts := roadContextPattern.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+		phrase := parts[2]
+		if idx := roadContextCutPattern.FindStringIndex(phrase); idx != nil {
+			return phrase[idx[0]:]
+		}
+		return ""
+	})
 }
 
 func ExtractEvidence(normalized string) []model.Evidence {
@@ -57,10 +75,7 @@ func ExtractEvidence(normalized string) []model.Evidence {
 	words := strings.Fields(rest)
 	seen := make(map[string]bool)
 	for _, w := range words {
-		if postalCodePattern.MatchString(w) {
-			continue
-		}
-		if roadPrefixPattern.MatchString(w) {
+		if postalCodePattern.MatchString(w) || roadPrefixPattern.MatchString(w) {
 			continue
 		}
 		lower := strings.ToLower(w)
@@ -68,28 +83,8 @@ func ExtractEvidence(normalized string) []model.Evidence {
 			continue
 		}
 		seen[lower] = true
-		if isRoadNameWord(w) {
-			evidence = append(evidence, model.Evidence{
-				Type:  model.EvidenceRoadName,
-				Value: w,
-			})
-		} else {
-			evidence = append(evidence, model.Evidence{
-				Type:  model.EvidencePlaceName,
-				Value: w,
-			})
-		}
+		evidence = append(evidence, model.Evidence{Type: model.EvidencePlaceName, Value: w})
 	}
 
 	return evidence
-}
-
-func isRoadNameWord(w string) bool {
-	roadIndicators := []string{"jl", "jalan", "gg", "gang"}
-	for _, ri := range roadIndicators {
-		if strings.EqualFold(w, ri) {
-			return false
-		}
-	}
-	return false
 }

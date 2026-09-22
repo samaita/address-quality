@@ -48,7 +48,8 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
 
 	roadTokens := detectRoadContextTokens(sanitized)
-	resolved := svc.ResolveEvidence(ctx, sourceID, evidence, normalized, roadTokens)
+	compactMatchText := normalizer.Normalize(stripRoadContext(sanitized))
+	resolved := svc.ResolveEvidence(ctx, sourceID, evidence, normalized, compactMatchText, roadTokens)
 
 	buildCandidates := func(res []model.ResolvedEvidence) []model.AdminCandidate {
 		cands := svc.DiscoverCandidates(res, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
