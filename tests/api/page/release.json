@@ -1,7 +1,7 @@
 {
-  "release": "v0.1.0-alpha",
-  "build": "v0.1.0-alpha",
-  "git_commit": "02ba28d",
+  "release": "v0.1.3-alpha",
+  "build": "v0.1.3-alpha",
+  "git_commit": "6212f76",
   "runner": {
     "cpu": null,
     "memory": null,
