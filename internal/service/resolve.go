@@ -11,7 +11,7 @@ import (
 	"address-quality/internal/model"
 )
 
-func (svc *Service) ResolveEvidence(ctx context.Context, sourceID int64, evidence []model.Evidence, normalizedText string, roadTokens map[string]bool) []model.ResolvedEvidence {
+func (svc *Service) ResolveEvidence(ctx context.Context, sourceID int64, evidence []model.Evidence, normalizedText, compactMatchText string, roadTokens map[string]bool) []model.ResolvedEvidence {
 	if err := ensurePhraseDictLoaded(svc, ctx); err != nil {
 		return nil
 	}
@@ -37,7 +37,68 @@ func (svc *Service) ResolveEvidence(ctx context.Context, sourceID int64, evidenc
 
 	svc.applyCityPriority(resolved, roadTokens)
 
+	// Whitespace-only variants are an exact normalization fallback. Do not let
+	// them displace a literal subdistrict that is already supported by the same
+	// resolved hierarchy; later Nominatim/NER scoring can arbitrate those peers.
+	if !svc.hasHierarchyCompatibleExactSubdistrict(resolved) {
+		compactEntities := svc.matchCompactPhrases(sourceID, compactMatchText)
+		for i := range resolved {
+			re := &resolved[i]
+			if re.Evidence.Type != model.EvidencePlaceName {
+				continue
+			}
+			re.Candidates = appendUniqueEntities(re.Candidates, compactEntities[re.Evidence.Value]...)
+		}
+	}
+
 	return resolved
+}
+
+func (svc *Service) hasHierarchyCompatibleExactSubdistrict(resolved []model.ResolvedEvidence) bool {
+	if svc.hierarchyCache == nil {
+		return false
+	}
+	districts := make(map[int64]bool)
+	cities := make(map[int64]bool)
+	provinces := make(map[int64]bool)
+	for _, re := range resolved {
+		if re.Evidence.Type != model.EvidencePlaceName {
+			continue
+		}
+		for _, e := range re.Candidates {
+			switch e.Level {
+			case "DISTRICT":
+				districts[e.ID] = true
+			case "CITY":
+				cities[e.ID] = true
+			case "PROVINCE":
+				provinces[e.ID] = true
+			}
+		}
+	}
+
+	for _, re := range resolved {
+		if re.Evidence.Type != model.EvidencePlaceName {
+			continue
+		}
+		for _, e := range re.Candidates {
+			if e.Level != "SUBDISTRICT" {
+				continue
+			}
+			districtID, ok := svc.hierarchyCache.SubDistrictToDist[e.ID]
+			if !ok {
+				continue
+			}
+			cityID := svc.hierarchyCache.DistrictToCity[districtID]
+			provinceID := svc.hierarchyCache.CityToProvince[cityID]
+			if (len(districts) == 0 || districts[districtID]) &&
+				(len(cities) == 0 || cities[cityID]) &&
+				(len(provinces) == 0 || provinces[provinceID]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // applyCityPriority suppresses SUBDISTRICT/DISTRICT candidates for tokens in the

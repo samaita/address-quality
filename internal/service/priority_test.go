@@ -4,16 +4,18 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"address-quality/internal/model"
+	"address-quality/internal/normalizer"
 )
 
 func priorityTestService() *Service {
 	return &Service{
 		cityPrioritySet: map[string]string{
-			"bandung": "KOTA",
-			"depok":   "KOTA",
+			"bandung":     "KOTA",
+			"depok":       "KOTA",
 			"karanganyar": "KABUPATEN",
 		},
 	}
@@ -32,7 +34,7 @@ func TestApplyCityPriority_SuppressesSubdistrictWhenSoleEvidence(t *testing.T) {
 			Candidates: []model.Entity{
 				ent(1, "Kota Bandung", "CITY"),
 				ent(2, "Kabupaten Bandung", "CITY"),
-				ent(3, "Bandung", "SUBDISTRICT"),   // Tulungagung subdist
+				ent(3, "Bandung", "SUBDISTRICT"), // Tulungagung subdist
 				ent(4, "Bandung", "DISTRICT"),
 			},
 		},
@@ -122,7 +124,7 @@ func TestApplyCityPriority_RoadNameNotEvidence(t *testing.T) {
 			},
 		},
 		{
-			Evidence: model.Evidence{Type: model.EvidenceRoadName, Value: "aceh"},
+			Evidence:   model.Evidence{Type: model.EvidenceRoadName, Value: "aceh"},
 			Candidates: nil, // road names never resolve
 		},
 	}
@@ -184,7 +186,7 @@ func TestDetectRoadContextTokens(t *testing.T) {
 		{"Jalan Merdeka No.1", map[string]bool{"merdeka": true}},
 		{"Gg. Haji", map[string]bool{"haji": true}},
 		{"Jl. Gatot Subroto No.86 Bandung", map[string]bool{"gatot": true, "subroto": true}},
-		{"Bandung", map[string]bool{}}, // no road prefix
+		{"Bandung", map[string]bool{}},           // no road prefix
 		{"Kecamatan Bandung", map[string]bool{}}, // admin prefix, not road
 	}
 	for _, tc := range cases {
@@ -198,5 +200,19 @@ func TestDetectRoadContextTokens(t *testing.T) {
 				t.Errorf("%q: missing %q in %v", tc.raw, k, got)
 			}
 		}
+	}
+}
+
+func TestStripRoadContext_PreservesLaterAdministrativeOccurrence(t *testing.T) {
+	got := normalizer.Normalize(stripRoadContext("JL. PASIR KALIKI NO.78, PASIR KALIKI, KEC. CICENDO"))
+	if got != "no pasir kaliki cicendo" {
+		t.Fatalf("unexpected stripped context: %q", got)
+	}
+}
+
+func TestStripRoadContext_RemovesRoadOnlyAlias(t *testing.T) {
+	got := normalizer.Normalize(stripRoadContext("Jl. Pasir Kaliki No.235, Sukabungah, Kec. Sukajadi"))
+	if strings.Contains(got, "pasir") || strings.Contains(got, "kaliki") {
+		t.Fatalf("road-only alias remained in compact-match text: %q", got)
 	}
 }
