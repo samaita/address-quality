@@ -22,6 +22,7 @@ type Config struct {
 	MaxAddressLength   int
 	AddressDBPath      string
 	LocationDBPath     string
+	PostgresDSN        string
 	DBMaxOpenConns     int
 	LocationSourceCode string
 	LogLevel           string
@@ -30,6 +31,11 @@ type Config struct {
 	GoogleMapsAPIMock  bool
 	GoogleMapsAPIKey   string
 	GoogleMapsBaseURL  string
+}
+
+// PostgresEnabled reports whether the optional Postgres connection is configured.
+func (c *Config) PostgresEnabled() bool {
+	return c.PostgresDSN != ""
 }
 
 func Load() *Config {
@@ -48,6 +54,7 @@ func Load() *Config {
 	viper.SetDefault("MAX_ADDRESS_LENGTH", 1000)
 	viper.SetDefault("ADDRESS_DB_PATH", "db/address.db")
 	viper.SetDefault("LOCATION_DB_PATH", "db/location.db")
+	viper.SetDefault("POSTGRES_DSN", "")
 	viper.SetDefault("DB_MAX_OPEN_CONNS", 10)
 	viper.SetDefault("LOCATION_SOURCE_CODE", "kemendagri")
 	viper.SetDefault("LOG_LEVEL", "info")
@@ -72,6 +79,7 @@ func Load() *Config {
 		MaxAddressLength:   viper.GetInt("MAX_ADDRESS_LENGTH"),
 		AddressDBPath:      viper.GetString("ADDRESS_DB_PATH"),
 		LocationDBPath:     viper.GetString("LOCATION_DB_PATH"),
+		PostgresDSN:        viper.GetString("POSTGRES_DSN"),
 		DBMaxOpenConns:     viper.GetInt("DB_MAX_OPEN_CONNS"),
 		LocationSourceCode: viper.GetString("LOCATION_SOURCE_CODE"),
 		LogLevel:           viper.GetString("LOG_LEVEL"),
@@ -87,6 +95,7 @@ func Load() *Config {
 		Int("rate_limit", cfg.RateLimit).
 		Int("rate_window", cfg.RateWindow).
 		Bool("google_maps_api_mock", cfg.GoogleMapsAPIMock).
+		Bool("postgres_enabled", cfg.PostgresEnabled()).
 		Msg("config loaded")
 	return cfg
 }

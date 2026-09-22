@@ -310,3 +310,48 @@ func TestMatchPhrases_UsedIsStable(t *testing.T) {
 		t.Fatal("matchPhrases should be deterministic")
 	}
 }
+
+func TestMatchCompactPhrases_WhitespaceOnlyAlias(t *testing.T) {
+	svc := &Service{phraseDict: map[string]map[string][]model.Entity{
+		"1:balong gede": {
+			"SUBDISTRICT": {{ID: 100, Name: "Balong Gede", Level: "SUBDISTRICT"}},
+		},
+		"1:pasirkaliki": {
+			"SUBDISTRICT": {{ID: 101, Name: "Pasirkaliki", Level: "SUBDISTRICT"}},
+		},
+		"1:bandung": {
+			"CITY":        {{ID: 102, Name: "Kota Bandung", Level: "CITY"}},
+			"SUBDISTRICT": {{ID: 103, Name: "Bandung", Level: "SUBDISTRICT"}},
+		},
+	}}
+
+	cases := []struct {
+		input string
+		word  string
+		id    int64
+	}{
+		{input: "balonggede regol", word: "balonggede", id: 100},
+		{input: "pasir kaliki cicendo", word: "pasir", id: 101},
+	}
+	for _, tc := range cases {
+		got := svc.matchCompactPhrases(1, tc.input)[tc.word]
+		if len(got) != 1 || got[0].ID != tc.id {
+			t.Fatalf("matchCompactPhrases(%q)[%q] = %+v, want entity %d", tc.input, tc.word, got, tc.id)
+		}
+	}
+	if got := svc.matchCompactPhrases(1, "bandung")["bandung"]; len(got) != 0 {
+		t.Fatalf("ordinary exact phrase must not be replayed by compact matching: %+v", got)
+	}
+}
+
+func TestHierarchyCompatibleLiteralSubdistrictBlocksCompactPeer(t *testing.T) {
+	svc := newFixtureService()
+	resolved := []model.ResolvedEvidence{
+		ev(model.EvidencePlaceName, "cikeruh", model.Entity{ID: 1000, Name: "Cikeruh", Level: "SUBDISTRICT"}),
+		ev(model.EvidencePlaceName, "cicendo", model.Entity{ID: 100, Name: "Cicendo", Level: "DISTRICT"}),
+		ev(model.EvidencePlaceName, "bandung", model.Entity{ID: 10, Name: "Kota Bandung", Level: "CITY"}),
+	}
+	if !svc.hasHierarchyCompatibleExactSubdistrict(resolved) {
+		t.Fatal("expected the literal subdistrict under the resolved hierarchy to block compact peers")
+	}
+}

@@ -38,7 +38,8 @@ Seeds location.db from db/source/wilayah.sql and db/source/wilayah_kodepos.sql.
 
 The source files are MySQL dumps of Indonesian administrative regions and postal codes.
 The seeder parses them, determines hierarchy levels from kode patterns, normalizes names,
-and batch-inserts into location_codes.
+and batch-inserts into location_codes. When POSTGRES_DSN is configured, PostgreSQL is
+automatically replaced with an exact COPY of the completed SQLite location database.
 
 First run:   seeder --init
 Reset:        seeder --drop && seeder --init
@@ -86,11 +87,6 @@ Flags:
 		logger.Fatal().Err(err).Msg("open location db")
 	}
 
-	addressRepo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("open address db")
-	}
-
 	hasTables, err := repo.HasLocationTables(ctx)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("check tables")
@@ -100,51 +96,8 @@ Flags:
 		if hasTables {
 			logger.Fatal().Msg("tables already exist, use --drop to recreate")
 		}
-		logger.Info().Msg("running db/location.sql...")
-		schema, err := os.ReadFile("db/location.sql")
-		if err != nil {
-			logger.Fatal().Err(err).Msg("read db/location.sql")
-		}
-		if err := repo.ExecSchema(ctx, string(schema)); err != nil {
-			logger.Fatal().Err(err).Msg("exec schema")
-		}
-		logger.Info().Msg("schema created")
-
-		hasAddressTables, err := addressRepo.HasAddressTables(ctx)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("check address tables")
-		}
-		if !hasAddressTables {
-			logger.Info().Msg("running db/address.sql...")
-			addressSchema, err := os.ReadFile("db/address.sql")
-			if err != nil {
-				logger.Fatal().Err(err).Msg("read db/address.sql")
-			}
-			if err := addressRepo.ExecSchema(ctx, string(addressSchema)); err != nil {
-				logger.Fatal().Err(err).Msg("exec address schema")
-			}
-			logger.Info().Msg("address schema created")
-		} else {
-			logger.Info().Msg("address tables already exist")
-		}
-
-		hasGoogleMapsTable, err := addressRepo.HasGoogleMapsTable(ctx)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("check google maps table")
-		}
-		if !hasGoogleMapsTable {
-			logger.Info().Msg("running db/google_maps.sql...")
-			googleMapsSchema, err := os.ReadFile("db/google_maps.sql")
-			if err != nil {
-				logger.Fatal().Err(err).Msg("read db/google_maps.sql")
-			}
-			if err := addressRepo.ExecSchema(ctx, string(googleMapsSchema)); err != nil {
-				logger.Fatal().Err(err).Msg("exec google maps schema")
-			}
-			logger.Info().Msg("google maps schema created")
-		} else {
-			logger.Info().Msg("google maps table already exists")
-		}
+		execLocationSchema(ctx, repo)
+		initAddressSchemas(ctx, cfg)
 	} else if *dropFlag {
 		if !hasTables {
 			logger.Fatal().Msg("no tables to drop, use --init for first-time setup")
@@ -153,9 +106,19 @@ Flags:
 			fmt.Fprintln(os.Stderr, "aborted")
 			os.Exit(1)
 		}
-		logger.Info().Msg("dropping all tables...")
+		if cfg.PostgresEnabled() {
+			logger.Info().Msg("dropping postgres location tables before sqlite...")
+			pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+			if err != nil {
+				logger.Fatal().Err(err).Msg("open postgres before drop; sqlite was not changed")
+			}
+			if err := pgRepo.DropAll(ctx); err != nil {
+				logger.Fatal().Err(err).Msg("drop postgres; sqlite was not changed")
+			}
+		}
+		logger.Info().Msg("dropping sqlite location tables...")
 		if err := repo.DropAll(ctx); err != nil {
-			logger.Fatal().Err(err).Msg("drop all")
+			logger.Fatal().Err(err).Msg("drop sqlite")
 		}
 		logger.Info().Msg("tables dropped")
 		return
@@ -165,7 +128,7 @@ Flags:
 		}
 		logger.Info().Msg("truncating all data...")
 		if err := repo.TruncateAll(ctx); err != nil {
-			logger.Fatal().Err(err).Msg("truncate")
+			logger.Fatal().Err(err).Msg("truncate sqlite")
 		}
 	} else if *normalizeFlag {
 		if !hasTables {
@@ -176,18 +139,13 @@ Flags:
 			logger.Fatal().Err(err).Msg("rebuild normalized")
 		}
 		logger.Info().Msg("normalize rebuild complete")
+		syncPostgres(ctx, cfg, repo)
 		return
 	} else if !hasTables {
 		fmt.Fprintln(os.Stderr, "Location tables not found. Initialize the schema by running:")
 		fmt.Fprintln(os.Stderr, "  bin/seeder --init")
 		os.Exit(1)
 	}
-
-	sourceID, err := repo.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("insert source")
-	}
-	logger.Info().Int64("location_source_id", sourceID).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
 
 	logger.Info().Msg("parsing db/source/wilayah.sql...")
 	rows, err := parseWilayah("db/source/wilayah.sql")
@@ -213,6 +171,12 @@ Flags:
 	}
 	logger.Info().Int("count", postalCount).Msg("joined postal codes")
 
+	sourceID, err := repo.InsertLocationSource(ctx, *sourceCode, *sourceVersion, *sourceName, *sourceDate, *sourceDesc)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("insert source")
+	}
+	logger.Info().Int64("location_source_id", sourceID).Str("code", *sourceCode).Str("version", *sourceVersion).Msg("source created")
+
 	batchSize := 500
 	total := len(rows)
 	for i := 0; i < total; i += batchSize {
@@ -226,8 +190,6 @@ Flags:
 		logger.Info().Int("inserted", end).Int("total", total).Msg("batch progress")
 	}
 
-	logger.Info().Msg("seeding complete")
-
 	logger.Info().Msg("rebuilding location hierarchy...")
 	if err := repo.RebuildLocationHierarchy(ctx, sourceID); err != nil {
 		logger.Fatal().Err(err).Msg("rebuild hierarchy")
@@ -239,6 +201,91 @@ Flags:
 		logger.Fatal().Err(err).Msg("rebuild city priority")
 	}
 	logger.Info().Msg("city priority rebuild complete")
+
+	logger.Info().Msg("seeding complete")
+	syncPostgres(ctx, cfg, repo)
+}
+
+// execLocationSchema creates only the SQLite source-of-truth schema.
+func execLocationSchema(ctx context.Context, t *database.LocationRepository) {
+	const file = "db/location.sql"
+	logger.Info().Str("file", file).Msg("running location schema...")
+	schema, err := os.ReadFile(file)
+	if err != nil {
+		logger.Fatal().Err(err).Str("file", file).Msg("read location schema")
+	}
+	if err := t.ExecSchema(ctx, string(schema)); err != nil {
+		logger.Fatal().Err(err).Str("file", file).Msg("exec location schema")
+	}
+	logger.Info().Str("file", file).Msg("location schema created")
+}
+
+func syncPostgres(ctx context.Context, cfg *config.Config, sqliteRepo *database.LocationRepository) {
+	if !cfg.PostgresEnabled() {
+		return
+	}
+
+	logger.Info().Msg("rebuilding postgres from sqlite snapshot...")
+	pgRepo, err := database.NewPostgresDB(cfg.PostgresDSN, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("open postgres; sqlite succeeded but postgres is not synchronized")
+	}
+	schema, err := os.ReadFile("db/location_postgres.sql")
+	if err != nil {
+		logger.Fatal().Err(err).Msg("read db/location_postgres.sql; sqlite succeeded but postgres is not synchronized")
+	}
+	indexes, err := os.ReadFile("db/location_postgres_indexes.sql")
+	if err != nil {
+		logger.Fatal().Err(err).Msg("read db/location_postgres_indexes.sql; sqlite succeeded but postgres is not synchronized")
+	}
+	if err := pgRepo.ReplaceFromSQLite(ctx, sqliteRepo, string(schema), string(indexes)); err != nil {
+		logger.Fatal().Err(err).Msg("copy sqlite snapshot to postgres; sqlite succeeded but postgres is not synchronized")
+	}
+	logger.Info().Msg("postgres snapshot synchronized")
+}
+
+// initAddressSchemas creates the SQLite address and google_maps schemas.
+func initAddressSchemas(ctx context.Context, cfg *config.Config) {
+	addressRepo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("open address db")
+	}
+
+	hasAddressTables, err := addressRepo.HasAddressTables(ctx)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("check address tables")
+	}
+	if !hasAddressTables {
+		logger.Info().Msg("running db/address.sql...")
+		addressSchema, err := os.ReadFile("db/address.sql")
+		if err != nil {
+			logger.Fatal().Err(err).Msg("read db/address.sql")
+		}
+		if err := addressRepo.ExecSchema(ctx, string(addressSchema)); err != nil {
+			logger.Fatal().Err(err).Msg("exec address schema")
+		}
+		logger.Info().Msg("address schema created")
+	} else {
+		logger.Info().Msg("address tables already exist")
+	}
+
+	hasGoogleMapsTable, err := addressRepo.HasGoogleMapsTable(ctx)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("check google maps table")
+	}
+	if !hasGoogleMapsTable {
+		logger.Info().Msg("running db/google_maps.sql...")
+		googleMapsSchema, err := os.ReadFile("db/google_maps.sql")
+		if err != nil {
+			logger.Fatal().Err(err).Msg("read db/google_maps.sql")
+		}
+		if err := addressRepo.ExecSchema(ctx, string(googleMapsSchema)); err != nil {
+			logger.Fatal().Err(err).Msg("exec google maps schema")
+		}
+		logger.Info().Msg("google maps schema created")
+	} else {
+		logger.Info().Msg("google maps table already exists")
+	}
 }
 
 func parseWilayah(path string) ([]database.LocationCodeRow, error) {

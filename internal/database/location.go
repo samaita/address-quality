@@ -8,7 +8,9 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 
 	"address-quality/internal/logger"
@@ -17,9 +19,10 @@ import (
 )
 
 type LocationRepository struct {
-	db *sql.DB
+	db *sqlDB
 }
 
+// NewLocationDB opens the mandatory SQLite location database.
 func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error) {
 	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
@@ -33,14 +36,48 @@ func NewLocationDB(dbPath string, maxOpenConns int) (*LocationRepository, error)
 	}
 
 	logger.Info().Str("db_path", dbPath).Msg("location database initialized")
-	return &LocationRepository{db: db}, nil
+	return &LocationRepository{db: &sqlDB{DB: db}}, nil
+}
+
+// NewPostgresDB opens the optional Postgres connection. When dsn is empty it
+// returns (nil, nil): Postgres is not configured and the app runs without it.
+// On a ping failure it still returns the repository alongside the error so the
+// caller can keep running and surface the failure via /health.
+func NewPostgresDB(dsn string, maxOpenConns int) (*LocationRepository, error) {
+	if dsn == "" {
+		logger.Info().Msg("postgres not configured, skipping")
+		return nil, nil
+	}
+
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, logDBErr(context.Background(), "open", dsn, err)
+	}
+
+	db.SetMaxOpenConns(maxOpenConns)
+	repo := &LocationRepository{db: &sqlDB{DB: db, pg: true}}
+
+	if err = db.Ping(); err != nil {
+		return repo, logDBErr(context.Background(), "ping", dsn, err)
+	}
+
+	logger.Info().Msg("postgres connection initialized")
+	return repo, nil
 }
 
 func (r *LocationRepository) Ping(ctx context.Context) error {
+	if r == nil || r.db == nil {
+		return logDBErr(ctx, "ping", "", fmt.Errorf("location repository not initialized"))
+	}
 	return logDBErr(ctx, "ping", "", r.db.PingContext(ctx))
 }
 
 func (r *LocationRepository) HasLocationTables(ctx context.Context) (bool, error) {
+	if r.db.pg {
+		var exists bool
+		err := r.db.QueryRowContext(ctx, `SELECT to_regclass('location_sources') IS NOT NULL`).Scan(&exists)
+		return exists, logDBErr(ctx, "has_location_tables", "", err)
+	}
 	var name string
 	err := r.db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='location_sources'`).Scan(&name)
 	if err == sql.ErrNoRows {
@@ -139,7 +176,20 @@ type LocationCodeRow struct {
 }
 
 func (r *LocationRepository) DropAll(ctx context.Context) error {
-	tables := []string{"location_hierarchy", "location_alias", "location_codes", "location_sources", "location_levels"}
+	if r.db.pg {
+		_, err := r.db.ExecContext(ctx, `
+			DROP TABLE IF EXISTS
+				location_hierarchy,
+				location_alias,
+				location_city_priority,
+				location_codes,
+				location_sources,
+				location_levels
+			CASCADE
+		`)
+		return logDBErr(ctx, "drop_all", "postgres", err)
+	}
+	tables := []string{"location_hierarchy", "location_alias", "location_city_priority", "location_codes", "location_sources", "location_levels"}
 	for _, t := range tables {
 		if _, err := r.db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", t)); err != nil {
 			return logDBErr(ctx, "drop_all", t, fmt.Errorf("drop %s: %w", t, err))
@@ -149,7 +199,7 @@ func (r *LocationRepository) DropAll(ctx context.Context) error {
 }
 
 func (r *LocationRepository) ExecSchema(ctx context.Context, sqlContent string) error {
-	statements := strings.Split(sqlContent, ";")
+	statements := strings.Split(stripSQLComments(sqlContent), ";")
 	for _, stmt := range statements {
 		lines := strings.Split(stmt, "\n")
 		start := 0
@@ -180,6 +230,11 @@ func (r *LocationRepository) TruncateAll(ctx context.Context) error {
 		"DELETE FROM location_sources",
 		"DELETE FROM sqlite_sequence WHERE name IN ('location_hierarchy', 'location_alias', 'location_codes', 'location_sources')",
 	}
+	if r.db.pg {
+		queries = []string{
+			"TRUNCATE location_hierarchy, location_alias, location_codes, location_sources, location_city_priority RESTART IDENTITY CASCADE",
+		}
+	}
 	for _, q := range queries {
 		if _, err := r.db.ExecContext(ctx, q); err != nil {
 			return logDBErr(ctx, "truncate_all", q, fmt.Errorf("truncate: %w", err))
@@ -198,18 +253,20 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 	if err != nil {
 		return logDBErr(ctx, "rebuild_hierarchy_query_parents", sourceID, fmt.Errorf("query parents: %w", err))
 	}
-	defer rows.Close()
 
 	kodeToID := make(map[string]int64)
 	for rows.Next() {
 		var kode string
 		var id int64
 		if err := rows.Scan(&kode, &id); err != nil {
+			rows.Close()
 			return logDBErr(ctx, "rebuild_hierarchy_scan_parent", sourceID, fmt.Errorf("scan parent: %w", err))
 		}
 		kodeToID[kode] = id
 	}
-	if err := rows.Err(); err != nil {
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
 		return logDBErr(ctx, "rebuild_hierarchy_rows_parents", sourceID, fmt.Errorf("rows parents: %w", err))
 	}
 	logger.Info().Int("count", len(kodeToID)).Msg("loaded parent kode->id mappings")
@@ -221,7 +278,27 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 	if err != nil {
 		return logDBErr(ctx, "rebuild_hierarchy_query_subdistricts", sourceID, fmt.Errorf("query subdistricts: %w", err))
 	}
-	defer subRows.Close()
+
+	// Materialize subdistricts and close the read cursor before opening the
+	// write transaction; SQLite locks otherwise deadlock the writer.
+	type subDistrict struct {
+		id   int64
+		kode string
+	}
+	var subs []subDistrict
+	for subRows.Next() {
+		var s subDistrict
+		if err := subRows.Scan(&s.id, &s.kode); err != nil {
+			subRows.Close()
+			return logDBErr(ctx, "rebuild_hierarchy_scan_subdistrict", s.kode, fmt.Errorf("scan subdistrict: %w", err))
+		}
+		subs = append(subs, s)
+	}
+	err = subRows.Err()
+	subRows.Close()
+	if err != nil {
+		return logDBErr(ctx, "rebuild_hierarchy_rows_subdistricts", sourceID, fmt.Errorf("rows subdistricts: %w", err))
+	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -229,22 +306,38 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT OR IGNORE INTO location_hierarchy (location_source_id, province_id, city_id, district_id, subdistrict_id)
-		VALUES (?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return logDBErr(ctx, "rebuild_hierarchy_prepare", sourceID, fmt.Errorf("prepare: %w", err))
+	// Multi-row VALUES keeps round trips low on high-latency Postgres.
+	const hcols = 5
+	const hchunk = 4000
+	type hierarchyInsert struct {
+		provinceID, cityID, districtID, subdistrictID int64
 	}
-	defer stmt.Close()
+	pending := make([]hierarchyInsert, 0, hchunk)
+	flush := func() error {
+		if len(pending) == 0 {
+			return nil
+		}
+		var b strings.Builder
+		b.WriteString(`INSERT INTO location_hierarchy (location_source_id, province_id, city_id, district_id, subdistrict_id) VALUES `)
+		args := make([]any, 0, len(pending)*hcols)
+		for i, h := range pending {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString("(?, ?, ?, ?, ?)")
+			args = append(args, sourceID, h.provinceID, h.cityID, h.districtID, h.subdistrictID)
+		}
+		b.WriteString(" ON CONFLICT DO NOTHING")
+		if _, err := tx.ExecContext(ctx, r.db.rebind(b.String()), args...); err != nil {
+			return logDBErr(ctx, "rebuild_hierarchy_insert", sourceID, fmt.Errorf("insert hierarchy batch: %w", err))
+		}
+		pending = pending[:0]
+		return nil
+	}
 
 	var count int
-	for subRows.Next() {
-		var id int64
-		var kode string
-		if err := subRows.Scan(&id, &kode); err != nil {
-			return logDBErr(ctx, "rebuild_hierarchy_scan_subdistrict", kode, fmt.Errorf("scan subdistrict: %w", err))
-		}
+	for _, s := range subs {
+		id, kode := s.id, s.kode
 
 		parts := strings.Split(kode, ".")
 		if len(parts) != 4 {
@@ -271,14 +364,17 @@ func (r *LocationRepository) RebuildLocationHierarchy(ctx context.Context, sourc
 			continue
 		}
 
-		if _, err := stmt.ExecContext(ctx, sourceID, provinceID, cityID, districtID, id); err != nil {
-			return logDBErr(ctx, "rebuild_hierarchy_insert", kode, fmt.Errorf("insert hierarchy %s: %w", kode, err))
-		}
+		pending = append(pending, hierarchyInsert{provinceID, cityID, districtID, id})
 		count++
+		if len(pending) >= hchunk {
+			if err := flush(); err != nil {
+				return err
+			}
+		}
 	}
 
-	if err := subRows.Err(); err != nil {
-		return logDBErr(ctx, "rebuild_hierarchy_rows_subdistricts", sourceID, fmt.Errorf("rows subdistricts: %w", err))
+	if err := flush(); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -296,7 +392,25 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 	if err != nil {
 		return logDBErr(ctx, "rebuild_normalized_query", "", fmt.Errorf("rebuild normalized query: %w", err))
 	}
-	defer rows.Close()
+
+	type codeName struct {
+		id   int64
+		name string
+	}
+	var codes []codeName
+	for rows.Next() {
+		var c codeName
+		if err := rows.Scan(&c.id, &c.name); err != nil {
+			rows.Close()
+			return logDBErr(ctx, "rebuild_normalized_scan", c.id, fmt.Errorf("scan: %w", err))
+		}
+		codes = append(codes, c)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return logDBErr(ctx, "rebuild_normalized_rows", "", fmt.Errorf("rows: %w", err))
+	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -304,29 +418,34 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `
-		UPDATE location_codes SET lowercase_normalized = ?, updated_at = datetime('now') WHERE id = ?
-	`)
-	if err != nil {
-		return logDBErr(ctx, "rebuild_normalized_prepare", "", fmt.Errorf("prepare: %w", err))
-	}
-	defer stmt.Close()
-
+	// Batched CASE update keeps round trips low on high-latency Postgres.
+	// 2 params per row + updated_at + 1 per row in the IN list.
+	const nchunk = 4000
+	now := time.Now().UTC().Format(time.RFC3339)
 	var count int
-	for rows.Next() {
-		var id int64
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			return logDBErr(ctx, "rebuild_normalized_scan", id, fmt.Errorf("scan: %w", err))
+	for start := 0; start < len(codes); start += nchunk {
+		end := min(start+nchunk, len(codes))
+		var b strings.Builder
+		b.WriteString("UPDATE location_codes SET lowercase_normalized = CASE id")
+		args := make([]any, 0, (end-start)*3+1)
+		for _, c := range codes[start:end] {
+			b.WriteString(" WHEN ? THEN ?")
+			args = append(args, c.id, normalizer.Normalize(c.name))
 		}
-		normalized := normalizer.Normalize(name)
-		if _, err := stmt.ExecContext(ctx, normalized, id); err != nil {
-			return logDBErr(ctx, "rebuild_normalized_update", id, fmt.Errorf("update %d: %w", id, err))
+		b.WriteString(" END, updated_at = ? WHERE id IN (")
+		args = append(args, now)
+		for i, c := range codes[start:end] {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString("?")
+			args = append(args, c.id)
 		}
-		count++
-	}
-	if err := rows.Err(); err != nil {
-		return logDBErr(ctx, "rebuild_normalized_rows", "", fmt.Errorf("rows: %w", err))
+		b.WriteString(")")
+		if _, err := tx.ExecContext(ctx, r.db.rebind(b.String()), args...); err != nil {
+			return logDBErr(ctx, "rebuild_normalized_update", start, fmt.Errorf("update batch %d: %w", start, err))
+		}
+		count += end - start
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -337,53 +456,59 @@ func (r *LocationRepository) RebuildNormalized(ctx context.Context) error {
 	return nil
 }
 
+// InsertLocationSource inserts a source into the SQLite source of truth and
+// returns its generated id. If (code, version) already exists, its id is
+// returned instead.
 func (r *LocationRepository) InsertLocationSource(ctx context.Context, code, version, name, codeDate, desc string) (int64, error) {
-	result, err := r.db.ExecContext(ctx, `
-		INSERT OR IGNORE INTO location_sources (code, version, name, code_date, desc)
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO location_sources (code, version, name, code_date, "desc")
 		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT DO NOTHING
 	`, code, version, name, codeDate, desc)
 	if err != nil {
 		return 0, logDBErr(ctx, "insert_source", map[string]any{"code": code, "version": version, "name": name}, fmt.Errorf("insert source: %w", err))
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, logDBErr(ctx, "insert_source_last_insert_id", code, fmt.Errorf("last insert id: %w", err))
-	}
-
-	if id > 0 {
-		return id, nil
-	}
-
+	var out int64
 	err = r.db.QueryRowContext(ctx, `
 		SELECT id FROM location_sources WHERE code = ? AND version = ? AND deleted_at IS NULL
-	`, code, version).Scan(&id)
+	`, code, version).Scan(&out)
 	if err != nil {
 		return 0, logDBErr(ctx, "insert_source_lookup", map[string]any{"code": code, "version": version}, fmt.Errorf("lookup source: %w", err))
 	}
-	return id, nil
+	return out, nil
 }
 
 func (r *LocationRepository) InsertLocationCodeBatch(ctx context.Context, sourceID int64, rows []LocationCodeRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return logDBErr(ctx, "insert_code_batch_begin_tx", sourceID, fmt.Errorf("begin tx: %w", err))
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT OR IGNORE INTO location_codes (location_source_id, kode, name, lowercase_normalized, level_id, postal_code)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return logDBErr(ctx, "insert_code_batch_prepare", sourceID, fmt.Errorf("prepare: %w", err))
-	}
-	defer stmt.Close()
-
-	for _, row := range rows {
-		normalized := normalizer.Normalize(row.Name)
-		if _, err := stmt.ExecContext(ctx, sourceID, row.Kode, row.Name, normalized, row.LevelID, row.PostalCode); err != nil {
-			return logDBErr(ctx, "insert_code_batch", map[string]any{"source_id": sourceID, "kode": row.Kode}, fmt.Errorf("insert %s: %w", row.Kode, err))
+	// 4000 rows x 6 columns stays under SQLite's 32766 parameter limit.
+	const cols = 6
+	const chunk = 4000
+	for start := 0; start < len(rows); start += chunk {
+		end := min(start+chunk, len(rows))
+		var b strings.Builder
+		b.WriteString(`INSERT INTO location_codes (location_source_id, kode, name, lowercase_normalized, level_id, postal_code) VALUES `)
+		args := make([]any, 0, (end-start)*cols)
+		for i := start; i < end; i++ {
+			if i > start {
+				b.WriteByte(',')
+			}
+			b.WriteString("(?, ?, ?, ?, ?, ?)")
+			row := rows[i]
+			args = append(args, sourceID, row.Kode, row.Name, normalizer.Normalize(row.Name), row.LevelID, row.PostalCode)
+		}
+		b.WriteString(" ON CONFLICT DO NOTHING")
+		if _, err := tx.ExecContext(ctx, r.db.rebind(b.String()), args...); err != nil {
+			return logDBErr(ctx, "insert_code_batch", map[string]any{"source_id": sourceID, "start": start, "end": end}, fmt.Errorf("insert batch %d-%d: %w", start, end, err))
 		}
 	}
 
@@ -437,6 +562,47 @@ func (r *LocationRepository) FindByPostalCode(ctx context.Context, postalCode st
 	}
 
 	return results, nil
+}
+
+// FindSimilarLocations returns up to limit location rows whose
+// lowercase_normalized is word-similar (pg_trgm) to the given token, strongest
+// first, across all admin levels. Postgres only: trigram matching does not
+// exist on SQLite, so it returns (nil, nil) there and callers skip fuzzy
+// resolution. The `%>` form keeps the GIN trigram index usable.
+func (r *LocationRepository) FindSimilarLocations(ctx context.Context, sourceID int64, token string, limit int, minSimilarity float64) ([]model.Entity, error) {
+	if r == nil || r.db == nil || !r.db.pg {
+		return nil, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, name, level_id, COALESCE(postal_code, '')
+		FROM location_codes
+		WHERE location_source_id = ? AND deleted_at IS NULL
+		  AND level_id BETWEEN 2 AND 5
+		  AND lowercase_normalized %> ?
+		  AND word_similarity(?, lowercase_normalized) >= ?
+		ORDER BY word_similarity(?, lowercase_normalized) DESC
+		LIMIT ?
+	`, sourceID, token, token, minSimilarity, token, limit)
+	if err != nil {
+		return nil, logDBErr(ctx, "find_similar_locations", map[string]any{"source_id": sourceID, "token": token}, err)
+	}
+	defer rows.Close()
+
+	levelNames := map[int]string{2: "PROVINCE", 3: "CITY", 4: "DISTRICT", 5: "SUBDISTRICT"}
+	var entities []model.Entity
+	for rows.Next() {
+		var e model.Entity
+		var levelID int
+		if err := rows.Scan(&e.ID, &e.Name, &levelID, &e.PostalCode); err != nil {
+			return nil, logDBErr(ctx, "find_similar_locations_scan", map[string]any{"source_id": sourceID, "token": token}, err)
+		}
+		e.Level = levelNames[levelID]
+		entities = append(entities, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logDBErr(ctx, "find_similar_locations_rows", map[string]any{"source_id": sourceID, "token": token}, err)
+	}
+	return entities, nil
 }
 
 type DistrictRow struct {
@@ -619,25 +785,13 @@ func (r *LocationRepository) RebuildCityPriority(ctx context.Context, sourceID i
 		return err
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return logDBErr(ctx, "rebuild_city_priority_begin_tx", sourceID, fmt.Errorf("begin tx: %w", err))
+	// Resolve city types before the write transaction: querying while the
+	// transaction holds the write lock can deadlock SQLite.
+	type priority struct {
+		name     string
+		cityType string
 	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, `DELETE FROM location_city_priority WHERE location_source_id = ?`, sourceID); err != nil {
-		return logDBErr(ctx, "rebuild_city_priority_delete", sourceID, fmt.Errorf("delete city priority: %w", err))
-	}
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT OR IGNORE INTO location_city_priority (location_source_id, lowercase_normalized, city_type)
-		VALUES (?, ?, ?)
-	`)
-	if err != nil {
-		return logDBErr(ctx, "rebuild_city_priority_prepare", sourceID, fmt.Errorf("prepare: %w", err))
-	}
-	defer stmt.Close()
-
+	priorities := make([]priority, 0, len(names))
 	for _, name := range names {
 		cityRows, err := r.CityRowsByName(ctx, sourceID, name)
 		if err != nil {
@@ -651,8 +805,32 @@ func (r *LocationRepository) RebuildCityPriority(ctx context.Context, sourceID i
 				break
 			}
 		}
-		if _, err := stmt.ExecContext(ctx, sourceID, name, cityType); err != nil {
-			return logDBErr(ctx, "rebuild_city_priority_insert", name, fmt.Errorf("insert %s: %w", name, err))
+		priorities = append(priorities, priority{name: name, cityType: cityType})
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return logDBErr(ctx, "rebuild_city_priority_begin_tx", sourceID, fmt.Errorf("begin tx: %w", err))
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM location_city_priority WHERE location_source_id = ?`, sourceID); err != nil {
+		return logDBErr(ctx, "rebuild_city_priority_delete", sourceID, fmt.Errorf("delete city priority: %w", err))
+	}
+
+	stmt, err := tx.PrepareContext(ctx, r.db.rebind(`
+		INSERT INTO location_city_priority (location_source_id, lowercase_normalized, city_type)
+		VALUES (?, ?, ?)
+		ON CONFLICT DO NOTHING
+	`))
+	if err != nil {
+		return logDBErr(ctx, "rebuild_city_priority_prepare", sourceID, fmt.Errorf("prepare: %w", err))
+	}
+	defer stmt.Close()
+
+	for _, p := range priorities {
+		if _, err := stmt.ExecContext(ctx, sourceID, p.name, p.cityType); err != nil {
+			return logDBErr(ctx, "rebuild_city_priority_insert", p.name, fmt.Errorf("insert %s: %w", p.name, err))
 		}
 	}
 
