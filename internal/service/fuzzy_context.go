@@ -28,11 +28,9 @@ const (
 	// fuzzyFrontierCoverageGap is how far below the best candidate coverage a
 	// candidate may fall and still join the expansion frontier.
 	fuzzyFrontierCoverageGap = 0.05
-	// fuzzyMinFrontierCoverage is the absolute coverage floor that guards
-	// against fully-garbage contexts. Low on purpose: noisy real addresses
-	// legitimately have low coverage with a well-supported candidate (the
-	// used-evidence count is the context signal, not the ratio).
-	fuzzyMinFrontierCoverage = 0.1
+	// fuzzyMinFrontierCoverage is the absolute coverage floor; below it no
+	// candidate has enough context for recovery at all.
+	fuzzyMinFrontierCoverage = 0.5
 	// fuzzyMinTargetKeyLen skips degenerate match targets ("no", "rt").
 	fuzzyMinTargetKeyLen = 4
 )
@@ -184,37 +182,6 @@ func (svc *Service) candidateNeighborhood(c *model.AdminCandidate) []model.Entit
 	return out
 }
 
-// postalEntityCompatible reports whether a postal-resolved subdistrict fits
-// the candidate's resolved hierarchy: every level the candidate already
-// asserts must agree with the entity's ancestry chain.
-func (svc *Service) postalEntityCompatible(e model.Entity, c *model.AdminCandidate) bool {
-	if svc.hierarchyCache == nil || e.Level != "SUBDISTRICT" {
-		return false
-	}
-	distID, ok := svc.hierarchyCache.SubDistrictToDist[e.ID]
-	if !ok {
-		return false
-	}
-	loc := c.Location
-	if loc.District != nil && loc.District.ID != distID {
-		return false
-	}
-	cityID, hasCity := svc.hierarchyCache.DistrictToCity[distID]
-	if loc.City != nil && (!hasCity || cityID != loc.City.ID) {
-		return false
-	}
-	if loc.Province != nil {
-		if !hasCity {
-			return false
-		}
-		provID, ok := svc.hierarchyCache.CityToProvince[cityID]
-		if !ok || provID != loc.Province.ID {
-			return false
-		}
-	}
-	return true
-}
-
 // buildMatchTargets indexes neighborhood names for fuzzy comparison: full
 // names AND their individual words, lowercased with spaces stripped, so both
 // "pasir kaliki"↔"Pasirkaliki" and "bndung"↔"Bandung" (word of "Kota
@@ -276,32 +243,12 @@ func (svc *Service) RecoverContextualEvidence(candidates []model.AdminCandidate,
 		return nil, nil, nil
 	}
 
-	// batch: one deduplicated neighborhood across all frontier candidates.
-	// Postal evidence never enters discovery (least reliable), but its
-	// resolved entities are cheap in-memory vocabulary for recovery when
-	// they fit a frontier candidate's hierarchy (e.g. postal 40391 ->
-	// kelurahan Lembang when the city Kab. Bandung Barat is the context).
-	postalEntities := make([]model.Entity, 0, 4)
-	for _, re := range resolved {
-		if re.Evidence.Type != model.EvidencePostalCode {
-			continue
-		}
-		for _, c := range re.Candidates {
-			postalEntities = append(postalEntities, c)
-		}
-	}
-
+	// batch: one deduplicated neighborhood across all frontier candidates
 	seenEntity := make(map[int64]bool)
 	var entities []model.Entity
 	for _, fc := range frontier {
 		for _, e := range svc.candidateNeighborhood(fc.Candidate) {
 			if !seenEntity[e.ID] {
-				seenEntity[e.ID] = true
-				entities = append(entities, e)
-			}
-		}
-		for _, e := range postalEntities {
-			if !seenEntity[e.ID] && svc.postalEntityCompatible(e, fc.Candidate) {
 				seenEntity[e.ID] = true
 				entities = append(entities, e)
 			}
