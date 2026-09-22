@@ -56,5 +56,64 @@
         }
       ]
     }
+  },
+  {
+    "release": "v0.1.2-alpha",
+    "build": "v0.1.2-alpha",
+    "benchmark_build": "v0.0.0-google-maps-api",
+    "git_commit": "17792a8",
+    "benchmark_timestamp": "2026-09-22",
+    "dataset_version": null,
+    "dataset_source": null,
+    "dataset_generation_timestamp": null,
+    "load_test_timestamp": null,
+    "benchmark_source": "2026-09-22_benchmark_v0_0000.json",
+    "benchmark_runner": null,
+    "runner": {
+      "cpu": null,
+      "memory": null,
+      "os": null,
+      "k6_version": null
+    },
+    "server": {
+      "cpu": null,
+      "memory": null,
+      "os": null,
+      "api_version": "v0",
+      "git_commit": "17792a8"
+    },
+    "metrics": {
+      "overall_accuracy": 76.4,
+      "dataset_size": 106,
+      "average_confidence": null,
+      "dataset_version": null,
+      "hierarchy": [
+        {
+          "level": "Province",
+          "correct": 104,
+          "pct": 98.1
+        },
+        {
+          "level": "City",
+          "correct": 100,
+          "pct": 94.3
+        },
+        {
+          "level": "District (Kecamatan)",
+          "correct": 100,
+          "pct": 94.3
+        },
+        {
+          "level": "Subdistrict (Kelurahan)",
+          "correct": 84,
+          "pct": 79.2
+        },
+        {
+          "level": "All four levels (exact)",
+          "correct": 81,
+          "pct": 76.4
+        }
+      ]
+    }
   }
 ]
