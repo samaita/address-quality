@@ -278,3 +278,67 @@ func TestBenchmarkContextualRecovery(t *testing.T) {
 		t.Fatalf("clean accuracy is 0%% — pipeline broken")
 	}
 }
+
+func TestSpacingAliasAddressRegressions(t *testing.T) {
+	if _, err := os.Stat("../../db/location.db"); err != nil {
+		t.Skip("db/location.db not found")
+	}
+	repo, err := database.NewLocationDB("../../db/location.db", 2)
+	if err != nil {
+		t.Skipf("cannot open location db: %v", err)
+	}
+	svc := New(nil, repo, nil, sanitizer.New(sanitizer.DefaultPolicy()), 1000, "kemendagri", false, true, "", "")
+
+	tests := []struct {
+		name        string
+		address     string
+		subdistrict string
+		district    string
+		city        string
+	}{
+		{
+			name:        "single token input to spaced canonical name",
+			address:     "YOGYA GRAND KEPATIHAN JL. KEPATIHAN NO.18, BALONGGEDE, KEC. REGOL, KOTA BANDUNG, JAWABARAT",
+			subdistrict: "Balong Gede",
+			district:    "Regol",
+			city:        "Kota Bandung",
+		},
+		{
+			name:        "road occurrence followed by administrative occurrence",
+			address:     "JL. PASIR KALIKI NO.78 RT.000 RW.000, PASIR KALIKI, KEC. CICENDO, KOTA BANDUNG, JAWA BARAT 40171",
+			subdistrict: "Pasirkaliki",
+			district:    "Cicendo",
+			city:        "Kota Bandung",
+		},
+		{
+			name:        "road-only alias does not override explicit subdistrict",
+			address:     "JL. PASIR KALIKI NO.235, SUKABUNGAH, KEC. SUKAJADI, KOTA BANDUNG, JAWA BARAT 40162",
+			subdistrict: "Sukabungah",
+			district:    "Sukajadi",
+			city:        "Kota Bandung",
+		},
+		{
+			name:        "literal cikeruh remains ahead of compact mekargalih peer",
+			address:     "JL. RAYA DANGDEUR NO.145 RT.02 RW.11 DESA MEKAR GALIH KEC. CIKERUH, MEKAR GALIH JATINANGOR KAB. SUMEDANG, JAWA BARAT",
+			subdistrict: "Cikeruh",
+			district:    "Jatinangor",
+			city:        "Kabupaten Sumedang",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := svc.ValidateAddressV1(context.Background(), &model.AddressRequest{Address: tc.address}, "spacing-alias-test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			loc := resp.Data.Location
+			if loc.SubDistrict != tc.subdistrict || loc.District != tc.district || loc.City != tc.city {
+				t.Fatalf("got %q/%q/%q, want %q/%q/%q", loc.SubDistrict, loc.District, loc.City, tc.subdistrict, tc.district, tc.city)
+			}
+			if len(resp.Data.Metadata.FuzzyCorrections) != 0 {
+				t.Fatalf("spacing alias must not be reported as fuzzy: %+v", resp.Data.Metadata.FuzzyCorrections)
+			}
+		})
+	}
+}

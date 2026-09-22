@@ -94,10 +94,10 @@ type Service struct {
 	enableStoreRequest bool
 	storeQueue         *queue.Queue[*database.AddressRecord]
 
-	googleMapsMock   bool
-	googleMapsAPIKey string
-	googleMapsBaseURL string
-	googleMapsMu     sync.Mutex
+	googleMapsMock      bool
+	googleMapsAPIKey    string
+	googleMapsBaseURL   string
+	googleMapsMu        sync.Mutex
 	provinceCache       map[string][]*provinceEntry
 	provinceOnce        sync.Once
 	provinceErr         error
@@ -127,9 +127,10 @@ type Service struct {
 	hierarchyOnce  sync.Once
 	hierarchyErr   error
 
-	phraseDict     map[string]map[string][]model.Entity
-	phraseDictOnce sync.Once
-	phraseDictErr  error
+	phraseDict        map[string]map[string][]model.Entity
+	compactPhraseDict map[string]map[string][]model.Entity
+	phraseDictOnce    sync.Once
+	phraseDictErr     error
 
 	// Lazily built parent->children indexes for contextual fuzzy recovery
 	// (in-memory neighborhood, no DB round trips).
