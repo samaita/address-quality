@@ -197,13 +197,10 @@ async function main() {
       const outputDistrict = (loc.district || '').trim();
       const outputSubdistrict = (loc.sub_district || '').trim();
 
-      // spacing variants of an administrative name are the same place
-      // ("Pasirkaliki" == "Pasir Kaliki", "Tamansari" == "Taman Sari")
-      const normalizeName = (s) => s.toLowerCase().replace(/\s+/g, '');
-      const sameProvince = normalizeName(outputProvince) === normalizeName(row.actualProvince);
-      const sameCity = normalizeName(outputCity) === normalizeName(row.actualCity);
-      const sameDistrict = normalizeName(outputDistrict) === normalizeName(row.actualDistrict);
-      const sameSubdistrict = normalizeName(outputSubdistrict) === normalizeName(row.actualSubdistrict);
+      const sameProvince = outputProvince.toLowerCase() === row.actualProvince.toLowerCase();
+      const sameCity = outputCity.toLowerCase() === row.actualCity.toLowerCase();
+      const sameDistrict = outputDistrict.toLowerCase() === row.actualDistrict.toLowerCase();
+      const sameSubdistrict = outputSubdistrict.toLowerCase() === row.actualSubdistrict.toLowerCase();
 
       outRows.push({
         source: SOURCE,
