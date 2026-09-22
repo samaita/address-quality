@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 
@@ -51,6 +52,7 @@ func TestBenchmarkContextualRecovery(t *testing.T) {
 	// sample subdistricts with a complete hierarchy chain
 	rnd := rand.New(rand.NewSource(42)) // deterministic
 	type place struct {
+		id                            int64
 		sub, dist, city, prov, postal string
 	}
 	var places []place
@@ -71,12 +73,16 @@ func TestBenchmarkContextualRecovery(t *testing.T) {
 			if !ok3 || prov == nil {
 				continue
 			}
-			places = append(places, place{s.Name, dist.Name, city.Name, prov.Name, s.PostalCode})
+			places = append(places, place{s.ID, s.Name, dist.Name, city.Name, prov.Name, s.PostalCode})
 		}
 	}
 	if len(places) < 20 {
 		t.Fatalf("not enough hierarchy-complete places: %d", len(places))
 	}
+	// sort by a total order (id) before shuffling: places comes from map
+	// iteration, which is randomized per run — without a total order the
+	// sample differs between runs, making regression comparison impossible.
+	sort.Slice(places, func(i, j int) bool { return places[i].id < places[j].id })
 	rnd.Shuffle(len(places), func(i, j int) { places[i], places[j] = places[j], places[i] })
 	const sampleSize = 20
 	places = places[:sampleSize]
@@ -183,12 +189,17 @@ func TestBenchmarkContextualRecovery(t *testing.T) {
 			t.Fatalf("validate %q: %v", addr, err)
 		}
 		loc := resp.Data.Location
+		correct := strings.EqualFold(loc.Province, p.prov) &&
+			strings.EqualFold(loc.City, p.city) &&
+			strings.EqualFold(loc.District, p.dist) &&
+			strings.EqualFold(loc.SubDistrict, p.sub)
+		if !correct {
+			t.Logf("MISS: %q\n     want %q/%q/%q/%q got %q/%q/%q/%q",
+				addr, p.prov, p.city, p.dist, p.sub, loc.Province, loc.City, loc.District, loc.SubDistrict)
+		}
 		return result{
 			corrections: len(resp.Data.Metadata.FuzzyCorrections) > 0,
-			correct: strings.EqualFold(loc.Province, p.prov) &&
-				strings.EqualFold(loc.City, p.city) &&
-				strings.EqualFold(loc.District, p.dist) &&
-				strings.EqualFold(loc.SubDistrict, p.sub),
+			correct:     correct,
 		}
 	}
 

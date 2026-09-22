@@ -326,8 +326,38 @@ func (svc *Service) matchPhrases(sourceID int64, normalizedText string) map[stri
 			wordEntities[words[k]] = append(wordEntities[words[k]], entities...)
 		}
 
+		// A repeated-word phrase ("lembang lembang") is ambiguous: it may be
+		// one mention of a reduplicated official name (Bone Bone, Fak Fak),
+		// but in addresses it is usually two separate mentions of the same
+		// name — kelurahan and kecamatan sharing it ("lembang kec lembang").
+		// Keep the phrase match, but also add the word's own matches so the
+		// single-name entities stay reachable; scoring resolves the ambiguity.
+		if repeatedPhrase(words[i:longestEnd]) {
+			singleKey := fmt.Sprintf("%d:%s", sourceID, words[i])
+			if byLevel, ok := svc.phraseDict[singleKey]; ok {
+				var single []model.Entity
+				for _, levelEntities := range byLevel {
+					single = append(single, levelEntities...)
+				}
+				for k := i; k < longestEnd; k++ {
+					wordEntities[words[k]] = append(wordEntities[words[k]], single...)
+				}
+			}
+		}
+
 		i = longestEnd
 	}
 
 	return wordEntities
+}
+
+// repeatedPhrase reports whether a matched phrase is one word repeated
+// ("lembang lembang", "fak fak").
+func repeatedPhrase(words []string) bool {
+	for _, w := range words {
+		if w != words[0] {
+			return false
+		}
+	}
+	return len(words) > 1
 }
