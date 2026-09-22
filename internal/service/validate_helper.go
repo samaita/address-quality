@@ -284,6 +284,7 @@ func (svc *Service) loadPhraseDict(ctx context.Context) {
 	}
 
 	svc.phraseDict = dict
+	svc.compactPhraseDict = buildCompactPhraseDict(dict)
 }
 
 func ensurePhraseDictLoaded(svc *Service, ctx context.Context) error {
@@ -326,8 +327,137 @@ func (svc *Service) matchPhrases(sourceID int64, normalizedText string) map[stri
 			wordEntities[words[k]] = append(wordEntities[words[k]], entities...)
 		}
 
+		// A repeated-word phrase ("lembang lembang") is ambiguous: it may be
+		// one mention of a reduplicated official name (Bone Bone, Fak Fak),
+		// but in addresses it is usually two separate mentions of the same
+		// name — kelurahan and kecamatan sharing it ("lembang kec lembang").
+		// Keep the phrase match, but also add the word's own matches so the
+		// single-name entities stay reachable; scoring resolves the ambiguity.
+		if repeatedPhrase(words[i:longestEnd]) {
+			singleKey := fmt.Sprintf("%d:%s", sourceID, words[i])
+			if byLevel, ok := svc.phraseDict[singleKey]; ok {
+				var single []model.Entity
+				for _, levelEntities := range byLevel {
+					single = append(single, levelEntities...)
+				}
+				for k := i; k < longestEnd; k++ {
+					wordEntities[words[k]] = append(wordEntities[words[k]], single...)
+				}
+			}
+		}
+
 		i = longestEnd
 	}
 
 	return wordEntities
+}
+
+// buildCompactPhraseDict indexes administrative names with whitespace removed.
+// This is deterministic normalization, not fuzzy matching: no characters may
+// be inserted, deleted, substituted, or transposed.
+func buildCompactPhraseDict(dict map[string]map[string][]model.Entity) map[string]map[string][]model.Entity {
+	compact := make(map[string]map[string][]model.Entity, len(dict))
+	for key, byLevel := range dict {
+		sep := strings.IndexByte(key, ':')
+		if sep < 0 {
+			continue
+		}
+		compactKey := key[:sep+1] + compactSpaces(key[sep+1:])
+		levels := compact[compactKey]
+		if levels == nil {
+			levels = make(map[string][]model.Entity)
+			compact[compactKey] = levels
+		}
+		for level, entities := range byLevel {
+			levels[level] = appendUniqueEntities(levels[level], entities...)
+		}
+	}
+	return compact
+}
+
+func appendUniqueEntities(dst []model.Entity, entities ...model.Entity) []model.Entity {
+	seen := make(map[int64]bool, len(dst)+len(entities))
+	for _, e := range dst {
+		seen[e.ID] = true
+	}
+	for _, e := range entities {
+		if seen[e.ID] {
+			continue
+		}
+		seen[e.ID] = true
+		dst = append(dst, e)
+	}
+	return dst
+}
+
+// matchCompactPhrases mirrors longest-match phrase resolution, but requires
+// exact equality after whitespace removal. Results are kept separate from the
+// normal phrase pass so literal, hierarchy-compatible subdistrict evidence can
+// retain priority (for example Cikeruh versus Mekargalih).
+func (svc *Service) matchCompactPhrases(sourceID int64, normalizedText string) map[string][]model.Entity {
+	if svc.compactPhraseDict == nil {
+		svc.compactPhraseDict = buildCompactPhraseDict(svc.phraseDict)
+	}
+
+	words := strings.Fields(normalizedText)
+	wordEntities := make(map[string][]model.Entity)
+	for i := 0; i < len(words); {
+		longestEnd := -1
+		var entities []model.Entity
+		for j := len(words); j > i; j-- {
+			spacedCandidate := strings.Join(words[i:j], " ")
+			candidate := compactSpaces(spacedCandidate)
+			key := fmt.Sprintf("%d:%s", sourceID, candidate)
+			byLevel, ok := svc.compactPhraseDict[key]
+			if !ok {
+				continue
+			}
+			// Remove entities already reachable through the ordinary exact
+			// phrase key. The compact pass is only for a real spacing change;
+			// replaying a one-word exact name such as "bandung" would bypass
+			// city-priority handling and introduce unrelated lower-level peers.
+			exactIDs := make(map[int64]bool)
+			if exactByLevel := svc.phraseDict[fmt.Sprintf("%d:%s", sourceID, spacedCandidate)]; exactByLevel != nil {
+				for _, exactEntities := range exactByLevel {
+					for _, e := range exactEntities {
+						exactIDs[e.ID] = true
+					}
+				}
+			}
+			var spacingOnly []model.Entity
+			for _, levelEntities := range byLevel {
+				for _, e := range levelEntities {
+					if !exactIDs[e.ID] {
+						spacingOnly = appendUniqueEntities(spacingOnly, e)
+					}
+				}
+			}
+			if len(spacingOnly) == 0 {
+				continue
+			}
+			longestEnd = j
+			entities = spacingOnly
+			break
+		}
+		if longestEnd == -1 {
+			i++
+			continue
+		}
+		for k := i; k < longestEnd; k++ {
+			wordEntities[words[k]] = appendUniqueEntities(wordEntities[words[k]], entities...)
+		}
+		i = longestEnd
+	}
+	return wordEntities
+}
+
+// repeatedPhrase reports whether a matched phrase is one word repeated
+// ("lembang lembang", "fak fak").
+func repeatedPhrase(words []string) bool {
+	for _, w := range words {
+		if w != words[0] {
+			return false
+		}
+	}
+	return len(words) > 1
 }

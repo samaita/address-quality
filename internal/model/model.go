@@ -10,8 +10,10 @@ import (
 )
 
 type HealthResponse struct {
-	Status   string `json:"status" example:"ok"`
-	Database string `json:"database,omitempty" example:"ok"`
+	Status           string `json:"status" example:"ok"`
+	Database         string `json:"database,omitempty" example:"ok"`
+	LocationDatabase string `json:"location_database,omitempty" example:"ok"`
+	Postgres         string `json:"postgres,omitempty" example:"disabled"`
 }
 
 type ErrorResponse struct {
@@ -124,9 +126,15 @@ type ResolutionCandidate struct {
 	Reasons  []string `json:"reasons"`
 }
 
+type FuzzyCorrection struct {
+	From string `json:"from" example:"cihuar"`
+	To   string `json:"to" example:"Cihaur Geulis"`
+}
+
 type Metadata struct {
-	LocationSource  string `json:"location_source" example:"kemendagri"`
-	LocationVersion string `json:"location_version" example:"2025"`
+	LocationSource   string            `json:"location_source" example:"kemendagri"`
+	LocationVersion  string            `json:"location_version" example:"2025"`
+	FuzzyCorrections []FuzzyCorrection `json:"fuzzy_corrections,omitempty"`
 }
 
 type ResponseData struct {

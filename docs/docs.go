@@ -230,6 +230,19 @@ const docTemplate = `{
                 }
             }
         },
+        "model.FuzzyCorrection": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string",
+                    "example": "cihuar"
+                },
+                "to": {
+                    "type": "string",
+                    "example": "Cihaur Geulis"
+                }
+            }
+        },
         "model.GeocodeRequest": {
             "type": "object",
             "required": [
@@ -273,6 +286,14 @@ const docTemplate = `{
                     "type": "string",
                     "example": "ok"
                 },
+                "location_database": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "postgres": {
+                    "type": "string",
+                    "example": "disabled"
+                },
                 "status": {
                     "type": "string",
                     "example": "ok"
@@ -307,6 +328,12 @@ const docTemplate = `{
         "model.Metadata": {
             "type": "object",
             "properties": {
+                "fuzzy_corrections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.FuzzyCorrection"
+                    }
+                },
                 "location_source": {
                     "type": "string",
                     "example": "kemendagri"
