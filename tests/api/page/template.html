@@ -535,7 +535,7 @@
       var rows = challengeRow('Address ID', ex.id);
       if (ex.raw) rows += challengeRow('Input', ex.raw);
       rows += challengeRow('Formatted', ex.formatted);
-      rows += challengeRow('Actual address', [ex.actual.province, ex.actual.city, ex.actual.district, ex.actual.subdistrict].filter(Boolean).join(', '));
+      rows += challengeRow('Actual address', ex.actual.formatted);
       rows += challengeRow('Confidence', ex.confidence === null || ex.confidence === undefined ? null : pct(ex.confidence, 0));
       rows += challengeRow('Status', ex.status);
       exHtml = '<div class="aq-example"><div class="aq-example-label">Example</div><div class="aq-rows">' + rows + '</div></div>';
@@ -605,7 +605,7 @@
       }
       if (f.missing && f.missing.length) flags.push('missing: ' + f.missing.join(', '));
       if (f.conflicts && f.conflicts.length) flags.push('conflicts: ' + f.conflicts.join(', '));
-      var actual = [f.actual.province, f.actual.city, f.actual.district, f.actual.subdistrict].filter(Boolean).join(', ');
+      var actual = f.actual.formatted;
       failRows += '<tr><td class="aq-num">' + num(i + 1, 0) + '</td>' +
         '<td class="aq-num">' + (f.confidence === null || f.confidence === undefined ? '<span class="aq-na">N/A</span>' : pct(f.confidence, 0)) + '</td>' +
         '<td>' + esc(f.status || '') + '</td>' +

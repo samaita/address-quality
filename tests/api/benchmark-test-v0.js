@@ -183,6 +183,11 @@ function normalizeName(value) {
     .replace(/\s+/g, '');
 }
 
+function normalizeCityName(value) {
+  if (!value) return '';
+  return normalizeName(String(value).replace(/\badministrasi\b/gi, ''));
+}
+
 function parseGoogleLocation(payload) {
   if (!payload || !payload.results || !payload.results.length) return null;
   const first = payload.results[0];
@@ -237,7 +242,7 @@ async function main() {
         const outputSubdistrict = (loc.sub_district || '').trim();
 
         const sameProvince = normalizeName(outputProvince) === normalizeName(row.actualProvince);
-        const sameCity = normalizeName(outputCity) === normalizeName(row.actualCity);
+        const sameCity = normalizeCityName(outputCity) === normalizeCityName(row.actualCity);
         const sameDistrict = normalizeName(outputDistrict) === normalizeName(row.actualDistrict);
         const sameSubdistrict = normalizeName(outputSubdistrict) === normalizeName(row.actualSubdistrict);
 
