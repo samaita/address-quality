@@ -180,7 +180,7 @@ function normalizeName(value) {
     .toLowerCase()
     .replace(/^(kecamatan|kec|kelurahan|kel|desa|provinsi)[\s.]*/, '')
     .replace(/[\s.]+$/, '')
-    .trim();
+    .replace(/\s+/g, '');
 }
 
 function parseGoogleLocation(payload) {
