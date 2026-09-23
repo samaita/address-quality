@@ -180,189 +180,12 @@
     "build": "v0.1.2-alpha",
     "benchmark_build": "v0.1.2-alpha",
     "git_commit": "17792a8",
-    "benchmark_timestamp": "2026-09-22",
-    "dataset_version": "2025",
-    "dataset_source": "kemendagri",
-    "dataset_generation_timestamp": null,
-    "load_test_timestamp": "2026-08-06T15:23:05.382Z",
-    "benchmark_source": "2026-09-22_benchmark_v1_0019.json",
-    "benchmark_runner": null,
-    "runner": {
-      "cpu": null,
-      "memory": null,
-      "os": null,
-      "k6_version": null
-    },
-    "server": {
-      "cpu": null,
-      "memory": null,
-      "os": null,
-      "api_version": "v1",
-      "git_commit": "17792a8"
-    },
-    "metrics": {
-      "overall_accuracy": 70.8,
-      "dataset_size": 106,
-      "average_confidence": 62.2,
-      "dataset_version": "2025",
-      "hierarchy": [
-        {
-          "level": "Province",
-          "correct": 94,
-          "pct": 88.7
-        },
-        {
-          "level": "City",
-          "correct": 92,
-          "pct": 86.8
-        },
-        {
-          "level": "District (Kecamatan)",
-          "correct": 82,
-          "pct": 77.4
-        },
-        {
-          "level": "Subdistrict (Kelurahan)",
-          "correct": 75,
-          "pct": 70.8
-        },
-        {
-          "level": "All four levels (exact)",
-          "correct": 75,
-          "pct": 70.8
-        }
-      ]
-    }
-  },
-  {
-    "release": "v0.1.2-alpha",
-    "build": "v0.1.2-alpha",
-    "benchmark_build": "agent-v1-20260923-0000-spacefold-baseline",
-    "git_commit": "17792a8",
-    "benchmark_timestamp": "2026-09-23",
-    "dataset_version": null,
-    "dataset_source": null,
-    "dataset_generation_timestamp": null,
-    "load_test_timestamp": "2026-08-06T15:23:05.382Z",
-    "benchmark_source": "2026-09-23_benchmark_v1_0000.json",
-    "benchmark_runner": null,
-    "runner": {
-      "cpu": null,
-      "memory": null,
-      "os": null,
-      "k6_version": null
-    },
-    "server": {
-      "cpu": null,
-      "memory": null,
-      "os": null,
-      "api_version": "v1",
-      "git_commit": "17792a8"
-    },
-    "metrics": {
-      "overall_accuracy": 0,
-      "dataset_size": 106,
-      "average_confidence": null,
-      "dataset_version": null,
-      "hierarchy": [
-        {
-          "level": "Province",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "City",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "District (Kecamatan)",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "Subdistrict (Kelurahan)",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "All four levels (exact)",
-          "correct": 0,
-          "pct": 0
-        }
-      ]
-    }
-  },
-  {
-    "release": "v0.1.2-alpha",
-    "build": "v0.1.2-alpha",
-    "benchmark_build": "agent-v1-20260923-0001-spacefold-iteration-1",
-    "git_commit": "17792a8",
-    "benchmark_timestamp": "2026-09-23",
-    "dataset_version": null,
-    "dataset_source": null,
-    "dataset_generation_timestamp": null,
-    "load_test_timestamp": "2026-08-06T15:23:05.382Z",
-    "benchmark_source": "2026-09-23_benchmark_v1_0001.json",
-    "benchmark_runner": null,
-    "runner": {
-      "cpu": null,
-      "memory": null,
-      "os": null,
-      "k6_version": null
-    },
-    "server": {
-      "cpu": null,
-      "memory": null,
-      "os": null,
-      "api_version": "v1",
-      "git_commit": "17792a8"
-    },
-    "metrics": {
-      "overall_accuracy": 0,
-      "dataset_size": 106,
-      "average_confidence": null,
-      "dataset_version": null,
-      "hierarchy": [
-        {
-          "level": "Province",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "City",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "District (Kecamatan)",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "Subdistrict (Kelurahan)",
-          "correct": 0,
-          "pct": 0
-        },
-        {
-          "level": "All four levels (exact)",
-          "correct": 0,
-          "pct": 0
-        }
-      ]
-    }
-  },
-  {
-    "release": "v0.1.2-alpha",
-    "build": "v0.1.2-alpha",
-    "benchmark_build": "agent-v1-20260923-0002-spacefold-final",
-    "git_commit": "17792a8",
     "benchmark_timestamp": "2026-09-23",
     "dataset_version": "2025",
     "dataset_source": "kemendagri",
     "dataset_generation_timestamp": null,
     "load_test_timestamp": "2026-08-06T15:23:05.382Z",
-    "benchmark_source": "2026-09-23_benchmark_v1_0002.json",
+    "benchmark_source": "2026-09-23_benchmark_v1_0003.json",
     "benchmark_runner": null,
     "runner": {
       "cpu": null,
@@ -390,13 +213,13 @@
         },
         {
           "level": "City",
-          "correct": 92,
-          "pct": 86.8
+          "correct": 91,
+          "pct": 85.8
         },
         {
           "level": "District (Kecamatan)",
-          "correct": 82,
-          "pct": 77.4
+          "correct": 81,
+          "pct": 76.4
         },
         {
           "level": "Subdistrict (Kelurahan)",
