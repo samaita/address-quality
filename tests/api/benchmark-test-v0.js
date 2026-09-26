@@ -180,7 +180,12 @@ function normalizeName(value) {
     .toLowerCase()
     .replace(/^(kecamatan|kec|kelurahan|kel|desa|provinsi)[\s.]*/, '')
     .replace(/[\s.]+$/, '')
-    .trim();
+    .replace(/\s+/g, '');
+}
+
+function normalizeCityName(value) {
+  if (!value) return '';
+  return normalizeName(String(value).replace(/\badministrasi\b/gi, ''));
 }
 
 function parseGoogleLocation(payload) {
@@ -237,7 +242,7 @@ async function main() {
         const outputSubdistrict = (loc.sub_district || '').trim();
 
         const sameProvince = normalizeName(outputProvince) === normalizeName(row.actualProvince);
-        const sameCity = normalizeName(outputCity) === normalizeName(row.actualCity);
+        const sameCity = normalizeCityName(outputCity) === normalizeCityName(row.actualCity);
         const sameDistrict = normalizeName(outputDistrict) === normalizeName(row.actualDistrict);
         const sameSubdistrict = normalizeName(outputSubdistrict) === normalizeName(row.actualSubdistrict);
 

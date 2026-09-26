@@ -171,6 +171,12 @@ function postRequest(address, source) {
   });
 }
 
+function normalizeName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, '');
+}
+
 async function main() {
   console.log(`Reading input: ${INPUT_FILE}`);
   const rows = readInputCsv(INPUT_FILE);
@@ -197,10 +203,10 @@ async function main() {
       const outputDistrict = (loc.district || '').trim();
       const outputSubdistrict = (loc.sub_district || '').trim();
 
-      const sameProvince = outputProvince.toLowerCase() === row.actualProvince.toLowerCase();
-      const sameCity = outputCity.toLowerCase() === row.actualCity.toLowerCase();
-      const sameDistrict = outputDistrict.toLowerCase() === row.actualDistrict.toLowerCase();
-      const sameSubdistrict = outputSubdistrict.toLowerCase() === row.actualSubdistrict.toLowerCase();
+      const sameProvince = normalizeName(outputProvince) === normalizeName(row.actualProvince);
+      const sameCity = normalizeName(outputCity) === normalizeName(row.actualCity);
+      const sameDistrict = normalizeName(outputDistrict) === normalizeName(row.actualDistrict);
+      const sameSubdistrict = normalizeName(outputSubdistrict) === normalizeName(row.actualSubdistrict);
 
       outRows.push({
         source: SOURCE,
