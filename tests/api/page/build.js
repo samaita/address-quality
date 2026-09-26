@@ -62,15 +62,39 @@ function isRoadLike(raw) {
   return /(?:^|[\s,])(?:jln?\.?|jalan)[\s.]/i.test(String(raw || ''));
 }
 
-function trimRecord(record) {
-  const q = record.quality;
-  const c = record.comparison || {};
+function formatActualAddress(actual) {
+  const value = actual || {};
+  const subdistrict = String(value.subdistrict || '')
+    .replace(/^\s*(?:kelurahan|desa)\s+/i, '')
+    .replace(/^\s*kel\.?\s+/i, '')
+    .trim();
+  const district = String(value.district || '')
+    .replace(/^\s*kec(?:amatan)?\.?\s+/i, '')
+    .trim();
+  const city = String(value.city || '').trim();
+  const province = String(value.province || '')
+    .replace(/^\s*provinsi\s+/i, '')
+    .trim();
+
+  return [subdistrict, district, city, province].filter(Boolean).join(', ');
+}
+
+function actualFromComparison(comparison) {
+  const c = comparison || {};
   const actual = {
     province: c.actual_province,
     city: c.actual_city,
     district: c.actual_district,
     subdistrict: c.actual_subdistrict,
   };
+  actual.formatted = formatActualAddress(actual);
+  return actual;
+}
+
+function trimRecord(record) {
+  const q = record.quality;
+  const c = record.comparison || {};
+  const actual = actualFromComparison(c);
   const same = {
     p: c.same_province,
     c: c.same_city,
@@ -126,12 +150,7 @@ function exampleFrom(candidates, preferNote) {
     formatted: best.quality && best.quality.formatted_address,
     status: best.quality && best.quality.status,
     confidence: best.quality && best.quality.confidence,
-    actual: {
-      province: best.comparison.actual_province,
-      city: best.comparison.actual_city,
-      district: best.comparison.actual_district,
-      subdistrict: best.comparison.actual_subdistrict,
-    },
+    actual: actualFromComparison(best.comparison),
   };
 }
 
@@ -315,12 +334,7 @@ function buildFullPayload(meta, before, benchmarkFile, perfFile, benchmarkRows) 
       status: q.status,
       confidence: q.confidence,
       formatted: q.formatted_address,
-      actual: {
-        province: c.actual_province,
-        city: c.actual_city,
-        district: c.actual_district,
-        subdistrict: c.actual_subdistrict,
-      },
+      actual: actualFromComparison(c),
       same: {
         p: c.same_province,
         c: c.same_city,
@@ -378,10 +392,16 @@ function upsertEntry(entries, entry) {
   return { entries, before };
 }
 
+function parseMetadataEntries(content) {
+  const trimmed = String(content || '').trim();
+  if (!trimmed) return [];
+  const existing = JSON.parse(trimmed);
+  return Array.isArray(existing) ? existing : [existing];
+}
+
 function readMetadataEntries() {
   if (!fs.existsSync(META_FILE)) return [];
-  const existing = readJson(META_FILE);
-  return Array.isArray(existing) ? existing : [existing];
+  return parseMetadataEntries(fs.readFileSync(META_FILE, 'utf-8'));
 }
 
 function main() {
@@ -440,4 +460,8 @@ function main() {
   );
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { formatActualAddress, parseMetadataEntries };
