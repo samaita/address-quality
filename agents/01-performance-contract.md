@@ -164,7 +164,7 @@ Required artifact validity:
 ## Workload and comparison contract
 
 - Smoke uses the existing one-iteration script only for route/auth/response checks, never as a stable latency sample.
-- Initial controlled baseline may use the existing five-address k6 scenario to establish the pipeline, explicitly labeled `synthetic-five-address`; it is not production-representative. A later baseline should use a privacy-approved fixed dataset/corpus and declared selection/weighting. Existing accuracy CSVs are private/ignored and cannot be committed or exposed raw.
+- Initial controlled baseline uses the existing five-address k6 scenario, explicitly labeled `synthetic-five-address`. This is the intentionally scoped performance workload for this task, not production traffic. The accuracy benchmark's private/non-committed dataset and its historical 106-record result are separate and must not be substituted for these five performance inputs.
 - Load testing declares stage schedule, VUs, request mix, dataset identity/count, rate/think time, API version, cache state, and whether health probes share the target.
 - Stress testing is opt-in only and must require an explicit non-production base URL/target classification. Add a hard upper bound for VUs, rate, and duration; refuse production hosts rather than relying on a developer remembering a warning. No stress workload runs automatically.
 - k6 concurrency means virtual users; achieved RPS is a consequence of request duration and any sleep/pacing. Capture both configured stages and observed metrics when present.
