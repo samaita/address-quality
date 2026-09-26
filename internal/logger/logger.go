@@ -4,8 +4,10 @@
 package logger
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/rs/zerolog"
 
+	"address-quality/internal/metrics"
 	mw "address-quality/internal/middleware"
 )
 
@@ -86,6 +89,21 @@ func EchoMiddleware() echo.MiddlewareFunc {
 			req := c.Request()
 			res := c.Response()
 			reqID := mw.GetRequestID(req.Context())
+
+			// Handler errors are written by Echo's error handler after this
+			// middleware returns, so res.Status is not final yet.
+			status := res.Status
+			if status == 0 {
+				status = http.StatusOK
+			}
+			if err != nil {
+				status = http.StatusInternalServerError
+				var he *echo.HTTPError
+				if errors.As(err, &he) {
+					status = he.Code
+				}
+			}
+			metrics.ObserveHTTP(req.Method, c.Path(), status, stop.Sub(start))
 
 			event := L.Info()
 			if res.Status >= 500 {
