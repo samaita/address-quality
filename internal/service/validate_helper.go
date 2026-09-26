@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"address-quality/internal/database"
+	"address-quality/internal/metrics"
 	"address-quality/internal/model"
 	"address-quality/internal/normalizer"
 )
@@ -31,6 +32,11 @@ func (svc *Service) resolveLocationByPostalCode(ctx context.Context, location mo
 	if inputPostalCode == "" {
 		return location, false, nil
 	}
+	// Timed here, not at the call site, so the stage is recorded only when the
+	// postal lookup path is actually invoked.
+	defer func(start time.Time) {
+		metrics.ObserveStage(metrics.StagePostalCodeFallback, time.Since(start))
+	}(time.Now())
 
 	// No winner found — infer full location from postal code DB
 	if location == (model.Location{}) {

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"address-quality/internal/logger"
+	"address-quality/internal/metrics"
 	"address-quality/internal/model"
 	"address-quality/internal/normalizer"
 )
@@ -33,6 +34,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	if sourceCode == "" {
 		sourceCode = svc.sourceCode
 	}
+	sourceStart := time.Now()
 	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(ctx, sourceCode)
 	if err != nil {
 		log.Error().Err(err).Msg("find source by code")
@@ -43,13 +45,16 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		log.Error().Err(err).Msg("load caches")
 		return nil, err
 	}
+	metrics.ObserveStage(metrics.StageSourceAndCacheReady, time.Since(sourceStart))
 
+	evidenceStart := time.Now()
 	evidence := ExtractEvidence(normalized)
 	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
 
 	roadTokens := detectRoadContextTokens(sanitized)
 	compactMatchText := normalizer.Normalize(stripRoadContext(sanitized))
 	resolved := svc.ResolveEvidence(ctx, sourceID, evidence, normalized, compactMatchText, roadTokens)
+	metrics.ObserveStage(metrics.StageEvidenceResolution, time.Since(evidenceStart))
 
 	buildCandidates := func(res []model.ResolvedEvidence) []model.AdminCandidate {
 		cands := svc.DiscoverCandidates(res, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
@@ -58,8 +63,11 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		return BuildConclusions(cands, svc.hierarchyCache, res)
 	}
 
+	buildStart := time.Now()
 	candidates := buildCandidates(resolved)
+	metrics.ObserveStage(metrics.StageCandidateBuild, time.Since(buildStart))
 
+	recoveryStart := time.Now()
 	// Second-pass contextual recovery: exact-resolution candidates provide the
 	// context; unexplained input spans are fuzzy-matched against their
 	// in-memory neighborhood; recovered evidence triggers a single rebuild.
@@ -68,8 +76,10 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		resolved = append(resolved, recovered...)
 		candidates = buildCandidates(resolved)
 	}
+	metrics.ObserveStage(metrics.StageContextualRecovery, time.Since(recoveryStart))
 	log.Debug().Int("resolved_count", len(resolved)).Int("fuzzy_corrections", len(fuzzyCorrections)).Msg("entity resolution")
 
+	evalStart := time.Now()
 	var scored []scoredCandidate
 	evalEvidence := evidenceWithoutValues(evidence, fuzzyExplained)
 	for _, c := range candidates {
@@ -88,6 +98,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		}
 		return len(scored[i].eval.Conflicts) < len(scored[j].eval.Conflicts)
 	})
+	metrics.ObserveStage(metrics.StageCandidateEvaluation, time.Since(evalStart))
 
 	status := model.StatusUnknown
 	if len(scored) > 0 {
