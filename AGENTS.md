@@ -3,43 +3,32 @@
 ## Project
 
 Address Quality is an Indonesian address validation system.
-
 The core validation flow is conceptually:
-
 Normalize -> Evidence -> Candidates -> Hierarchy -> Score
-
 Repository code is the source of truth for the actual implementation. Inspect it before making changes.
 
 ## Core Engineering Principle
 
 > Never Improve Blindly.
-
 Changes must be driven by evidence, tests, benchmarks, or a clearly identified defect.
-
 Do not optimize, refactor, or redesign unrelated code while completing a scoped task.
 
 ## Agent Working Rules
 
 Before editing:
-
 1. Read the relevant implementation.
 2. Read nearby tests.
 3. Check existing documentation and configuration.
 4. Understand the request flow and existing conventions.
 5. Identify assumptions that cannot be established from repository evidence.
-
 Prefer the smallest change that satisfies the task.
-
 Do not introduce infrastructure or abstractions merely because they are common industry practice.
-
 Do not silently reinterpret requirements. If repository evidence contradicts the task, document the contradiction.
 
 ## Address Quality Correctness
 
 Treat validation behavior as sensitive.
-
 Do not change any of the following unless the task explicitly requires it:
-
 - normalization behavior
 - evidence extraction semantics
 - candidate generation
@@ -49,11 +38,8 @@ Do not change any of the following unless the task explicitly requires it:
 - status classification
 - postal-code behavior
 - public API contracts
-
 Preserve the principle that evidence and candidate resolution are separate concerns.
-
 Do not use performance work as an excuse to modify matching behavior.
-
 When touching validation code, add or update tests that demonstrate behavior before and after the change.
 
 ## Agentic V1 Accuracy Workflow
@@ -68,7 +54,6 @@ When touching validation code, add or update tests that demonstrate behavior bef
 ### Workflow
 
 For every change that can affect V1 address parsing, normalization, matching, accuracy, or validation API output:
-
 1. Before editing, run `make benchmark` to establish a fresh baseline.
 2. Immediately run `make benchmark-page` and supply a unique `benchmark_build` label to record the baseline in `tests/api/page/metadata.json`.
 3. Inspect `tests/api/page/full-benchmark.html` locally to identify failure patterns, then prioritize broadly applicable fixes. Do not overfit individual benchmark rows.
@@ -78,7 +63,6 @@ For every change that can affect V1 address parsing, normalization, matching, ac
 7. Immediately run `make benchmark-page` with a new unique `benchmark_build` label so the iteration is appended to `tests/api/page/metadata.json`.
 8. Compare the baseline and iteration metadata entries for overall exact matches across province, city, district, and subdistrict, and for province, city, district, and subdistrict accuracy.
 9. Continue diagnosing, implementing, testing, and running the paired benchmark and benchmark-page commands until overall exact-match accuracy improves with no degradation in any hierarchy metric, or until a genuine blocker requires user input.
-
 Every V1 benchmark run must be followed by `make benchmark-page`, including the baseline and every attempted iteration. Do not stop merely because the first attempted fix fails to improve accuracy. Never claim an accuracy improvement without benchmark evidence. Changes that cannot affect V1 address accuracy do not require this benchmark cycle.
 
 ### Benchmark and API Test Authority
@@ -114,7 +98,6 @@ Every V1 benchmark run must be followed by `make benchmark-page`, including the 
 ## Agentic V1 Performance Workflow
 
 Performance work covers aq-chore-53 (instrumentation), aq-chore-54 (k6 tests), and aq-chore-52 (Performance Report Audit Page). Unless a task explicitly changes the plan, use this order:
-
 1. Repository/performance audit.
 2. Performance measurement contract.
 3. aq-chore-53 instrumentation.
@@ -123,7 +106,6 @@ Performance work covers aq-chore-53 (instrumentation), aq-chore-54 (k6 tests), a
 6. aq-chore-52 Performance Report.
 7. End-to-end verification.
 8. Continuous observability stack as a separate future task.
-
 The dependency direction is performance contract -> instrumentation -> k6 benchmark -> machine-readable benchmark artifact -> Performance Report. The report consumes measurements; do not hard-code values that can come from generated artifacts.
 
 ### Measurement ownership and integrity
@@ -139,21 +121,17 @@ The dependency direction is performance contract -> instrumentation -> k6 benchm
 ### Instrumentation and artifacts
 
 Instrumentation must have bounded cardinality, avoid raw addresses, API keys, and sensitive data in labels, remain safe under concurrent requests, have low overhead, and avoid changing validation results. Instrument meaningful stages, not every function. Do not expose benchmark/debug endpoints publicly by accident; inspect deployment architecture and restrict any required snapshot access.
-
 The benchmark pipeline must not require Grafana, Prometheus, or an OpenTelemetry Collector. Future observability may reuse transport-neutral application instrumentation, but do not install, configure, or deploy that stack unless explicitly requested. Controlled benchmarking answers “what happened during this experiment?”; continuous observability answers “what is happening over time?”.
-
 Performance runs should produce a versioned, machine-readable artifact, preferably JSON, capable of representing schema version, metadata, environment, workload, k6, application, runtime, missing measurements, configured thresholds, and observations. Follow the contract in `agents/`. The report must consume the artifact, not raw k6 console output.
 
 ## Testing
 
 Every implementation stage must be verifiable independently. Before declaring a task complete:
-
 1. Build the affected code.
 2. Run relevant unit/integration tests.
 3. Run required formatting/linting.
 4. Exercise changed behavior.
 5. Verify generated artifacts where applicable.
-
 For performance work, verify the complete path when applicable: Address Quality -> k6 workload -> client/application/runtime measurements -> benchmark artifact -> Performance Report. A file existing is not evidence that the feature works.
 
 ## Documentation
@@ -163,7 +141,6 @@ Document decisions future agents need to understand: what is measured, why, boun
 ## Security and scope control
 
 Do not expose benchmark/debug endpoints publicly by accident. If diagnostic endpoints are needed, inspect deployment architecture and choose an appropriate restriction such as disabled by default, environment-gated, localhost-only, or explicit benchmark mode. Do not commit secrets, API keys, credentials, or sensitive request payloads.
-
 Stop and request human input before changing the public API contract, validation/scoring semantics, adding a major persistent dependency, introducing substantial paid infrastructure, changing production deployment architecture, defining new SLOs or business performance targets, or running destructive/stress workloads against production. Ordinary implementation decisions within an approved design do not require approval.
 
 ## Agent Handoff
