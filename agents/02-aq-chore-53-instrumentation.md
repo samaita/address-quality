@@ -87,6 +87,8 @@ Exported metric: `app_span_duration_ms` (histogram, OTel default buckets). Label
 | `stage.candidate_evaluation` | evaluation loop + ranking sort |
 | `stage.postal_code_fallback` | postal lookup **only when invoked** |
 
+The request context carries the active span, so a stage started from it is recorded as a child of `http.request`. That parentage is what a trace view (Tempo or Jaeger) needs; the Prometheus histogram only sees the span name, so it stays flat.
+
 `stage.postal_code_fallback` starts inside `resolveLocationByPostalCode`, after its no-postal-code early return, so the series only exists when the lookup path really ran. Verified live: present for inputs carrying a 5-digit postal code, absent otherwise.
 
 `span.status` is `error` only for 5xx handler errors. Stage spans stay `unset`, because a stage returning no candidate is not an error.
@@ -111,7 +113,7 @@ This replaced `/internal/perf-snapshot` (loopback-only JSON). Unlike it, `/metri
 
 - `gofmt` clean on all touched files. `go build ./...` and `go vet ./...` clean.
 - `go test ./... -count=1` — all packages pass (incl. `internal/service` 17.6s).
-- `go test ./internal/telemetry -race` — 5 tests pass: span becomes a Prometheus metric, bounded dimensions, status-class mapping, no label leakage, concurrent spans.
+- `go test ./internal/telemetry -race` — 6 tests pass: span becomes a Prometheus metric, bounded dimensions, status-class mapping, no label leakage, concurrent spans, and the context carrying the span and nesting children under it.
 - Live against local `db/*.db`:
   - `POST /v1/validate` returns 200, same response shape as before.
   - `/metrics` 200 and shows all 7 span names.
@@ -125,7 +127,7 @@ The self-check caught two real defects during development: raw route strings bec
 
 - Request duration is measured in `logger.EchoMiddleware`, registered first via `e.Use`, so it wraps Recover, CORS and the route chain. It excludes Echo's `HTTPErrorHandler` write, which happens after the middleware returns.
 - Handler errors are written after the middleware returns, so `res.Status` is not final inside it. Status is resolved from the returned error (`*echo.HTTPError` code, else 500); without this every server error would be recorded as 2xx. Verified live: a 401 lands in `http_status_class="4xx"`.
-- `Start` deliberately discards the child context, so no call site changes behaviour. Nothing in the request path consumes trace context yet.
+- Spans nest through `context.Context`. `Start` returns the context carrying the span, and `EchoMiddleware` writes it back onto the request, so the six stage spans are children of `http.request` rather than separate roots. Stages whose callees take no context (`buildCandidates`, `RecoverContextualEvidence`, `EvaluateCandidate`) start their span from the parent context instead of the child, so the stages sit side by side instead of chaining into one another. The existing context values (request ID, cancellation) are preserved.
 
 ## Unresolved issues
 

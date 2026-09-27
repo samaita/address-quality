@@ -112,16 +112,21 @@ func Init() (func(context.Context) error, error) {
 	}, nil
 }
 
-// Start begins a span. Its elapsed time becomes app.span.duration_ms once the
-// span ends, so callers only have to End it. The context is deliberately not
-// returned: no call site changes behaviour, and request flow stays untouched.
-func Start(ctx context.Context, name string, attrs ...attribute.KeyValue) trace.Span {
+// Start begins a span and returns the context carrying it. The name and the
+// timing travel with that context: work started from it is recorded as a child
+// of this span, and trace.SpanFromContext reaches the same span without it
+// being passed around explicitly.
+//
+// Hand the returned context to callees that accept one. Where a callee takes
+// none, discard it and start the next sibling span from the parent context:
+// reusing the child context would nest the stages instead of placing them side
+// by side.
+func Start(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
 	opts := []trace.SpanStartOption{trace.WithSpanKind(trace.SpanKindInternal)}
 	if len(attrs) > 0 {
 		opts = append(opts, trace.WithAttributes(attrs...))
 	}
-	_, span := otel.Tracer(instrumentationName).Start(ctx, name, opts...)
-	return span
+	return otel.Tracer(instrumentationName).Start(ctx, name, opts...)
 }
 
 // Handler serves Prometheus exposition format. Returns 503 until Init runs.

@@ -34,28 +34,28 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	if sourceCode == "" {
 		sourceCode = svc.sourceCode
 	}
-	sourceSpan := telemetry.Start(ctx, telemetry.SpanSourceCacheReady)
-	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(ctx, sourceCode)
+	sourceCtx, sourceSpan := telemetry.Start(ctx, telemetry.SpanSourceCacheReady)
+	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(sourceCtx, sourceCode)
 	if err != nil {
 		sourceSpan.End()
 		log.Error().Err(err).Msg("find source by code")
 		return nil, err
 	}
 
-	if err := svc.ensureEntitiesCachesLoaded(ctx, sourceID); err != nil {
+	if err := svc.ensureEntitiesCachesLoaded(sourceCtx, sourceID); err != nil {
 		sourceSpan.End()
 		log.Error().Err(err).Msg("load caches")
 		return nil, err
 	}
 	sourceSpan.End()
 
-	evidenceSpan := telemetry.Start(ctx, telemetry.SpanEvidenceResolution)
+	evidenceCtx, evidenceSpan := telemetry.Start(ctx, telemetry.SpanEvidenceResolution)
 	evidence := ExtractEvidence(normalized)
 	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
 
 	roadTokens := detectRoadContextTokens(sanitized)
 	compactMatchText := normalizer.Normalize(stripRoadContext(sanitized))
-	resolved := svc.ResolveEvidence(ctx, sourceID, evidence, normalized, compactMatchText, roadTokens)
+	resolved := svc.ResolveEvidence(evidenceCtx, sourceID, evidence, normalized, compactMatchText, roadTokens)
 	evidenceSpan.End()
 
 	buildCandidates := func(res []model.ResolvedEvidence) []model.AdminCandidate {
@@ -65,11 +65,11 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 		return BuildConclusions(cands, svc.hierarchyCache, res)
 	}
 
-	buildSpan := telemetry.Start(ctx, telemetry.SpanCandidateBuild)
+	_, buildSpan := telemetry.Start(ctx, telemetry.SpanCandidateBuild)
 	candidates := buildCandidates(resolved)
 	buildSpan.End()
 
-	recoverySpan := telemetry.Start(ctx, telemetry.SpanContextualRecovery)
+	_, recoverySpan := telemetry.Start(ctx, telemetry.SpanContextualRecovery)
 	// Second-pass contextual recovery: exact-resolution candidates provide the
 	// context; unexplained input spans are fuzzy-matched against their
 	// in-memory neighborhood; recovered evidence triggers a single rebuild.
@@ -81,7 +81,7 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	recoverySpan.End()
 	log.Debug().Int("resolved_count", len(resolved)).Int("fuzzy_corrections", len(fuzzyCorrections)).Msg("entity resolution")
 
-	evalSpan := telemetry.Start(ctx, telemetry.SpanCandidateEvaluation)
+	_, evalSpan := telemetry.Start(ctx, telemetry.SpanCandidateEvaluation)
 	var scored []scoredCandidate
 	evalEvidence := evidenceWithoutValues(evidence, fuzzyExplained)
 	for _, c := range candidates {

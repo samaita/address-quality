@@ -34,7 +34,7 @@ func (svc *Service) resolveLocationByPostalCode(ctx context.Context, location mo
 	}
 	// Timed here, not at the call site, so the stage is recorded only when the
 	// postal lookup path is actually invoked.
-	span := telemetry.Start(ctx, telemetry.SpanPostalFallback)
+	ctx, span := telemetry.Start(ctx, telemetry.SpanPostalFallback)
 	defer span.End()
 
 	// No winner found — infer full location from postal code DB
