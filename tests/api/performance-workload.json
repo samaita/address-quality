@@ -1,0 +1,11 @@
+{
+  "id": "synthetic-five-address",
+  "description": "The performance workload for aq-chore-54. Exactly five synthetic addresses, measured by tests/api/load-test.js. This is NOT the accuracy dataset: accuracy uses a private non-committed 106-record set. Never merge the two and never present these five as an accuracy workload.",
+  "addresses": [
+    "Jl. Merdeka No.1, Jakarta Pusat 10110",
+    "Jl. Siliwangi No.1, Bogor 16119",
+    "Gang Mawar No.5, Bekasi Timur, Kota Bekasi 17111",
+    "Dekat Masjid Al-Ikhlas, Kapuas Tengah, Kalimantan Tengah",
+    "Perumahan Citra Garden Blok A2 No.3, Surabaya 60231"
+  ]
+}
