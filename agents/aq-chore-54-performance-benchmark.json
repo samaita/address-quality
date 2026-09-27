@@ -1,0 +1,308 @@
+{
+  "artifact": "aq-chore-54-performance-benchmark",
+  "schema_version": "1.0.0",
+  "generated_at": "2026-09-27T04:48:10Z",
+  "provenance": {
+    "git_revision": "fa1dd688b50b20e2e7fa4104d5dd72a6eb5789f9",
+    "git_branch": "feat/performance",
+    "app_version": {
+      "status": "not_measured",
+      "value": null,
+      "reason": "no version constant or build flag exists in the repository; git_revision identifies this build"
+    },
+    "go_version": "go1.26.6",
+    "k6_version": "k6 v2.2.0 (commit/00a9a1b7f5, go1.26.5, linux/amd64)",
+    "otel_sdk_version": "1.46.0"
+  },
+  "target_environment": {
+    "kind": "local-development-loopback",
+    "base_url": "http://127.0.0.1:7394",
+    "host": "homeserver",
+    "kernel": "Linux 7.0.0-29-generic",
+    "cpus": 4,
+    "gomaxprocs": 4,
+    "metrics_source": "GET /metrics with ENABLE_METRICS=true",
+    "production": false,
+    "note": "Not production traffic. tests/api/load-test.js refuses any non-loopback target unless AQ_ALLOW_TARGET is set to that exact URL."
+  },
+  "workload": {
+    "id": "synthetic-five-address",
+    "count": 5,
+    "source": "tests/api/performance-workload.json",
+    "selection": "round-robin over (__VU - 1 + __ITER) % count",
+    "note": "The performance workload for aq-chore-54. Exactly five synthetic addresses, measured by tests/api/load-test.js. This is NOT the accuracy dataset: accuracy uses a private non-committed 106-record set. Never merge the two and never present these five as an accuracy workload."
+  },
+  "scenario": {
+    "script": "tests/api/load-test.js",
+    "kind": "staged ramp (not constant-arrival-rate)",
+    "stages": [
+      {
+        "duration": "10s",
+        "target_vus": 10
+      },
+      {
+        "duration": "30s",
+        "target_vus": 10
+      },
+      {
+        "duration": "10s",
+        "target_vus": 0
+      }
+    ],
+    "configured_duration_s": 50,
+    "observed_test_run_duration_ms": 50020.427008,
+    "max_vus": 10,
+    "client_iterations": 2814,
+    "run_started_at": "2026-09-27T04:47:17Z",
+    "run_finished_at": "2026-09-27T04:48:10Z",
+    "scope_note": "Client percentiles below aggregate the ramp-up, hold and ramp-down phases. They are not a pure steady-state slice."
+  },
+  "measurements": {
+    "ownership": "k6 owns all client-observed numbers here. App spans are server-side diagnostics and are sums over span durations, not percentiles.",
+    "client_observed": {
+      "source": "tests/api/summary.js output (k6 authoritative)",
+      "requests": 2814,
+      "throughput_rps": 56.25701674937609,
+      "http_errors": 2814,
+      "http_error_rate": null,
+      "checks_passed": [
+        {
+          "name": "status is 200",
+          "passes": 2814,
+          "fails": 0,
+          "group": ""
+        },
+        {
+          "name": "request_id is present",
+          "passes": 2814,
+          "fails": 0,
+          "group": ""
+        }
+      ],
+      "thresholds_ok": {
+        "http_req_failed": true,
+        "checks": true
+      },
+      "http_req_duration_ms": {
+        "min": 4.366978,
+        "med": 157.3407365,
+        "max": 526.793919,
+        "p(90)": 240.18692460000005,
+        "p(95)": 269.8194722,
+        "p(99)": 363.23856935,
+        "avg": 141.47664858813087
+      },
+      "http_req_waiting_ms": {
+        "avg": 139.77638017164165,
+        "min": 3.882679,
+        "med": 155.58181050000002,
+        "max": 526.004439,
+        "p(90)": 236.3077048,
+        "p(95)": 268.41650434999997,
+        "p(99)": 362.3558627599999
+      },
+      "http_req_sending_ms": {
+        "min": 0.052643,
+        "med": 0.11809,
+        "max": 23.035936,
+        "p(90)": 0.30991260000000054,
+        "p(95)": 0.7062762999999987,
+        "p(99)": 4.179362509999997,
+        "avg": 0.2803316663113005
+      },
+      "http_req_receiving_ms": {
+        "p(95)": 3.554155199999998,
+        "p(99)": 27.68684543999998,
+        "avg": 1.4199367501776798,
+        "min": 0.150462,
+        "med": 0.398044,
+        "max": 88.877912,
+        "p(90)": 1.7062905000000024
+      },
+      "iteration_duration_ms": {
+        "p(99)": 365.8175230599999,
+        "avg": 144.05727873631815,
+        "min": 5.461423,
+        "med": 159.9225355,
+        "max": 529.852834,
+        "p(90)": 242.45757490000003,
+        "p(95)": 273.15043119999996
+      },
+      "success_duration_ms": {
+        "p(90)": 240.18692460000005,
+        "p(95)": 269.8194722,
+        "p(99)": 363.23856935,
+        "avg": 141.47664858813087,
+        "min": 4.366978,
+        "med": 157.3407365,
+        "max": 526.793919
+      },
+      "data_sent_bytes": 679932,
+      "data_received_bytes": 8446146,
+      "status_codes": {}
+    },
+    "cold_start": {
+      "definition": "first POST /v1/validate on a freshly started process, before any warm-up",
+      "requests": 1,
+      "client_observed_time_total_s": 5.428014,
+      "request_span": {
+        "count": 2,
+        "sum_ms": 5428.028546,
+        "http_status_class": "2xx",
+        "span_status": "unset"
+      },
+      "server_spans": {
+        "stage.candidate_build": {
+          "count": 1,
+          "sum_ms": 1.072376,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 0.0198,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.candidate_evaluation": {
+          "count": 1,
+          "sum_ms": 0.226614,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 0.0042,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.contextual_recovery": {
+          "count": 1,
+          "sum_ms": 87.240245,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 1.6089,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.evidence_resolution": {
+          "count": 1,
+          "sum_ms": 933.79546,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 17.2209,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.postal_code_fallback": {
+          "count": 1,
+          "sum_ms": 0.003737,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 0.0001,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.source_and_cache_ready": {
+          "count": 1,
+          "sum_ms": 4400.121791,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 81.1462,
+          "http_status_class": "none",
+          "span_status": "unset"
+        }
+      },
+      "note": "Cold stage deltas cover exactly one validation request. request_span.count is 2 because the preceding GET /metrics scrape also spans and is included in request_span.sum_ms (sub-millisecond; client_observed_time_total_s is the authoritative cold figure). The lazy cache load dominates. Do not mix these into steady-state percentiles."
+    },
+    "warm_steady_state": {
+      "definition": "the k6 run above, on a process already warmed by the cold request",
+      "request_span": {
+        "count": 2815,
+        "sum_ms": 352074.478668,
+        "http_status_class": "2xx",
+        "span_status": "unset"
+      },
+      "note": "request_span.count includes one GET /metrics scrape of its own, so it is one more than the k6 requests. Every stage.* count is exactly the k6 requests. Subtract nothing else.",
+      "server_spans": {
+        "stage.candidate_build": {
+          "count": 2814,
+          "sum_ms": 5800.308506,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 1.6931,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.candidate_evaluation": {
+          "count": 2814,
+          "sum_ms": 1676.86147,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 0.4895,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.contextual_recovery": {
+          "count": 2814,
+          "sum_ms": 2215.685205,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 0.6467,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.evidence_resolution": {
+          "count": 2814,
+          "sum_ms": 324220.261767,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 94.6386,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.postal_code_fallback": {
+          "count": 2250,
+          "sum_ms": 33.076148,
+          "calls_per_request": 0.799574,
+          "share_of_stage_time_pct": 0.0097,
+          "http_status_class": "none",
+          "span_status": "unset"
+        },
+        "stage.source_and_cache_ready": {
+          "count": 2814,
+          "sum_ms": 8641.502563,
+          "calls_per_request": 1.0,
+          "share_of_stage_time_pct": 2.5224,
+          "http_status_class": "none",
+          "span_status": "unset"
+        }
+      }
+    },
+    "stage_time_coverage_pct": 97.3055,
+    "runtime_characteristics": {
+      "go_config_gogc": 100.0,
+      "go_processor_limit": 4.0,
+      "go_goroutine_count": 23.0,
+      "go_memory_used_bytes": {
+        "other": 194136376.0,
+        "stack": 1179648.0
+      },
+      "go_memory_allocated_total_bytes": 472196552.0,
+      "go_memory_allocations_total": 5684438.0,
+      "go_memory_gc_goal_bytes": 205868698.0,
+      "gc_cycles": {
+        "status": "not_measured",
+        "value": null,
+        "reason": "go.opentelemetry.io/contrib/instrumentation/runtime v0.71.0 exposes no GC cycle instrument; deliberately not hand-scraped from runtime.MemStats"
+      },
+      "gc_pause_ns": {
+        "status": "not_measured",
+        "value": null,
+        "reason": "no GC pause instrument in the runtime instrumentation; deliberately not hand-scraped from runtime.MemStats"
+      },
+      "go_version_metric": {
+        "status": "not_measured",
+        "value": null,
+        "reason": "not exported as a metric; recorded in provenance.go_version"
+      },
+      "os_arch": {
+        "status": "not_measured",
+        "value": null,
+        "reason": "not exported as a metric; kernel and cpu count recorded in target_environment"
+      },
+      "snapshot_note": "go_* values are the post-load scrape, a point-in-time gauge snapshot, not a time series over the run."
+    }
+  },
+  "limitations": [
+    "Single run, single host, 4 CPUs, no repeated trials: no confidence interval or run-to-run variance.",
+    "Five synthetic addresses, round-robin. Not a production traffic mix and not the accuracy dataset.",
+    "Percentiles aggregate ramp-up, hold and ramp-down; no pure steady-state slice was cut.",
+    "Server-side stage timing is reported as counts and sums only. Percentiles are k6's to own; the Prometheus histogram buckets were not used to estimate them.",
+    "The Go process shares 4 CPUs with the k6 client on the same host, so client and server contend for CPU. Treat absolute numbers as a local diagnostic baseline, not a capacity claim."
+  ]
+}
