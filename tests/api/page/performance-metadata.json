@@ -1,0 +1,630 @@
+[
+  {
+    "release": "v0.1.2-alpha",
+    "build": "v0.1.2-alpha",
+    "performance_build": "agent-perf-20260927-a-baseline",
+    "artifact_source": "agents/aq-chore-54-performance-benchmark.json",
+    "git_commit": "fa1dd688b50b20e2e7fa4104d5dd72a6eb5789f9",
+    "generated_at": "2026-09-27T04:48:10Z",
+    "role": "baseline",
+    "before": null,
+    "after": {
+      "performance_build": "agent-perf-20260927-a-baseline",
+      "artifact_source": "agents/aq-chore-54-performance-benchmark.json",
+      "git_commit": "fa1dd688b50b20e2e7fa4104d5dd72a6eb5789f9",
+      "generated_at": "2026-09-27T04:48:10Z",
+      "target_environment": {
+        "kind": "local-development-loopback",
+        "base_url": "http://127.0.0.1:7394",
+        "host": "homeserver",
+        "kernel": "Linux 7.0.0-29-generic",
+        "cpus": 4,
+        "production": false
+      },
+      "workload": {
+        "id": "synthetic-five-address",
+        "count": 5,
+        "source": "tests/api/performance-workload.json"
+      },
+      "scenario": {
+        "kind": "staged ramp (not constant-arrival-rate)",
+        "max_vus": 10,
+        "configured_duration_s": 50,
+        "client_iterations": 2814
+      },
+      "metrics": {
+        "requests": 2814,
+        "throughput_rps": 56.25701674937609,
+        "http_errors": 0,
+        "http_error_rate": 0,
+        "thresholds_ok": {
+          "http_req_failed": true,
+          "checks": true
+        },
+        "http_req_duration_ms": {
+          "min": 4.366978,
+          "med": 157.3407365,
+          "max": 526.793919,
+          "p(90)": 240.18692460000005,
+          "p(95)": 269.8194722,
+          "p(99)": 363.23856935,
+          "avg": 141.47664858813087
+        },
+        "http_req_waiting_ms": {
+          "avg": 139.77638017164165,
+          "min": 3.882679,
+          "med": 155.58181050000002,
+          "max": 526.004439,
+          "p(90)": 236.3077048,
+          "p(95)": 268.41650434999997,
+          "p(99)": 362.3558627599999
+        },
+        "iteration_duration_ms": {
+          "p(99)": 365.8175230599999,
+          "avg": 144.05727873631815,
+          "min": 5.461423,
+          "med": 159.9225355,
+          "max": 529.852834,
+          "p(90)": 242.45757490000003,
+          "p(95)": 273.15043119999996
+        },
+        "cold_start_ms": 5428.014,
+        "cold_stages": {
+          "stage.candidate_build": {
+            "count": 1,
+            "sum_ms": 1.072376,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0198,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.candidate_evaluation": {
+            "count": 1,
+            "sum_ms": 0.226614,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0042,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.contextual_recovery": {
+            "count": 1,
+            "sum_ms": 87.240245,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 1.6089,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.evidence_resolution": {
+            "count": 1,
+            "sum_ms": 933.79546,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 17.2209,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.postal_code_fallback": {
+            "count": 1,
+            "sum_ms": 0.003737,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0001,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.source_and_cache_ready": {
+            "count": 1,
+            "sum_ms": 4400.121791,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 81.1462,
+            "http_status_class": "none",
+            "span_status": "unset"
+          }
+        },
+        "stage_time_coverage_pct": 97.3055,
+        "stages": [
+          {
+            "stage": "stage.candidate_build",
+            "count": 2814,
+            "sum_ms": 5800.308506,
+            "share_of_stage_time_pct": 1.6931,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.candidate_evaluation",
+            "count": 2814,
+            "sum_ms": 1676.86147,
+            "share_of_stage_time_pct": 0.4895,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.contextual_recovery",
+            "count": 2814,
+            "sum_ms": 2215.685205,
+            "share_of_stage_time_pct": 0.6467,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.evidence_resolution",
+            "count": 2814,
+            "sum_ms": 324220.261767,
+            "share_of_stage_time_pct": 94.6386,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.postal_code_fallback",
+            "count": 2250,
+            "sum_ms": 33.076148,
+            "share_of_stage_time_pct": 0.0097,
+            "calls_per_request": 0.799574,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.source_and_cache_ready",
+            "count": 2814,
+            "sum_ms": 8641.502563,
+            "share_of_stage_time_pct": 2.5224,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          }
+        ],
+        "runtime_characteristics": {
+          "go_config_gogc": 100,
+          "go_processor_limit": 4,
+          "go_goroutine_count": 23,
+          "go_memory_used_bytes": {
+            "other": 194136376,
+            "stack": 1179648
+          },
+          "go_memory_allocated_total_bytes": 472196552,
+          "go_memory_allocations_total": 5684438,
+          "go_memory_gc_goal_bytes": 205868698,
+          "gc_cycles": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "go.opentelemetry.io/contrib/instrumentation/runtime v0.71.0 exposes no GC cycle instrument; deliberately not hand-scraped from runtime.MemStats"
+          },
+          "gc_pause_ns": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "no GC pause instrument in the runtime instrumentation; deliberately not hand-scraped from runtime.MemStats"
+          },
+          "go_version_metric": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "not exported as a metric; recorded in provenance.go_version"
+          },
+          "os_arch": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "not exported as a metric; kernel and cpu count recorded in target_environment"
+          },
+          "snapshot_note": "go_* values are the post-load scrape, a point-in-time gauge snapshot, not a time series over the run."
+        }
+      }
+    }
+  },
+  {
+    "release": "v0.1.2-alpha",
+    "build": "v0.1.2-alpha",
+    "performance_build": "agent-perf-20260927-b-repeat",
+    "artifact_source": "agents/aq-chore-54-performance-benchmark-run2.json",
+    "git_commit": "dc4f3b52a45c91accaad02583a6bf0875b95b1d4",
+    "generated_at": "2026-09-27T07:35:58Z",
+    "role": "comparison",
+    "before": {
+      "performance_build": "agent-perf-20260927-a-baseline",
+      "artifact_source": "agents/aq-chore-54-performance-benchmark.json",
+      "git_commit": "fa1dd688b50b20e2e7fa4104d5dd72a6eb5789f9",
+      "generated_at": "2026-09-27T04:48:10Z",
+      "target_environment": {
+        "kind": "local-development-loopback",
+        "base_url": "http://127.0.0.1:7394",
+        "host": "homeserver",
+        "kernel": "Linux 7.0.0-29-generic",
+        "cpus": 4,
+        "production": false
+      },
+      "workload": {
+        "id": "synthetic-five-address",
+        "count": 5,
+        "source": "tests/api/performance-workload.json"
+      },
+      "scenario": {
+        "kind": "staged ramp (not constant-arrival-rate)",
+        "max_vus": 10,
+        "configured_duration_s": 50,
+        "client_iterations": 2814
+      },
+      "metrics": {
+        "requests": 2814,
+        "throughput_rps": 56.25701674937609,
+        "http_errors": 0,
+        "http_error_rate": 0,
+        "thresholds_ok": {
+          "http_req_failed": true,
+          "checks": true
+        },
+        "http_req_duration_ms": {
+          "min": 4.366978,
+          "med": 157.3407365,
+          "max": 526.793919,
+          "p(90)": 240.18692460000005,
+          "p(95)": 269.8194722,
+          "p(99)": 363.23856935,
+          "avg": 141.47664858813087
+        },
+        "http_req_waiting_ms": {
+          "avg": 139.77638017164165,
+          "min": 3.882679,
+          "med": 155.58181050000002,
+          "max": 526.004439,
+          "p(90)": 236.3077048,
+          "p(95)": 268.41650434999997,
+          "p(99)": 362.3558627599999
+        },
+        "iteration_duration_ms": {
+          "p(99)": 365.8175230599999,
+          "avg": 144.05727873631815,
+          "min": 5.461423,
+          "med": 159.9225355,
+          "max": 529.852834,
+          "p(90)": 242.45757490000003,
+          "p(95)": 273.15043119999996
+        },
+        "cold_start_ms": 5428.014,
+        "cold_stages": {
+          "stage.candidate_build": {
+            "count": 1,
+            "sum_ms": 1.072376,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0198,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.candidate_evaluation": {
+            "count": 1,
+            "sum_ms": 0.226614,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0042,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.contextual_recovery": {
+            "count": 1,
+            "sum_ms": 87.240245,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 1.6089,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.evidence_resolution": {
+            "count": 1,
+            "sum_ms": 933.79546,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 17.2209,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.postal_code_fallback": {
+            "count": 1,
+            "sum_ms": 0.003737,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0001,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.source_and_cache_ready": {
+            "count": 1,
+            "sum_ms": 4400.121791,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 81.1462,
+            "http_status_class": "none",
+            "span_status": "unset"
+          }
+        },
+        "stage_time_coverage_pct": 97.3055,
+        "stages": [
+          {
+            "stage": "stage.candidate_build",
+            "count": 2814,
+            "sum_ms": 5800.308506,
+            "share_of_stage_time_pct": 1.6931,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.candidate_evaluation",
+            "count": 2814,
+            "sum_ms": 1676.86147,
+            "share_of_stage_time_pct": 0.4895,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.contextual_recovery",
+            "count": 2814,
+            "sum_ms": 2215.685205,
+            "share_of_stage_time_pct": 0.6467,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.evidence_resolution",
+            "count": 2814,
+            "sum_ms": 324220.261767,
+            "share_of_stage_time_pct": 94.6386,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.postal_code_fallback",
+            "count": 2250,
+            "sum_ms": 33.076148,
+            "share_of_stage_time_pct": 0.0097,
+            "calls_per_request": 0.799574,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.source_and_cache_ready",
+            "count": 2814,
+            "sum_ms": 8641.502563,
+            "share_of_stage_time_pct": 2.5224,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          }
+        ],
+        "runtime_characteristics": {
+          "go_config_gogc": 100,
+          "go_processor_limit": 4,
+          "go_goroutine_count": 23,
+          "go_memory_used_bytes": {
+            "other": 194136376,
+            "stack": 1179648
+          },
+          "go_memory_allocated_total_bytes": 472196552,
+          "go_memory_allocations_total": 5684438,
+          "go_memory_gc_goal_bytes": 205868698,
+          "gc_cycles": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "go.opentelemetry.io/contrib/instrumentation/runtime v0.71.0 exposes no GC cycle instrument; deliberately not hand-scraped from runtime.MemStats"
+          },
+          "gc_pause_ns": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "no GC pause instrument in the runtime instrumentation; deliberately not hand-scraped from runtime.MemStats"
+          },
+          "go_version_metric": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "not exported as a metric; recorded in provenance.go_version"
+          },
+          "os_arch": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "not exported as a metric; kernel and cpu count recorded in target_environment"
+          },
+          "snapshot_note": "go_* values are the post-load scrape, a point-in-time gauge snapshot, not a time series over the run."
+        }
+      }
+    },
+    "after": {
+      "performance_build": "agent-perf-20260927-b-repeat",
+      "artifact_source": "agents/aq-chore-54-performance-benchmark-run2.json",
+      "git_commit": "dc4f3b52a45c91accaad02583a6bf0875b95b1d4",
+      "generated_at": "2026-09-27T07:35:58Z",
+      "target_environment": {
+        "kind": "local-development-loopback",
+        "base_url": "http://127.0.0.1:7394",
+        "host": "homeserver",
+        "kernel": "Linux 7.0.0-29-generic",
+        "cpus": 4,
+        "production": false
+      },
+      "workload": {
+        "id": "synthetic-five-address",
+        "count": 5,
+        "source": "tests/api/performance-workload.json"
+      },
+      "scenario": {
+        "kind": "staged ramp (not constant-arrival-rate)",
+        "max_vus": 10,
+        "configured_duration_s": 50,
+        "client_iterations": 2571
+      },
+      "metrics": {
+        "requests": 2571,
+        "throughput_rps": 51.38839379450562,
+        "http_errors": 0,
+        "http_error_rate": 0,
+        "thresholds_ok": {
+          "checks": true,
+          "http_req_failed": true
+        },
+        "http_req_duration_ms": {
+          "max": 670.498076,
+          "p(90)": 264.656201,
+          "p(95)": 303.409098,
+          "p(99)": 445.8575176000018,
+          "avg": 154.75124591948656,
+          "min": 4.458337,
+          "med": 165.838602
+        },
+        "http_req_waiting_ms": {
+          "max": 667.182413,
+          "p(90)": 262.593834,
+          "p(95)": 300.3673195,
+          "p(99)": 444.52997380000204,
+          "avg": 153.07185682924967,
+          "min": 3.946261,
+          "med": 164.123405
+        },
+        "iteration_duration_ms": {
+          "med": 168.994006,
+          "max": 673.74848,
+          "p(90)": 266.937795,
+          "p(95)": 307.8496315,
+          "p(99)": 450.64654980000097,
+          "avg": 157.69834802411535,
+          "min": 5.61541
+        },
+        "cold_start_ms": 5795.687,
+        "cold_stages": {
+          "stage.candidate_build": {
+            "count": 1,
+            "sum_ms": 0.933224,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0161,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.candidate_evaluation": {
+            "count": 1,
+            "sum_ms": 0.240069,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0041,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.contextual_recovery": {
+            "count": 1,
+            "sum_ms": 85.054537,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 1.469,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.evidence_resolution": {
+            "count": 1,
+            "sum_ms": 960.890658,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 16.5953,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.postal_code_fallback": {
+            "count": 1,
+            "sum_ms": 0.006447,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 0.0001,
+            "http_status_class": "none",
+            "span_status": "unset"
+          },
+          "stage.source_and_cache_ready": {
+            "count": 1,
+            "sum_ms": 4743.021251,
+            "calls_per_request": 1,
+            "share_of_stage_time_pct": 81.9154,
+            "http_status_class": "none",
+            "span_status": "unset"
+          }
+        },
+        "stage_time_coverage_pct": 97.2501,
+        "stages": [
+          {
+            "stage": "stage.candidate_build",
+            "count": 2571,
+            "sum_ms": 5927.328272,
+            "share_of_stage_time_pct": 1.7299,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.candidate_evaluation",
+            "count": 2571,
+            "sum_ms": 1582.516069,
+            "share_of_stage_time_pct": 0.4619,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.contextual_recovery",
+            "count": 2571,
+            "sum_ms": 1929.227609,
+            "share_of_stage_time_pct": 0.5631,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.evidence_resolution",
+            "count": 2571,
+            "sum_ms": 324719.841371,
+            "share_of_stage_time_pct": 94.7727,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.postal_code_fallback",
+            "count": 2057,
+            "sum_ms": 16.911418,
+            "share_of_stage_time_pct": 0.0049,
+            "calls_per_request": 0.800078,
+            "span_status": "unset",
+            "http_status_class": "none"
+          },
+          {
+            "stage": "stage.source_and_cache_ready",
+            "count": 2571,
+            "sum_ms": 8454.462098,
+            "share_of_stage_time_pct": 2.4675,
+            "calls_per_request": 1,
+            "span_status": "unset",
+            "http_status_class": "none"
+          }
+        ],
+        "runtime_characteristics": {
+          "go_config_gogc": 100,
+          "go_processor_limit": 4,
+          "go_goroutine_count": 23,
+          "go_memory_used_bytes": {
+            "other": 195856696,
+            "stack": 1343488
+          },
+          "go_memory_allocated_total_bytes": 448017560,
+          "go_memory_allocations_total": 5427270,
+          "go_memory_gc_goal_bytes": 207185698,
+          "gc_cycles": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "go.opentelemetry.io/contrib/instrumentation/runtime v0.71.0 exposes no GC cycle instrument; deliberately not hand-scraped from runtime.MemStats"
+          },
+          "gc_pause_ns": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "no GC pause instrument in the runtime instrumentation; deliberately not hand-scraped from runtime.MemStats"
+          },
+          "go_version_metric": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "not exported as a metric; recorded in provenance.go_version"
+          },
+          "os_arch": {
+            "status": "not_measured",
+            "value": null,
+            "reason": "not exported as a metric; kernel and cpu count recorded in target_environment"
+          },
+          "snapshot_note": "go_* values are the post-load scrape, a point-in-time gauge snapshot, not a time series over the run."
+        }
+      }
+    }
+  }
+]

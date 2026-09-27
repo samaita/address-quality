@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Address Quality — Performance</title>
+<style>
+/* Scoped under .aq-performance so it cannot leak into (or be affected by) the
+   parent page when embedded. Same design tokens as template.html. */
+.aq-performance {
+  --aq-bg: #f7f7f8;
+  --aq-surface: #ffffff;
+  --aq-surface-50: #fafafa;
+  --aq-border: #e4e4e7;
+  --aq-border-strong: #d4d4d8;
+  --aq-text: #18181b;
+  --aq-muted: #71717a;
+  --aq-faint: #a1a1aa;
+  --aq-accent: #4f46e5;
+  --aq-accent-soft: #4f46e50f;
+  --aq-green: #16a34a;
+  --aq-red: #dc2626;
+  --aq-amber: #b45309;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  line-height: 1.6;
+  color: var(--aq-text);
+  background: var(--aq-bg);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+.aq-performance *,
+.aq-performance *::before,
+.aq-performance *::after { box-sizing: border-box; }
+.aq-performance :where(h1, h2, h3, p, ul, li, table, th, td) { margin: 0; padding: 0; }
+
+.aq-shell { max-width: 1120px; margin: 0 auto; padding: 40px 24px 72px; }
+.aq-kicker { color: var(--aq-muted); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.aq-title { font-size: 34px; line-height: 1.2; letter-spacing: -.02em; margin-top: 4px; }
+.aq-release { color: var(--aq-muted); font-size: 14px; margin-top: 6px; }
+
+.aq-section { margin-top: 40px; }
+.aq-section-title { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--aq-muted); padding-bottom: 10px; border-bottom: 1px solid var(--aq-border); }
+.aq-subtitle { font-size: 17px; margin: 18px 0 10px; }
+.aq-note { color: var(--aq-muted); font-size: 13px; margin-top: 8px; }
+
+.aq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
+.aq-card { background: var(--aq-surface); border: 1px solid var(--aq-border); border-radius: 10px; padding: 14px 16px; }
+.aq-card dt { color: var(--aq-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.aq-card dd { font-size: 22px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.aq-card dd small { font-size: 13px; color: var(--aq-muted); }
+
+.aq-table { width: 100%; border-collapse: collapse; background: var(--aq-surface); border: 1px solid var(--aq-border); border-radius: 10px; overflow: hidden; margin-top: 12px; }
+.aq-table th, .aq-table td { padding: 9px 12px; border-bottom: 1px solid var(--aq-border); font-size: 14px; text-align: left; }
+.aq-table thead th { background: var(--aq-surface-50); color: var(--aq-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.aq-table tbody tr:last-child td { border-bottom: 0; }
+.aq-table .aq-num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.aq-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.aq-dim { color: var(--aq-muted); font-size: 13px; }
+
+.aq-better { color: var(--aq-green); }
+.aq-worse { color: var(--aq-red); }
+.aq-flat { color: var(--aq-faint); }
+
+.aq-banner { border: 1px solid var(--aq-border-strong); border-left: 3px solid var(--aq-amber); background: var(--aq-surface); border-radius: 8px; padding: 12px 16px; margin-top: 18px; }
+.aq-banner h3 { font-size: 15px; margin-bottom: 4px; }
+.aq-banner ul { margin: 6px 0 0 18px; }
+.aq-banner li { font-size: 13px; color: var(--aq-muted); }
+
+.aq-empty { color: var(--aq-faint); font-style: italic; }
+.aq-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; border: 1px solid var(--aq-border-strong); color: var(--aq-muted); }
+.aq-error { background: var(--aq-surface); border: 1px solid var(--aq-border); border-radius: 10px; padding: 24px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="aq-performance">
+  <div class="aq-shell">
+    <div id="aq-error" class="aq-error" hidden>
+      <h2>Performance data unavailable</h2>
+      <p class="aq-dim">Regenerate this page with <span class="aq-mono">make performance-page</span> once a benchmark artifact exists.</p>
+    </div>
+
+    <div id="aq-app" hidden>
+      <header>
+        <div class="aq-kicker">Address Quality</div>
+        <h1 class="aq-title">Performance</h1>
+        <div class="aq-release" id="aq-release-line"></div>
+      </header>
+
+      <div id="aq-comparability"></div>
+
+      <section class="aq-section">
+        <h2 class="aq-section-title">Before and after</h2>
+        <p class="aq-note">Both sides come from named runs in <span class="aq-mono">performance-metadata.json</span>. The baseline is chosen by label, never by file position.</p>
+        <div class="aq-grid" id="aq-headline"></div>
+        <table class="aq-table" id="aq-delta"></table>
+        <p class="aq-note" id="aq-delta-note"></p>
+      </section>
+
+      <section class="aq-section">
+        <h2 class="aq-section-title">Client observed latency</h2>
+        <p class="aq-note">k6 is authoritative for everything in this section. Milliseconds, after run.</p>
+        <table class="aq-table" id="aq-latency"></table>
+      </section>
+
+      <section class="aq-section">
+        <h2 class="aq-section-title">Cold start</h2>
+        <p class="aq-note">First request on a fresh process, measured separately so lazy cache loading never lands in warm percentiles.</p>
+        <table class="aq-table" id="aq-cold"></table>
+      </section>
+
+      <section class="aq-section">
+        <h2 class="aq-section-title">Server-side stages</h2>
+        <p class="aq-note">Diagnostic only. Span-duration sums, not percentiles. Stages are ordered by after-run share of stage time.</p>
+        <table class="aq-table" id="aq-stages"></table>
+        <p class="aq-note" id="aq-coverage"></p>
+      </section>
+
+      <section class="aq-section">
+        <h2 class="aq-section-title">Runtime characteristics</h2>
+        <table class="aq-table" id="aq-runtime"></table>
+      </section>
+
+      <section class="aq-section">
+        <h2 class="aq-section-title">Not measured</h2>
+        <p class="aq-note">Absent data is never zero. These are gaps with their reasons, carried through from the artifact.</p>
+        <table class="aq-table" id="aq-notmeasured"></table>
+      </section>
+
+      <section class="aq-section">
+        <h2 class="aq-section-title">Limitations</h2>
+        <ul id="aq-limitations" style="margin:12px 0 0 20px"></ul>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const AQ_DATA = __AQ_DATA__;
+(function () {
+  // Escape via the DOM so the source never needs a literal ampersand or
+  // angle bracket (which keeps this block immune to entity mangling).
+  const esc = (s) => {
+    const el = document.createElement('div');
+    el.textContent = String(s == null ? '' : s);
+    return el.innerHTML;
+  };
+  const num = (v, digits) => {
+    if (v === null || v === undefined || Number.isNaN(v)) return '<span class="aq-empty">n/a</span>';
+    return Number(v).toFixed(digits === undefined ? 2 : digits);
+  };
+  const ms = (v) => (v === null || v === undefined ? '<span class="aq-empty">n/a</span>' : num(v, v >= 100 ? 1 : 3) + ' ms');
+
+  try {
+    if (!AQ_DATA || !AQ_DATA.entry || !AQ_DATA.entry.after) throw new Error('no after snapshot');
+    const entry = AQ_DATA.entry;
+    const after = entry.after;
+    const before = entry.before;
+    const A = after.metrics;
+    const B = before ? before.metrics : null;
+
+    document.getElementById('aq-release-line').innerHTML =
+      esc(entry.release || 'unreleased') + ' · build ' + esc(entry.build || 'n/a') +
+      ' · <span class="aq-mono">' + esc(entry.performance_build) + '</span> ' +
+      '<span class="aq-pill">' + esc(entry.role || 'comparison') + '</span>' +
+      ' · commit <span class="aq-mono">' + esc((entry.git_commit || '').slice(0, 7) || 'n/a') + '</span>' +
+      ' · ' + esc(entry.generated_at || '');
+
+    // Comparability guard: unlike runs must not be differenced silently.
+    const cmp = AQ_DATA.comparability || { comparable: true, reasons: [] };
+    if (!cmp.comparable) {
+      document.getElementById('aq-comparability').innerHTML =
+        '<div class="aq-banner"><h3>Not a like-for-like comparison</h3>' +
+        '<p class="aq-dim">The two runs were measured under different conditions, so the deltas below mix ' +
+        'code change with environment change.</p><ul>' +
+        cmp.reasons.map((r) => '<li>' + esc(r) + '</li>').join('') + '</ul></div>';
+    }
+
+    // Headline cards.
+    const cards = [
+      { label: 'Requests', k: 'requests', better: 'higher', digits: 0 },
+      { label: 'Throughput', k: 'throughput_rps', better: 'higher', digits: 2, unit: 'req/s' },
+      { label: 'p(95) latency', k: 'p(95)', from: 'http_req_duration_ms', better: 'lower', ms: true },
+      { label: 'p(99) latency', k: 'p(99)', from: 'http_req_duration_ms', better: 'lower', ms: true },
+      { label: 'HTTP errors', k: 'http_errors', better: 'lower', digits: 0 },
+      { label: 'Cold start', k: 'cold_start_ms', better: 'lower', ms: true },
+    ];
+    document.getElementById('aq-headline').innerHTML = cards.map((c) => {
+      const read = (M) => {
+        if (!M) return null;
+        const src = c.from ? M[c.from] : M;
+        return src ? src[c.k] : null;
+      };
+      const av = read(A), bv = read(B);
+      const shown = c.ms ? ms(av) : num(av, c.digits) + (c.unit ? ' <small>' + esc(c.unit) + '</small>' : '');
+      let delta = '<small class="aq-flat">no baseline</small>';
+      if (B && bv !== null && bv !== undefined && av !== null && av !== undefined) {
+        const d = av - bv;
+        const cls = d === 0 ? 'aq-flat' : ((c.better === 'lower') === (d < 0) ? 'aq-better' : 'aq-worse');
+        const sign = d > 0 ? '+' : '';
+        delta = '<small class="' + cls + '">' + sign + num(c.ms ? d : d, c.digits === undefined ? 2 : c.digits) +
+                (c.ms ? ' ms' : '') + '</small>';
+      }
+      return '<div class="aq-card"><dt>' + esc(c.label) + '</dt><dd>' + shown + '<br>' + delta + '</dd></div>';
+    }).join('');
+
+    // Full before/after table.
+    const rows = [
+      { label: 'Requests', k: 'requests', better: 'higher', digits: 0 },
+      { label: 'Throughput (req/s)', k: 'throughput_rps', better: 'higher', digits: 2 },
+      { label: 'HTTP errors', k: 'http_errors', better: 'lower', digits: 0 },
+      { label: 'HTTP error rate', k: 'http_error_rate', better: 'lower', digits: 4 },
+      { label: 'Cold start (ms)', k: 'cold_start_ms', better: 'lower', digits: 3 },
+      { label: 'Stage coverage of request time (%)', k: 'stage_time_coverage_pct', better: 'neutral', digits: 2 },
+    ];
+    const pctiles = ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'];
+    pctiles.forEach((p) => rows.push({
+      label: 'http_req_duration ' + p + ' (ms)', from: 'http_req_duration_ms', k: p, better: 'lower', digits: 3,
+    }));
+
+    document.getElementById('aq-delta').innerHTML =
+      '<thead><tr><th>Metric</th><th class="aq-num">Before</th><th class="aq-num">After</th><th class="aq-num">Delta</th><th>Direction</th></tr></thead><tbody>' +
+      rows.map((r) => {
+        const read = (M) => {
+          if (!M) return null;
+          const src = r.from ? M[r.from] : M;
+          return src ? src[r.k] : null;
+        };
+        const av = read(A), bv = read(B);
+        let deltaCell = '<span class="aq-empty">n/a</span>', dir = '<span class="aq-flat">no baseline</span>';
+        if (B && bv !== null && bv !== undefined && av !== null && av !== undefined) {
+          const d = av - bv;
+          const neutral = r.better === 'neutral';
+          const cls = neutral ? 'aq-flat' : (d === 0 ? 'aq-flat' : ((r.better === 'lower') === (d < 0) ? 'aq-better' : 'aq-worse'));
+          const sign = d > 0 ? '+' : '';
+          deltaCell = '<span class="' + cls + '">' + sign + num(d, r.digits) + '</span>';
+          dir = neutral
+            ? '<span class="aq-flat">no direction</span>'
+            : (d === 0
+              ? '<span class="aq-flat">unchanged</span>'
+              : '<span class="' + cls + '">' + (((r.better === 'lower') === (d < 0)) ? 'improved' : 'regressed') + '</span>');
+        }
+        return '<tr><td>' + esc(r.label) + '</td>' +
+          '<td class="aq-num">' + num(bv, r.digits) + '</td>' +
+          '<td class="aq-num">' + num(av, r.digits) + '</td>' +
+          '<td class="aq-num">' + deltaCell + '</td><td>' + dir + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    document.getElementById('aq-delta-note').innerHTML = before
+      ? 'Before = <span class="aq-mono">' + esc(before.performance_build) + '</span> ' +
+        '(<span class="aq-mono">' + esc(before.artifact_source) + '</span>, commit ' +
+        '<span class="aq-mono">' + esc((before.git_commit || '').slice(0, 7) || 'n/a') + '</span>). ' +
+        'After = <span class="aq-mono">' + esc(after.performance_build) + '</span> ' +
+        '(<span class="aq-mono">' + esc(after.artifact_source) + '</span>, commit ' +
+        '<span class="aq-mono">' + esc((after.git_commit || '').slice(0, 7) || 'n/a') + '</span>). ' +
+        (before.git_commit === after.git_commit
+          ? '<strong>Same commit: these deltas are run-to-run variance, not code change.</strong>'
+          : 'Different commits: a delta smaller than the run-to-run spread is not evidence of a change.')
+      : 'This run is the baseline. There is no before side yet, so every delta is n/a rather than zero.';
+
+    // Latency percentiles.
+    const trend = (name) => (A[name] ? pctiles.map((p) =>
+      '<tr><td>' + esc(name) + ' ' + p + '</td><td class="aq-num">' + ms(A[name][p]) + '</td></tr>').join('') : '');
+    document.getElementById('aq-latency').innerHTML =
+      '<thead><tr><th>Metric</th><th class="aq-num">After run</th></tr></thead><tbody>' +
+      ['http_req_duration_ms', 'http_req_waiting_ms', 'iteration_duration_ms'].map(trend).join('') + '</tbody>';
+
+    // Cold start.
+    const coldRows = [];
+    coldRows.push('<tr><td><strong>Total, client observed</strong></td><td class="aq-num">' + ms(A.cold_start_ms) + '</td><td class="aq-num"></td></tr>');
+    const cs = A.cold_stages || {};
+    Object.keys(cs).sort((x, y) => (cs[y].sum_ms || 0) - (cs[x].sum_ms || 0)).forEach((s) => {
+      coldRows.push('<tr><td class="aq-mono">' + esc(s) + '</td><td class="aq-num">' + ms(cs[s].sum_ms) +
+        '</td><td class="aq-num">' + num(cs[s].share_of_stage_time_pct) + '%</td></tr>');
+    });
+    document.getElementById('aq-cold').innerHTML =
+      '<thead><tr><th>Part</th><th class="aq-num">Sum</th><th class="aq-num">Share</th></tr></thead><tbody>' +
+      coldRows.join('') + '</tbody>';
+
+    // Stages, before and after share.
+    const stageNames = Object.keys(A.stages.reduce((acc, s) => { acc[s.stage] = 1; return acc; }, {}));
+    const bIdx = {};
+    (B ? B.stages : []).forEach((s) => { bIdx[s.stage] = s; });
+    document.getElementById('aq-stages').innerHTML =
+      '<thead><tr><th>Stage</th><th class="aq-num">After count</th><th class="aq-num">After sum</th>' +
+      '<th class="aq-num">After share</th><th class="aq-num">Before share</th><th class="aq-num">Calls/req</th></tr></thead><tbody>' +
+      A.stages.slice().sort((x, y) => (y.sum_ms || 0) - (x.sum_ms || 0)).map((s) => {
+        const b = bIdx[s.stage];
+        return '<tr><td class="aq-mono">' + esc(s.stage) + '</td>' +
+          '<td class="aq-num">' + num(s.count, 0) + '</td>' +
+          '<td class="aq-num">' + ms(s.sum_ms) + '</td>' +
+          '<td class="aq-num">' + num(s.share_of_stage_time_pct) + '%</td>' +
+          '<td class="aq-num">' + (b ? num(b.share_of_stage_time_pct) + '%' : '<span class="aq-empty">n/a</span>') + '</td>' +
+          '<td class="aq-num">' + num(s.calls_per_request, 3) + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    document.getElementById('aq-coverage').innerHTML =
+      'Stages explain ' + num(AQ_DATA.stage_time_coverage_pct) + '% of <span class="aq-mono">http.request</span> time. ' +
+      'The remainder is work no stage wraps (sanitizing, normalization, JSON encoding, HTTP server overhead).';
+
+    // Runtime.
+    const rt = A.runtime_characteristics || {};
+    // Flatten the memory dict; drop notes and anything already listed under
+    // "not measured" so this table is measurements only.
+    const flat = {};
+    Object.entries(rt).forEach(([k, v]) => {
+      if (k === 'snapshot_note') return;
+      if (v && typeof v === 'object') {
+        if (v.status === 'not_measured') return;
+        Object.entries(v).forEach(([sk, sv]) => { flat[k + '_' + sk] = sv; });
+        return;
+      }
+      flat[k] = v;
+    });
+    const rtRows = Object.entries(flat)
+      .map(([k, v]) => '<tr><td class="aq-mono">' + esc(k) + '</td><td class="aq-num">' + esc(String(v)) + '</td></tr>').join('');
+    document.getElementById('aq-runtime').innerHTML =
+      '<thead><tr><th>Measurement</th><th class="aq-num">Value</th></tr></thead><tbody>' + rtRows + '</tbody>';
+
+    // Not measured.
+    const nm = AQ_DATA.not_measured || [];
+    document.getElementById('aq-notmeasured').innerHTML = nm.length
+      ? '<thead><tr><th>Field</th><th>Reason</th></tr></thead><tbody>' +
+        nm.map((n) => '<tr><td class="aq-mono">' + esc(n.path) + '</td><td class="aq-dim">' + esc(n.reason) + '</td></tr>').join('') +
+        '</tbody>'
+      : '<tbody><tr><td class="aq-empty">nothing missing</td></tr></tbody>';
+
+    const lim = AQ_DATA.limitations || [];
+    document.getElementById('aq-limitations').innerHTML =
+      lim.concat(before ? [
+        'Two runs are recorded here and they bound the smallest credible delta: a change ' +
+        'smaller than the spread between them is not distinguishable from run-to-run noise.',
+      ] : []).map((l) => '<li>' + esc(l) + '</li>').join('') || '<li class="aq-empty">none recorded</li>';
+
+    document.getElementById('aq-app').hidden = false;
+  } catch (e) {
+    document.getElementById('aq-error').hidden = false;
+  }
+})();
+</script>
+</body>
+</html>
