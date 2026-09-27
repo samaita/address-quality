@@ -14,15 +14,13 @@ const TARGET_VUS = parseInt(__ENV.K6_VUS) || 10;
 console.log(`BASE_URL: ${BASE_URL.url} (from ${BASE_URL.source})`);
 console.log(`API_KEY: ${API_KEY.apiKey ? 'set' : 'blank'} (from ${API_KEY.source})`);
 
+const workload = JSON.parse(open('./performance-workload.json'));
+
 const addresses = new SharedArray('addresses', function () {
-  return [
-    'Jl. Merdeka No.1, Jakarta Pusat 10110',
-    'Jl. Siliwangi No.1, Bogor 16119',
-    'Gang Mawar No.5, Bekasi Timur, Kota Bekasi 17111',
-    'Dekat Masjid Al-Ikhlas, Kapuas Tengah, Kalimantan Tengah',
-    'Perumahan Citra Garden Blok A2 No.3, Surabaya 60231',
-  ];
+  return workload.addresses;
 });
+
+console.log(`workload: ${workload.id} (${addresses.length} addresses)`);
 
 export const options = {
   stages: [
