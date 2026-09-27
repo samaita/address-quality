@@ -1,4 +1,4 @@
-.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed seed-init seed-drop seed-truncate seed-normalize benchmark benchmark-page benchmark-v0 benchmark-page-v0
+.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed seed-init seed-drop seed-truncate seed-normalize benchmark benchmark-page benchmark-v0 benchmark-page-v0 performance-page
 
 run:
 	go run ./cmd/server
@@ -64,3 +64,11 @@ benchmark-v0:
 
 benchmark-page-v0:
 	@printf 'benchmark_build: '; read b; [ -n "$$b" ] || { echo 'error: benchmark_build is required'; exit 1; }; BENCH_VER=v0 node tests/api/page/build.js "$$b"
+
+# Performance page. The baseline is named, never inferred from file order:
+# leave `before` blank only for the very first (baseline) run.
+performance-page:
+	@printf 'performance_build: '; read b; [ -n "$$b" ] || { echo 'error: performance_build is required'; exit 1; }; \
+	printf 'before performance_build (blank = this run is the baseline): '; read bf; \
+	if [ -n "$$bf" ]; then node tests/api/page/performance-build.js "$$b" --before "$$bf"; \
+	else node tests/api/page/performance-build.js "$$b"; fi

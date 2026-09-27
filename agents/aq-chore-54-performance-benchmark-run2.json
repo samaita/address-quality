@@ -1,9 +1,9 @@
 {
   "artifact": "aq-chore-54-performance-benchmark",
   "schema_version": "1.0.0",
-  "generated_at": "2026-09-27T04:48:10Z",
+  "generated_at": "2026-09-27T07:35:58Z",
   "provenance": {
-    "git_revision": "fa1dd688b50b20e2e7fa4104d5dd72a6eb5789f9",
+    "git_revision": "dc4f3b52a45c91accaad02583a6bf0875b95b1d4",
     "git_branch": "feat/performance",
     "app_version": {
       "status": "not_measured",
@@ -50,95 +50,95 @@
       }
     ],
     "configured_duration_s": 50,
-    "observed_test_run_duration_ms": 50020.427008,
+    "observed_test_run_duration_ms": 50030.75228,
     "max_vus": 10,
-    "client_iterations": 2814,
-    "run_started_at": "2026-09-27T04:47:17Z",
-    "run_finished_at": "2026-09-27T04:48:10Z",
+    "client_iterations": 2571,
+    "run_started_at": "2026-09-27T07:35:05Z",
+    "run_finished_at": "2026-09-27T07:35:58Z",
     "scope_note": "Client percentiles below aggregate the ramp-up, hold and ramp-down phases. They are not a pure steady-state slice."
   },
   "measurements": {
     "ownership": "k6 owns all client-observed numbers here. App spans are server-side diagnostics and are sums over span durations, not percentiles.",
     "client_observed": {
       "source": "tests/api/summary.js output (k6 authoritative)",
-      "requests": 2814,
-      "throughput_rps": 56.25701674937609,
+      "requests": 2571,
+      "throughput_rps": 51.38839379450562,
       "http_errors": 0,
       "http_error_rate": 0,
       "checks_passed": [
         {
           "name": "status is 200",
-          "passes": 2814,
+          "passes": 2571,
           "fails": 0,
           "group": ""
         },
         {
           "name": "request_id is present",
-          "passes": 2814,
+          "passes": 2571,
           "fails": 0,
           "group": ""
         }
       ],
       "thresholds_ok": {
-        "http_req_failed": true,
-        "checks": true
+        "checks": true,
+        "http_req_failed": true
       },
       "http_req_duration_ms": {
-        "min": 4.366978,
-        "med": 157.3407365,
-        "max": 526.793919,
-        "p(90)": 240.18692460000005,
-        "p(95)": 269.8194722,
-        "p(99)": 363.23856935,
-        "avg": 141.47664858813087
+        "max": 670.498076,
+        "p(90)": 264.656201,
+        "p(95)": 303.409098,
+        "p(99)": 445.8575176000018,
+        "avg": 154.75124591948656,
+        "min": 4.458337,
+        "med": 165.838602
       },
       "http_req_waiting_ms": {
-        "avg": 139.77638017164165,
-        "min": 3.882679,
-        "med": 155.58181050000002,
-        "max": 526.004439,
-        "p(90)": 236.3077048,
-        "p(95)": 268.41650434999997,
-        "p(99)": 362.3558627599999
+        "max": 667.182413,
+        "p(90)": 262.593834,
+        "p(95)": 300.3673195,
+        "p(99)": 444.52997380000204,
+        "avg": 153.07185682924967,
+        "min": 3.946261,
+        "med": 164.123405
       },
       "http_req_sending_ms": {
-        "min": 0.052643,
-        "med": 0.11809,
-        "max": 23.035936,
-        "p(90)": 0.30991260000000054,
-        "p(95)": 0.7062762999999987,
-        "p(99)": 4.179362509999997,
-        "avg": 0.2803316663113005
+        "p(95)": 1.155002,
+        "p(99)": 4.1574111,
+        "avg": 0.32326431194087835,
+        "min": 0.057726,
+        "med": 0.12343,
+        "max": 16.211924,
+        "p(90)": 0.433622
       },
       "http_req_receiving_ms": {
-        "p(95)": 3.554155199999998,
-        "p(99)": 27.68684543999998,
-        "avg": 1.4199367501776798,
-        "min": 0.150462,
-        "med": 0.398044,
-        "max": 88.877912,
-        "p(90)": 1.7062905000000024
+        "med": 0.425308,
+        "max": 66.633297,
+        "p(90)": 1.700076,
+        "p(95)": 3.715286,
+        "p(99)": 23.69298910000003,
+        "avg": 1.3561247782963823,
+        "min": 0.16455
       },
       "iteration_duration_ms": {
-        "p(99)": 365.8175230599999,
-        "avg": 144.05727873631815,
-        "min": 5.461423,
-        "med": 159.9225355,
-        "max": 529.852834,
-        "p(90)": 242.45757490000003,
-        "p(95)": 273.15043119999996
+        "med": 168.994006,
+        "max": 673.74848,
+        "p(90)": 266.937795,
+        "p(95)": 307.8496315,
+        "p(99)": 450.64654980000097,
+        "avg": 157.69834802411535,
+        "min": 5.61541
       },
       "success_duration_ms": {
-        "p(90)": 240.18692460000005,
-        "p(95)": 269.8194722,
-        "p(99)": 363.23856935,
-        "avg": 141.47664858813087,
-        "min": 4.366978,
-        "med": 157.3407365,
-        "max": 526.793919
+        "min": 4.458337,
+        "med": 165.838602,
+        "max": 670.498076,
+        "p(90)": 264.656201,
+        "p(95)": 303.409098,
+        "p(99)": 445.8575176000018,
+        "avg": 154.75124591948656
       },
-      "data_sent_bytes": 679932,
-      "data_received_bytes": 8446146,
+      "data_sent_bytes": 621169,
+      "data_received_bytes": 7719134,
       "status_code_breakdown": {
         "status": "not_measured",
         "value": null,
@@ -148,49 +148,49 @@
     "cold_start": {
       "definition": "first POST /v1/validate on a freshly started process, before any warm-up",
       "requests": 1,
-      "client_observed_time_total_s": 5.428014,
+      "client_observed_time_total_s": 5.795687,
       "request_span": {
         "count": 2,
-        "sum_ms": 5428.028546,
+        "sum_ms": 5802.846267,
         "http_status_class": "2xx",
         "span_status": "unset"
       },
       "server_spans": {
         "stage.candidate_build": {
           "count": 1,
-          "sum_ms": 1.072376,
+          "sum_ms": 0.933224,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 0.0198,
+          "share_of_stage_time_pct": 0.0161,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.candidate_evaluation": {
           "count": 1,
-          "sum_ms": 0.226614,
+          "sum_ms": 0.240069,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 0.0042,
+          "share_of_stage_time_pct": 0.0041,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.contextual_recovery": {
           "count": 1,
-          "sum_ms": 87.240245,
+          "sum_ms": 85.054537,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 1.6089,
+          "share_of_stage_time_pct": 1.469,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.evidence_resolution": {
           "count": 1,
-          "sum_ms": 933.79546,
+          "sum_ms": 960.890658,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 17.2209,
+          "share_of_stage_time_pct": 16.5953,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.postal_code_fallback": {
           "count": 1,
-          "sum_ms": 0.003737,
+          "sum_ms": 0.006447,
           "calls_per_request": 1.0,
           "share_of_stage_time_pct": 0.0001,
           "http_status_class": "none",
@@ -198,9 +198,9 @@
         },
         "stage.source_and_cache_ready": {
           "count": 1,
-          "sum_ms": 4400.121791,
+          "sum_ms": 4743.021251,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 81.1462,
+          "share_of_stage_time_pct": 81.9154,
           "http_status_class": "none",
           "span_status": "unset"
         }
@@ -210,75 +210,75 @@
     "warm_steady_state": {
       "definition": "the k6 run above, on a process already warmed by the cold request",
       "request_span": {
-        "count": 2815,
-        "sum_ms": 352074.478668,
+        "count": 2572,
+        "sum_ms": 352318.625349,
         "http_status_class": "2xx",
         "span_status": "unset"
       },
       "note": "request_span.count includes one GET /metrics scrape of its own, so it is one more than the k6 requests. Every stage.* count is exactly the k6 requests. Subtract nothing else.",
       "server_spans": {
         "stage.candidate_build": {
-          "count": 2814,
-          "sum_ms": 5800.308506,
+          "count": 2571,
+          "sum_ms": 5927.328272,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 1.6931,
+          "share_of_stage_time_pct": 1.7299,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.candidate_evaluation": {
-          "count": 2814,
-          "sum_ms": 1676.86147,
+          "count": 2571,
+          "sum_ms": 1582.516069,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 0.4895,
+          "share_of_stage_time_pct": 0.4619,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.contextual_recovery": {
-          "count": 2814,
-          "sum_ms": 2215.685205,
+          "count": 2571,
+          "sum_ms": 1929.227609,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 0.6467,
+          "share_of_stage_time_pct": 0.5631,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.evidence_resolution": {
-          "count": 2814,
-          "sum_ms": 324220.261767,
+          "count": 2571,
+          "sum_ms": 324719.841371,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 94.6386,
+          "share_of_stage_time_pct": 94.7727,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.postal_code_fallback": {
-          "count": 2250,
-          "sum_ms": 33.076148,
-          "calls_per_request": 0.799574,
-          "share_of_stage_time_pct": 0.0097,
+          "count": 2057,
+          "sum_ms": 16.911418,
+          "calls_per_request": 0.800078,
+          "share_of_stage_time_pct": 0.0049,
           "http_status_class": "none",
           "span_status": "unset"
         },
         "stage.source_and_cache_ready": {
-          "count": 2814,
-          "sum_ms": 8641.502563,
+          "count": 2571,
+          "sum_ms": 8454.462098,
           "calls_per_request": 1.0,
-          "share_of_stage_time_pct": 2.5224,
+          "share_of_stage_time_pct": 2.4675,
           "http_status_class": "none",
           "span_status": "unset"
         }
       }
     },
-    "stage_time_coverage_pct": 97.3055,
+    "stage_time_coverage_pct": 97.2501,
     "runtime_characteristics": {
       "go_config_gogc": 100.0,
       "go_processor_limit": 4.0,
       "go_goroutine_count": 23.0,
       "go_memory_used_bytes": {
-        "other": 194136376.0,
-        "stack": 1179648.0
+        "other": 195856696.0,
+        "stack": 1343488.0
       },
-      "go_memory_allocated_total_bytes": 472196552.0,
-      "go_memory_allocations_total": 5684438.0,
-      "go_memory_gc_goal_bytes": 205868698.0,
+      "go_memory_allocated_total_bytes": 448017560.0,
+      "go_memory_allocations_total": 5427270.0,
+      "go_memory_gc_goal_bytes": 207185698.0,
       "gc_cycles": {
         "status": "not_measured",
         "value": null,
