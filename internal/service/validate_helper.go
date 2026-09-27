@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"address-quality/internal/database"
-	"address-quality/internal/metrics"
 	"address-quality/internal/model"
 	"address-quality/internal/normalizer"
+	"address-quality/internal/telemetry"
 )
 
 var postalCodePattern = regexp.MustCompile(`\b(\d{5})\b`)
@@ -34,9 +34,8 @@ func (svc *Service) resolveLocationByPostalCode(ctx context.Context, location mo
 	}
 	// Timed here, not at the call site, so the stage is recorded only when the
 	// postal lookup path is actually invoked.
-	defer func(start time.Time) {
-		metrics.ObserveStage(metrics.StagePostalCodeFallback, time.Since(start))
-	}(time.Now())
+	span := telemetry.Start(ctx, telemetry.SpanPostalFallback)
+	defer span.End()
 
 	// No winner found — infer full location from postal code DB
 	if location == (model.Location{}) {
