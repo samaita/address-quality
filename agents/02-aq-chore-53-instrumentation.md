@@ -78,14 +78,23 @@ Exported metric: `app_span_duration_ms` (histogram, OTel default buckets). Label
 
 ### Stage boundaries as implemented
 
-| Span | Wraps |
-|---|---|
-| `stage.source_and_cache_ready` | `FindSourceByCode` + `ensureEntitiesCachesLoaded` |
-| `stage.evidence_resolution` | `ExtractEvidence` + road-context detection + `ResolveEvidence` |
-| `stage.candidate_build` | `buildCandidates` (discover, dedupe, enrich, conclusions) |
-| `stage.contextual_recovery` | `RecoverContextualEvidence` + its single conditional rebuild |
-| `stage.candidate_evaluation` | evaluation loop + ranking sort |
-| `stage.postal_code_fallback` | postal lookup **only when invoked** |
+| Span | Owning function | Wraps |
+|---|---|---|
+| `stage.source_and_cache_ready` | `sourceAndCaches` | `FindSourceByCode` + `ensureEntitiesCachesLoaded` |
+| `stage.evidence_resolution` | `resolveEvidenceStage` | `ExtractEvidence` + `ResolveEvidence` |
+| `stage.candidate_build` | `buildCandidates` | discover, dedupe, enrich, conclusions |
+| `stage.contextual_recovery` | `RecoverContextualEvidence` | second-pass fuzzy recovery |
+| `stage.candidate_evaluation` | `evaluateCandidates` | evaluation loop + ranking sort |
+| `stage.postal_code_fallback` | `resolveLocationByPostalCode` | postal lookup **only when invoked** |
+
+Each stage function owns its span and closes it with `defer span.End()`, so an early return cannot leak a span. `ValidateAddressV1` makes no telemetry call at all; it only threads `ctx` into these functions. Every one of them takes `ctx` as its first parameter and passes the child context to the work inside, so nothing downstream loses the parent.
+
+The one deliberate exception is `EchoMiddleware`: its `http.request` span ends explicitly, not deferred. It has a single return path (so there is no leak risk), it must resolve the status code from the returned error before closing the span, and a deferred end would also absorb the request log write and inflate request duration. Keep it that way unless the middleware gains another return path.
+
+Two measurement consequences of that ownership:
+
+- `stage.contextual_recovery` now measures the fuzzy recovery itself. When recovery adds evidence, the rebuild is timed as a second `stage.candidate_build` sample, so that stage can contribute **two samples per request**. Requests with no recovery contribute one. Do not read `app.validation_stage_calls_total` for that stage as a per-request counter.
+- Road-context token detection and the compact match text are plain input preparation in the caller, outside `stage.evidence_resolution`.
 
 The request context carries the active span, so a stage started from it is recorded as a child of `http.request`. That parentage is what a trace view (Tempo or Jaeger) needs; the Prometheus histogram only sees the span name, so it stays flat.
 

@@ -34,73 +34,29 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	if sourceCode == "" {
 		sourceCode = svc.sourceCode
 	}
-	sourceCtx, sourceSpan := telemetry.Start(ctx, telemetry.SpanSourceCacheReady)
-	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(sourceCtx, sourceCode)
+	sourceID, sourceVersion, err := svc.sourceAndCaches(ctx, requestID, sourceCode)
 	if err != nil {
-		sourceSpan.End()
-		log.Error().Err(err).Msg("find source by code")
 		return nil, err
 	}
-
-	if err := svc.ensureEntitiesCachesLoaded(sourceCtx, sourceID); err != nil {
-		sourceSpan.End()
-		log.Error().Err(err).Msg("load caches")
-		return nil, err
-	}
-	sourceSpan.End()
-
-	evidenceCtx, evidenceSpan := telemetry.Start(ctx, telemetry.SpanEvidenceResolution)
-	evidence := ExtractEvidence(normalized)
-	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
 
 	roadTokens := detectRoadContextTokens(sanitized)
 	compactMatchText := normalizer.Normalize(stripRoadContext(sanitized))
-	resolved := svc.ResolveEvidence(evidenceCtx, sourceID, evidence, normalized, compactMatchText, roadTokens)
-	evidenceSpan.End()
+	resolved, evidence := svc.resolveEvidenceStage(ctx, sourceID, normalized, compactMatchText, roadTokens)
+	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
 
-	buildCandidates := func(res []model.ResolvedEvidence) []model.AdminCandidate {
-		cands := svc.DiscoverCandidates(res, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
-		cands = DeduplicateCandidates(cands)
-		cands = svc.EnrichCandidates(cands)
-		return BuildConclusions(cands, svc.hierarchyCache, res)
-	}
+	candidates := svc.buildCandidates(ctx, resolved)
 
-	_, buildSpan := telemetry.Start(ctx, telemetry.SpanCandidateBuild)
-	candidates := buildCandidates(resolved)
-	buildSpan.End()
-
-	_, recoverySpan := telemetry.Start(ctx, telemetry.SpanContextualRecovery)
 	// Second-pass contextual recovery: exact-resolution candidates provide the
 	// context; unexplained input spans are fuzzy-matched against their
 	// in-memory neighborhood; recovered evidence triggers a single rebuild.
-	recovered, fuzzyCorrections, fuzzyExplained := svc.RecoverContextualEvidence(candidates, resolved, normalized, roadTokens)
+	recovered, fuzzyCorrections, fuzzyExplained := svc.RecoverContextualEvidence(ctx, candidates, resolved, normalized, roadTokens)
 	if len(recovered) > 0 {
 		resolved = append(resolved, recovered...)
-		candidates = buildCandidates(resolved)
+		candidates = svc.buildCandidates(ctx, resolved)
 	}
-	recoverySpan.End()
 	log.Debug().Int("resolved_count", len(resolved)).Int("fuzzy_corrections", len(fuzzyCorrections)).Msg("entity resolution")
 
-	_, evalSpan := telemetry.Start(ctx, telemetry.SpanCandidateEvaluation)
-	var scored []scoredCandidate
-	evalEvidence := evidenceWithoutValues(evidence, fuzzyExplained)
-	for _, c := range candidates {
-		eval := EvaluateCandidate(&c, svc.hierarchyCache, evalEvidence)
-		scored = append(scored, scoredCandidate{candidate: c, eval: eval})
-	}
-
-	sort.Slice(scored, func(i, j int) bool {
-		if scored[i].eval.Confidence != scored[j].eval.Confidence {
-			return scored[i].eval.Confidence > scored[j].eval.Confidence
-		}
-		iCount := countNonNil(scored[i].candidate.Location)
-		jCount := countNonNil(scored[j].candidate.Location)
-		if iCount != jCount {
-			return iCount > jCount
-		}
-		return len(scored[i].eval.Conflicts) < len(scored[j].eval.Conflicts)
-	})
-	evalSpan.End()
+	scored := svc.evaluateCandidates(ctx, candidates, evidenceWithoutValues(evidence, fuzzyExplained))
 
 	status := model.StatusUnknown
 	if len(scored) > 0 {
@@ -230,6 +186,76 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	}
 
 	return resp, nil
+}
+
+// sourceAndCaches resolves the source and loads its entity caches. Owns
+// stage.source_and_cache_ready with a deferred end, so the span closes on every
+// return path instead of only the happy one.
+func (svc *Service) sourceAndCaches(ctx context.Context, requestID, sourceCode string) (int64, string, error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanSourceCacheReady)
+	defer span.End()
+
+	log := logger.L.With().Str("request_id", requestID).Logger()
+	sourceID, sourceVersion, err := svc.locationRepo.FindSourceByCode(ctx, sourceCode)
+	if err != nil {
+		log.Error().Err(err).Msg("find source by code")
+		return 0, "", err
+	}
+	if err := svc.ensureEntitiesCachesLoaded(ctx, sourceID); err != nil {
+		log.Error().Err(err).Msg("load caches")
+		return 0, "", err
+	}
+	return sourceID, sourceVersion, nil
+}
+
+// resolveEvidenceStage extracts evidence and resolves it against the source.
+// Owns stage.evidence_resolution with a deferred end.
+func (svc *Service) resolveEvidenceStage(ctx context.Context, sourceID int64, normalized, compactMatchText string, roadTokens map[string]bool) ([]model.ResolvedEvidence, []model.Evidence) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanEvidenceResolution)
+	defer span.End()
+
+	evidence := ExtractEvidence(normalized)
+	return svc.ResolveEvidence(ctx, sourceID, evidence, normalized, compactMatchText, roadTokens), evidence
+}
+
+// buildCandidates turns resolved evidence into deduplicated, enriched
+// candidates and conclusions. Owns stage.candidate_build with a deferred end.
+// It runs a second time when contextual recovery adds evidence, so one request
+// can contribute two samples to this stage.
+func (svc *Service) buildCandidates(ctx context.Context, res []model.ResolvedEvidence) []model.AdminCandidate {
+	_, span := telemetry.Start(ctx, telemetry.SpanCandidateBuild)
+	defer span.End()
+
+	cands := svc.DiscoverCandidates(res, []model.DiscoveryStrategy{model.DiscoveryTopDown, model.DiscoveryAnyLevel})
+	cands = DeduplicateCandidates(cands)
+	cands = svc.EnrichCandidates(cands)
+	return BuildConclusions(cands, svc.hierarchyCache, res)
+}
+
+// evaluateCandidates scores and ranks candidates. Owns
+// stage.candidate_evaluation with a deferred end.
+func (svc *Service) evaluateCandidates(ctx context.Context, candidates []model.AdminCandidate, evalEvidence []model.Evidence) []scoredCandidate {
+	_, span := telemetry.Start(ctx, telemetry.SpanCandidateEvaluation)
+	defer span.End()
+
+	var scored []scoredCandidate
+	for _, c := range candidates {
+		eval := EvaluateCandidate(&c, svc.hierarchyCache, evalEvidence)
+		scored = append(scored, scoredCandidate{candidate: c, eval: eval})
+	}
+
+	sort.Slice(scored, func(i, j int) bool {
+		if scored[i].eval.Confidence != scored[j].eval.Confidence {
+			return scored[i].eval.Confidence > scored[j].eval.Confidence
+		}
+		iCount := countNonNil(scored[i].candidate.Location)
+		jCount := countNonNil(scored[j].candidate.Location)
+		if iCount != jCount {
+			return iCount > jCount
+		}
+		return len(scored[i].eval.Conflicts) < len(scored[j].eval.Conflicts)
+	})
+	return scored
 }
 
 func resolveLocationFromCandidate(winner *scoredCandidate) model.Location {
