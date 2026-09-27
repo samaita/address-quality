@@ -85,10 +85,13 @@ func EchoMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
-			span := telemetry.Start(c.Request().Context(), telemetry.SpanHTTPRequest,
+			reqCtx, span := telemetry.Start(c.Request().Context(), telemetry.SpanHTTPRequest,
 				attribute.String("http.request.method", telemetry.BoundMethod(c.Request().Method)),
 				attribute.String("http.route", telemetry.BoundRoute(c.Path())),
 			)
+			// Carry the span in the request context so the V1 stages nest under
+			// this request instead of becoming separate root spans.
+			c.SetRequest(c.Request().WithContext(reqCtx))
 			err := next(c)
 			stop := time.Now()
 

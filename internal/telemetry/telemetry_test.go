@@ -11,7 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func setup(t *testing.T) {
@@ -35,7 +38,7 @@ func scrape(t *testing.T) string {
 
 func TestSpanBecomesPrometheusMetric(t *testing.T) {
 	setup(t)
-	span := Start(context.Background(), SpanCandidateBuild)
+	_, span := Start(context.Background(), SpanCandidateBuild)
 	time.Sleep(2 * time.Millisecond)
 	span.End()
 
@@ -97,7 +100,7 @@ func TestNoLabelLeakage(t *testing.T) {
 
 	// Both as the span name and as an extra attribute: the exporter must
 	// carry neither, so no caller can smuggle an address into a label.
-	span := Start(context.Background(), secret,
+	_, span := Start(context.Background(), secret,
 		attribute.String("http.route", secret),
 		attribute.String("raw_address", secret),
 	)
@@ -116,7 +119,7 @@ func TestConcurrentSpans(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 20; j++ {
-				s := Start(context.Background(), SpanCandidateEvaluation)
+				_, s := Start(context.Background(), SpanCandidateEvaluation)
 				s.End()
 			}
 		}()
@@ -125,5 +128,57 @@ func TestConcurrentSpans(t *testing.T) {
 
 	if body := scrape(t); !strings.Contains(body, "stage.candidate_evaluation") {
 		t.Fatalf("concurrent spans missing:\n%s", body)
+	}
+}
+
+type endedSpan struct {
+	name   string
+	parent trace.SpanContext
+}
+
+// recorder captures completed spans so parentage can be asserted without a
+// trace backend.
+type recorder struct {
+	mu    sync.Mutex
+	spans []endedSpan
+}
+
+func (r *recorder) OnStart(context.Context, sdktrace.ReadWriteSpan) {}
+func (r *recorder) OnEnd(s sdktrace.ReadOnlySpan) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.spans = append(r.spans, endedSpan{name: s.Name(), parent: s.Parent()})
+}
+func (*recorder) Shutdown(context.Context) error   { return nil }
+func (*recorder) ForceFlush(context.Context) error { return nil }
+
+func TestContextCarriesSpanAndNests(t *testing.T) {
+	rec := &recorder{}
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec)))
+	t.Cleanup(func() { _, _ = Init() })
+
+	ctx, parent := Start(context.Background(), SpanHTTPRequest)
+	parentSC := parent.SpanContext()
+	if !trace.SpanFromContext(ctx).SpanContext().IsValid() {
+		t.Fatal("context does not carry the span")
+	}
+	_, child := Start(ctx, SpanEvidenceResolution)
+	child.End()
+	parent.End()
+
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	if len(rec.spans) != 2 {
+		t.Fatalf("ended spans = %d, want 2", len(rec.spans))
+	}
+	childRec, parentRec := rec.spans[0], rec.spans[1]
+	if childRec.name != SpanEvidenceResolution {
+		t.Fatalf("child name = %q", childRec.name)
+	}
+	if childRec.parent.TraceID() != parentSC.TraceID() || childRec.parent.SpanID() != parentSC.SpanID() {
+		t.Fatalf("child parent = %v, want trace %s span %s", childRec.parent, parentSC.TraceID(), parentSC.SpanID())
+	}
+	if parentRec.parent.IsValid() {
+		t.Fatalf("http.request span should be a root, got parent %v", parentRec.parent)
 	}
 }
