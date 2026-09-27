@@ -97,7 +97,7 @@ func TestRecoverMultiWordWithMisleadingExactMatches(t *testing.T) {
 	}
 
 	candidates := buildFixtureCandidates(svc, resolved)
-	recovered, corrections, explained := svc.RecoverContextualEvidence(candidates, resolved, normalized, roadTokens)
+	recovered, corrections, explained := svc.RecoverContextualEvidence(context.Background(), candidates, resolved, normalized, roadTokens)
 
 	if len(recovered) != 1 {
 		t.Fatalf("expected 1 recovered evidence, got %+v", recovered)
@@ -127,7 +127,7 @@ func TestRecoverCityTypo(t *testing.T) {
 		ev(model.EvidencePlaceName, "bndung"),
 	}
 	candidates := buildFixtureCandidates(svc, resolved)
-	recovered, corrections, _ := svc.RecoverContextualEvidence(candidates, resolved, normalized, nil)
+	recovered, corrections, _ := svc.RecoverContextualEvidence(context.Background(), candidates, resolved, normalized, nil)
 
 	if len(recovered) != 1 || recovered[0].Value != "bndung" {
 		t.Fatalf("expected recovered \"bndung\", got %+v", recovered)
@@ -154,7 +154,7 @@ func TestRecoverSubdistrictTypo(t *testing.T) {
 		ev(model.EvidencePlaceName, "gelis"),
 	}
 	candidates := buildFixtureCandidates(svc, resolved)
-	recovered, corrections, _ := svc.RecoverContextualEvidence(candidates, resolved, normalized, nil)
+	recovered, corrections, _ := svc.RecoverContextualEvidence(context.Background(), candidates, resolved, normalized, nil)
 
 	if len(recovered) != 1 || recovered[0].Value != "cihuar gelis" {
 		t.Fatalf("expected recovered \"cihuar gelis\", got %+v", recovered)
@@ -174,7 +174,7 @@ func TestWeakCandidateDoesNotExpand(t *testing.T) {
 		ev(model.EvidencePlaceName, "bandung", model.Entity{ID: 10, Name: "Kota Bandung", Level: "CITY"}),
 	}
 	candidates := buildFixtureCandidates(svc, resolved)
-	recovered, corrections, explained := svc.RecoverContextualEvidence(candidates, resolved, "bandung", nil)
+	recovered, corrections, explained := svc.RecoverContextualEvidence(context.Background(), candidates, resolved, "bandung", nil)
 	if recovered != nil || corrections != nil || explained != nil {
 		t.Fatalf("expected no recovery for weak candidate, got %+v", recovered)
 	}
@@ -202,7 +202,7 @@ func TestNoUsefulContextSkipsRecovery(t *testing.T) {
 		ev(model.EvidencePlaceName, "qqqq"),
 	}
 	candidates := buildFixtureCandidates(svc, resolved)
-	recovered, corrections, explained := svc.RecoverContextualEvidence(candidates, resolved, "zzzz qqqq", nil)
+	recovered, corrections, explained := svc.RecoverContextualEvidence(context.Background(), candidates, resolved, "zzzz qqqq", nil)
 	if recovered != nil || corrections != nil || explained != nil {
 		t.Fatalf("expected recovery to be skipped, got %+v", recovered)
 	}
