@@ -15,9 +15,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
-	"address-quality/internal/metrics"
 	mw "address-quality/internal/middleware"
+	"address-quality/internal/telemetry"
 )
 
 var L zerolog.Logger
@@ -83,6 +85,10 @@ func EchoMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
+			span := telemetry.Start(c.Request().Context(), telemetry.SpanHTTPRequest,
+				attribute.String("http.request.method", telemetry.BoundMethod(c.Request().Method)),
+				attribute.String("http.route", telemetry.BoundRoute(c.Path())),
+			)
 			err := next(c)
 			stop := time.Now()
 
@@ -103,7 +109,11 @@ func EchoMiddleware() echo.MiddlewareFunc {
 					status = he.Code
 				}
 			}
-			metrics.ObserveHTTP(req.Method, c.Path(), status, stop.Sub(start))
+			span.SetAttributes(attribute.Int("http.response.status_code", status))
+			if status >= 500 {
+				span.SetStatus(codes.Error, http.StatusText(status))
+			}
+			span.End()
 
 			event := L.Info()
 			if res.Status >= 500 {

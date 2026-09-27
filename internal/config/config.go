@@ -28,7 +28,7 @@ type Config struct {
 	LogLevel           string
 	AllowedOrigins     []string
 	EnableStoreRequest bool
-	EnablePerfSnapshot bool
+	EnableMetrics      bool
 	GoogleMapsAPIMock  bool
 	GoogleMapsAPIKey   string
 	GoogleMapsBaseURL  string
@@ -61,7 +61,7 @@ func Load() *Config {
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("CORS_ALLOWED_ORIGINS", "https://samaita.com")
 	viper.SetDefault("ENABLE_STORE_REQUEST", false)
-	viper.SetDefault("ENABLE_PERF_SNAPSHOT", false)
+	viper.SetDefault("ENABLE_METRICS", false)
 	viper.SetDefault("GOOGLE_MAPS_API_MOCK", true)
 	viper.SetDefault("GOOGLE_MAPS_API_KEY", "")
 	viper.SetDefault("GOOGLE_MAPS_BASE_URL", "https://geocode.googleapis.com/v4/geocode/address")
@@ -87,7 +87,7 @@ func Load() *Config {
 		LogLevel:           viper.GetString("LOG_LEVEL"),
 		AllowedOrigins:     strings.Split(viper.GetString("CORS_ALLOWED_ORIGINS"), ","),
 		EnableStoreRequest: viper.GetBool("ENABLE_STORE_REQUEST"),
-		EnablePerfSnapshot: viper.GetBool("ENABLE_PERF_SNAPSHOT"),
+		EnableMetrics:      viper.GetBool("ENABLE_METRICS"),
 		GoogleMapsAPIMock:  viper.GetBool("GOOGLE_MAPS_API_MOCK"),
 		GoogleMapsAPIKey:   viper.GetString("GOOGLE_MAPS_API_KEY"),
 		GoogleMapsBaseURL:  viper.GetString("GOOGLE_MAPS_BASE_URL"),

@@ -29,11 +29,17 @@ import (
 	"address-quality/internal/router"
 	"address-quality/internal/sanitizer"
 	"address-quality/internal/service"
+	"address-quality/internal/telemetry"
 )
 
 func main() {
 	cfg := config.Load()
 	logger.Init(cfg.LogLevel)
+
+	telemetryShutdown, err := telemetry.Init()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to initialize telemetry")
+	}
 
 	repo, err := database.New(cfg.AddressDBPath, cfg.DBMaxOpenConns)
 	if err != nil {
@@ -87,5 +93,8 @@ func main() {
 	}
 	if err := svc.Shutdown(shutdownCtx); err != nil {
 		logger.Error().Err(err).Msg("store queue drain failed")
+	}
+	if err := telemetryShutdown(shutdownCtx); err != nil {
+		logger.Error().Err(err).Msg("telemetry shutdown failed")
 	}
 }
