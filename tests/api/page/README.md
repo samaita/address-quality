@@ -21,32 +21,60 @@ and intended only for local inspection, never for publishing.
 
 ## Build
 
+Every generated page below is produced by one `make` target. The targets are
+independent; when regenerating a full set, run them in this order:
+`performance-page` → `benchmark-page-accuracy` → `benchmark-page-performance`.
+
+| Page | Make command | What it is |
+| --- | --- | --- |
+| `accuracy.html` | `make benchmark-page-accuracy` | Accuracy report (v1). Prompts for a `benchmark_build` label. |
+| `full-accuracy.html` | `make benchmark-page-accuracy` | `accuracy.html` untrimmed (raw addresses). Gitignored. |
+| `benchmark.html` | `make benchmark-page` | Combined accuracy + performance (the publishing artifact). |
+| `full-benchmark.html` | `make benchmark-page` | `benchmark.html` untrimmed (raw addresses, top-100 failures). Gitignored. |
+| `performance.html` | `make performance-page` | Standalone performance page. Prompts for a `performance_build` label and an optional baseline label. |
+| `accuracy-v0.html` | `make benchmark-page-v0` | Accuracy report for the v0 (Google Maps) benchmark. |
+| `full-accuracy-v0.html` | `make benchmark-page-v0` | `accuracy-v0.html` untrimmed (raw addresses). Gitignored. |
+| `benchmark-v0.html` | *(none)* | Legacy v0 combined page; tracked, but no current target produces it. |
+| `full-benchmark-v0.html` | *(none)* | Legacy v0 untrimmed page; gitignored, no current target produces it. |
+
+`benchmark.html` and `full-benchmark.html` can also be refreshed from existing
+accuracy data without re-running accuracy generation:
+
 ```bash
-make benchmark-page
+make benchmark-page-performance   # combine.js over the existing *-data.json
 ```
 
-The target prompts for a `benchmark_build` label (required — empty input aborts
-with an error). It is passed to `build.js` as its first argument and recorded as
-the entry's `benchmark_build`.
+### What each command reads and writes
 
-`tests/api/page/build.js` reads the **latest** accuracy benchmark and legacy load-test JSON from:
+- **`make benchmark-page-accuracy`** prompts for a required `benchmark_build`
+  label (empty input aborts). `build.js` reads the **latest** files from
+  `tests/api/benchmark/YYYY-MM-DD_benchmark_v1_0000.json` and (v1 only)
+  `tests/api/result/YYYY-MM-DD_load-test_0000.json`, then writes `accuracy.html`,
+  `full-accuracy.html` and their `*-data.json` payloads. The label is passed as
+  `build.js`'s first argument and recorded on the entry.
 
-- `tests/api/benchmark/YYYY-MM-DD_benchmark_v1_0000.json`
-- `tests/api/result/YYYY-MM-DD_load-test_0000.json`
+- **`make performance-page`** prompts for a required `performance_build` label
+  and an optional baseline label. `performance-build.js` reads the artifact
+  (`agents/aq-chore-54-performance-benchmark.json` by default, `--source` to
+  override), appends to `performance-metadata.json` and writes `performance.html`.
 
-and writes accuracy-only outputs `accuracy.html` and `full-accuracy.html`. The
-full file is gitignored because it contains raw addresses.
+- **`make benchmark-page`** runs `benchmark-page-accuracy`, then `combine.js`,
+  which combines the latest `*-data.json` with the latest recorded performance
+  run and renders `benchmark.html` and `full-benchmark.html` from
+  `template.html`. The combined template renders the performance payload
+  directly; it does not embed the standalone performance page.
 
-`make performance-page` appends the performance run to `performance-metadata.json`
-and writes standalone `performance.html`. `make benchmark-page` rebuilds accuracy
-data, then `combine.js` combines it with the latest recorded performance run and
-renders `benchmark.html` and `full-benchmark.html` from `template.html`. The
-combined template renders the performance payload directly; it does not embed the
-standalone performance page.
-`make benchmark-page-performance` refreshes the combined page from existing
-accuracy and performance data without rerunning accuracy generation.
-V0 accuracy outputs are `accuracy-v0.html` and `full-accuracy-v0.html`; all
-`full-accuracy*.html` files are ignored by git.
+- **`make benchmark-page-performance`** runs `combine.js` alone, refreshing the
+  combined page from existing accuracy and performance data without rerunning
+  accuracy generation.
+
+- **`make benchmark-page-v0`** is the v0 variant of `benchmark-page-accuracy`
+  (`BENCH_VER=v0`): it reads `tests/api/benchmark-v0/` and writes
+  `accuracy-v0.html` / `full-accuracy-v0.html` plus their `*-data.json`. v0 has no
+  combined page target.
+
+`full-accuracy*.html` and `full-benchmark*.html` are gitignored because they
+contain raw addresses.
 
 ## Release / build metadata
 
