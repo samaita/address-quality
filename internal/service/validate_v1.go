@@ -45,6 +45,20 @@ func (svc *Service) ValidateAddressV1(ctx context.Context, req *model.AddressReq
 	log.Debug().Int("evidence_count", len(evidence)).Msg("evidence extraction")
 
 	candidates := svc.buildCandidates(ctx, resolved)
+		return BuildConclusions(cands, svc.hierarchyCache, res)
+	}
+
+	candidates := buildCandidates(resolved)
+
+	// Second-pass contextual recovery: exact-resolution candidates provide the
+	// context; unexplained input spans are fuzzy-matched against their
+	// in-memory neighborhood; recovered evidence triggers a single rebuild.
+	recovered, fuzzyCorrections, fuzzyExplained := svc.RecoverContextualEvidence(candidates, resolved, normalized, roadTokens)
+	if len(recovered) > 0 {
+		resolved = append(resolved, recovered...)
+		candidates = buildCandidates(resolved)
+	}
+	log.Debug().Int("resolved_count", len(resolved)).Int("fuzzy_corrections", len(fuzzyCorrections)).Msg("entity resolution")
 
 	// Second-pass contextual recovery: exact-resolution candidates provide the
 	// context; unexplained input spans are fuzzy-matched against their

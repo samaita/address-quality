@@ -4,11 +4,9 @@
 package service
 
 import (
-	"context"
 	"strings"
 
 	"address-quality/internal/model"
-	"address-quality/internal/telemetry"
 )
 
 // Tunable knobs for contextual fuzzy recovery. All thresholds are relative to
@@ -235,12 +233,7 @@ func unexplainedRuns(words []string, explained, roadTokens map[string]bool) [][]
 // Returns the recovered evidence, span-level corrections (typo/normalization
 // use the same metadata mechanism), and the set of input token values the
 // recovery consumed (so typo tokens no longer count as unused evidence).
-func (svc *Service) RecoverContextualEvidence(ctx context.Context, candidates []model.AdminCandidate, resolved []model.ResolvedEvidence, normalized string, roadTokens map[string]bool) (recovered []model.ResolvedEvidence, corrections map[string]string, explained map[string]bool) {
-	// Owns stage.contextual_recovery with a deferred end, so the span closes on
-	// every return path instead of only the happy one.
-	_, span := telemetry.Start(ctx, telemetry.SpanContextualRecovery)
-	defer span.End()
-
+func (svc *Service) RecoverContextualEvidence(candidates []model.AdminCandidate, resolved []model.ResolvedEvidence, normalized string, roadTokens map[string]bool) (recovered []model.ResolvedEvidence, corrections map[string]string, explained map[string]bool) {
 	coverages := make([]CandidateCoverage, len(candidates))
 	for i := range candidates {
 		coverages[i] = evaluateCandidateCoverage(&candidates[i], resolvedEvidenceToEvidence(resolved), roadTokens)
