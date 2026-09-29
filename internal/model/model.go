@@ -96,14 +96,14 @@ const (
 )
 
 type CandidateEvaluation struct {
-	Candidate     AdminCandidate
-	Confidence    float64
-	Status        QualityStatus
-	Matched       []Component
-	Missing       []Component
+	Candidate      AdminCandidate
+	Confidence     float64
+	Status         QualityStatus
+	Matched        []Component
+	Missing        []Component
 	UnusedEvidence []Evidence
-	Conflicts     []Conflict
-	Reasons       []Reason
+	Conflicts      []Conflict
+	Reasons        []Reason
 }
 
 type Assessment struct {
@@ -245,9 +245,9 @@ type SubDistrict struct {
 }
 
 type PostalCode struct {
-	ID    int64
-	Code  string
-	Name  string
+	ID   int64
+	Code string
+	Name string
 }
 
 type Road struct {

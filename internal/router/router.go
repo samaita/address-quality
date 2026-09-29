@@ -15,6 +15,7 @@ import (
 	"address-quality/internal/handler"
 	"address-quality/internal/logger"
 	mw "address-quality/internal/middleware"
+	"address-quality/internal/telemetry"
 
 	_ "address-quality/docs"
 )
@@ -56,6 +57,13 @@ func Setup(h *handler.Handler, cfg *config.Config) *echo.Echo {
 	api.Use(mw.RequestID())
 	api.POST("/v0/validate", h.HandleGeocodeRequest)
 	api.POST("/v1/validate", h.HandleAddressRequest)
+
+	// Prometheus scrape endpoint feeding Grafana. Registered only when
+	// explicitly enabled: it exposes internal timings, so deployment must
+	// network-restrict it. Labels are bounded in internal/telemetry.
+	if cfg.EnableMetrics {
+		e.GET("/metrics", echo.WrapHandler(telemetry.Handler()))
+	}
 
 	return e
 }

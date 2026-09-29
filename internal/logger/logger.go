@@ -4,8 +4,10 @@
 package logger
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -13,8 +15,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	mw "address-quality/internal/middleware"
+	"address-quality/internal/telemetry"
 )
 
 var L zerolog.Logger
@@ -80,12 +85,38 @@ func EchoMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
+			reqCtx, span := telemetry.Start(c.Request().Context(), telemetry.SpanHTTPRequest,
+				attribute.String("http.request.method", telemetry.BoundMethod(c.Request().Method)),
+				attribute.String("http.route", telemetry.BoundRoute(c.Path())),
+			)
+			// Carry the span in the request context so the V1 stages nest under
+			// this request instead of becoming separate root spans.
+			c.SetRequest(c.Request().WithContext(reqCtx))
 			err := next(c)
 			stop := time.Now()
 
 			req := c.Request()
 			res := c.Response()
 			reqID := mw.GetRequestID(req.Context())
+
+			// Handler errors are written by Echo's error handler after this
+			// middleware returns, so res.Status is not final yet.
+			status := res.Status
+			if status == 0 {
+				status = http.StatusOK
+			}
+			if err != nil {
+				status = http.StatusInternalServerError
+				var he *echo.HTTPError
+				if errors.As(err, &he) {
+					status = he.Code
+				}
+			}
+			span.SetAttributes(attribute.Int("http.response.status_code", status))
+			if status >= 500 {
+				span.SetStatus(codes.Error, http.StatusText(status))
+			}
+			span.End()
 
 			event := L.Info()
 			if res.Status >= 500 {
