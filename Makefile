@@ -1,4 +1,4 @@
-.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed seed-init seed-drop seed-truncate seed-normalize benchmark benchmark-page benchmark-v0 benchmark-page-v0 performance-page
+.PHONY: run build test lint clean air swagger test-api test-api-smoke test-api-load test-api-load-prod build-seed seed seed-init seed-drop seed-truncate seed-normalize benchmark benchmark-page benchmark-page-accuracy benchmark-v0 benchmark-page-v0 benchmark-page-performance performance-page
 
 run:
 	go run ./cmd/server
@@ -57,6 +57,10 @@ benchmark:
 	node tests/api/benchmark-test.js --source=kemendagri --csv=tests/api/cases/address-tagged.csv
 
 benchmark-page:
+	@$(MAKE) benchmark-page-accuracy
+	node tests/api/page/combine.js
+
+benchmark-page-accuracy:
 	@printf 'benchmark_build: '; read b; [ -n "$$b" ] || { echo 'error: benchmark_build is required'; exit 1; }; node tests/api/page/build.js "$$b"
 
 benchmark-v0:
@@ -72,3 +76,6 @@ performance-page:
 	printf 'before performance_build (blank = this run is the baseline): '; read bf; \
 	if [ -n "$$bf" ]; then node tests/api/page/performance-build.js "$$b" --before "$$bf"; \
 	else node tests/api/page/performance-build.js "$$b"; fi
+
+benchmark-page-performance:
+	node tests/api/page/combine.js tests/api/page/accuracy-data.json tests/api/page/full-accuracy-data.json

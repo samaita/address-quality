@@ -11,6 +11,8 @@ tests/api/cases/*.csv
 !tests/api/cases/example.csv
 tests/api/page/full-benchmark.html
 tests/api/page/full-benchmark-v0.html
+tests/api/page/full-accuracy*.html
+tests/api/page/*-data.json
 docs/ISSUES.md
 bin
 bin/

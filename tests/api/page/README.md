@@ -3,7 +3,7 @@
 Self-contained, embeddable page that reports one Address Quality release/build:
 accuracy, performance and reproducibility metadata.
 
-The only artifact is **`benchmark.html`** — a single HTML file with the data inlined.
+The combined publishing artifact is **`benchmark.html`** — a single HTML file with accuracy and performance data inlined.
 It renders standalone and inside an `<iframe>`, with no external dependencies, no
 CORS, and scoped CSS that cannot affect the host page.
 
@@ -28,12 +28,24 @@ The target prompts for a `benchmark_build` label (required — empty input abort
 with an error). It is passed to `build.js` as its first argument and recorded as
 the entry's `benchmark_build`.
 
-`tests/api/page/build.js` reads the **latest** benchmark and load-test JSON from:
+`tests/api/page/build.js` reads the **latest** accuracy benchmark and legacy load-test JSON from:
 
 - `tests/api/benchmark/YYYY-MM-DD_benchmark_v1_0000.json`
 - `tests/api/result/YYYY-MM-DD_load-test_0000.json`
 
-and writes `tests/api/page/benchmark.html`.
+and writes accuracy-only outputs `accuracy.html` and `full-accuracy.html`. The
+full file is gitignored because it contains raw addresses.
+
+`make performance-page` appends the performance run to `performance-metadata.json`
+and writes standalone `performance.html`. `make benchmark-page` rebuilds accuracy
+data, then `combine.js` combines it with the latest recorded performance run and
+renders `benchmark.html` and `full-benchmark.html` from `template.html`. The
+combined template renders the performance payload directly; it does not embed the
+standalone performance page.
+`make benchmark-page-performance` refreshes the combined page from existing
+accuracy and performance data without rerunning accuracy generation.
+V0 accuracy outputs are `accuracy-v0.html` and `full-accuracy-v0.html`; all
+`full-accuracy*.html` files are ignored by git.
 
 ## Release / build metadata
 
@@ -126,9 +138,11 @@ excluded from git (`.gitignore`) and must not be published.
 1. Run the benchmark: `make benchmark` (writes `tests/api/benchmark/…json`)
 2. Run the load test: `make test-api-load` (writes `tests/api/result/…json`)
 3. Update `release.json` (release / build / environment)
-4. `make benchmark-page` and enter the `benchmark_build` label (appends or
+4. `make benchmark-page-accuracy` and enter the `benchmark_build` label (appends or
    replaces the run in `metadata.json`, keyed by `release` + `benchmark_build`)
-5. Publish the new `benchmark.html`
+5. `make performance-page` when refreshing performance data, then run
+   `make benchmark-page-performance` to update the combined page.
+6. Publish the new `benchmark.html`
 
 ## Embedding from the external website
 

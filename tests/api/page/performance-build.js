@@ -183,6 +183,22 @@ function parseArgs(argv) {
   return args;
 }
 
+function payloadFor(entry, entries, artifact) {
+  return {
+    entry,
+    entries: entries.map((e) => ({
+      performance_build: e.performance_build,
+      role: e.role || null,
+      generated_at: e.generated_at || null,
+      git_commit: e.git_commit || null,
+    })),
+    comparability: comparability(entry.before, entry.after),
+    not_measured: collectNotMeasured(artifact, 'artifact', []),
+    limitations: artifact.limitations || [],
+    stage_time_coverage_pct: entry.after.metrics.stage_time_coverage_pct,
+  };
+}
+
 function readMetadataEntries() {
   if (!fs.existsSync(META_FILE)) return [];
   const trimmed = fs.readFileSync(META_FILE, 'utf-8').trim();
@@ -262,19 +278,7 @@ function main() {
 
   fs.writeFileSync(META_FILE, JSON.stringify(entries, null, 2) + '\n');
 
-  const payload = {
-    entry,
-    entries: entries.map((e) => ({
-      performance_build: e.performance_build,
-      role: e.role || null,
-      generated_at: e.generated_at || null,
-      git_commit: e.git_commit || null,
-    })),
-    comparability: comparability(before, after),
-    not_measured: collectNotMeasured(artifact, 'artifact', []),
-    limitations: artifact.limitations || [],
-    stage_time_coverage_pct: after.metrics.stage_time_coverage_pct,
-  };
+  const payload = payloadFor(entry, entries, artifact);
 
   fs.writeFileSync(OUTPUT, renderTemplate(payload));
 
@@ -295,4 +299,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { metricsFrom, snapshotFrom, collectNotMeasured, comparability };
+module.exports = { metricsFrom, snapshotFrom, collectNotMeasured, comparability, payloadFor, readJson, relArtifact };
