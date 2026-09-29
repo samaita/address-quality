@@ -4,8 +4,9 @@ Self-contained, embeddable page that reports one Address Quality release/build:
 accuracy, performance and reproducibility metadata.
 
 The combined publishing artifact is **`benchmark.html`** — a single HTML file with accuracy and performance data inlined.
-It renders standalone and inside an `<iframe>`, with no external dependencies, no
-CORS, and scoped CSS that cannot affect the host page.
+Both sections are rendered inline from that inlined data (no nested document or
+iframe); the page renders standalone and inside an `<iframe>`, with no external
+dependencies, no CORS, and scoped CSS that cannot affect the host page.
 
 Each generated page is tied to a **`benchmark_build`** label (prompted by `make
 benchmark-page`). `release` identifies the underlying binary; `benchmark_build`

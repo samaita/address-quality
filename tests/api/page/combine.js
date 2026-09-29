@@ -8,21 +8,13 @@ const { payloadFor, readJson, relArtifact } = require('./performance-build');
 
 const PAGE_DIR = __dirname;
 const REPO_DIR = path.join(PAGE_DIR, '..', '..', '..');
-const TEMPLATE = path.join(PAGE_DIR, 'performance-template.html');
-const OUTPUT = path.join(PAGE_DIR, 'performance.html');
 const COMBINED_OUTPUT = path.join(PAGE_DIR, 'benchmark.html');
 const FULL_OUTPUT = path.join(PAGE_DIR, 'full-benchmark.html');
 const PERFORMANCE_META = path.join(PAGE_DIR, 'performance-metadata.json');
-function escapeScriptJson(value) {
-  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-}
 
-function renderPerformance(payload) {
-  let html = fs.readFileSync(TEMPLATE, 'utf8');
-  if (!html.includes('__AQ_DATA__')) throw new Error('performance-template.html missing __AQ_DATA__ marker');
-  return html.replace('const AQ_DATA = __AQ_DATA__;', `const AQ_DATA = ${escapeScriptJson(payload)};`);
-}
-
+// The performance report is inlined as data (performance_report); template.html
+// renders the performance section from it directly. No nested HTML document is
+// embedded, so there is nothing to render separately here.
 function combine(accuracyPayload, performancePayload) {
   return { ...accuracyPayload, performance_report: performancePayload };
 }
@@ -39,11 +31,10 @@ function main() {
   const accuracy = readJson(accuracyPath);
   const fullAccuracy = readJson(fullAccuracyPath);
 
-  fs.writeFileSync(OUTPUT, renderPerformance(report));
   fs.writeFileSync(COMBINED_OUTPUT, renderTemplate(combine(accuracy, report)));
   fs.writeFileSync(FULL_OUTPUT, renderTemplate(combine(fullAccuracy, report)));
-  console.log(`Wrote ${OUTPUT}, ${COMBINED_OUTPUT}, and ${FULL_OUTPUT} (performance source ${relArtifact(artifactPath)})`);
+  console.log(`Wrote ${COMBINED_OUTPUT} and ${FULL_OUTPUT} (performance source ${relArtifact(artifactPath)})`);
 }
 
 if (require.main === module) main();
-module.exports = { combine, escapeScriptJson };
+module.exports = { combine };
