@@ -123,17 +123,25 @@
 }
 .aq-section-title + .aq-subtitle { margin-top: 0; }
 
-/* Performance content hidden until load-test config data is available. */
-.aq-nav a[href="#performance"],
-#aq-summary-perf-title,
-#aq-summary-perf,
-#performance { display: none; }
-
-/* Full (untrimmed) builds expose the performance run. */
-.aq-benchmark.aq-full .aq-nav a[href="#performance"],
-.aq-benchmark.aq-full #aq-summary-perf-title,
-.aq-benchmark.aq-full #aq-summary-perf { display: grid; }
-.aq-benchmark.aq-full #performance { display: block; }
+/* Performance is rendered inline from the inlined report. Its tables use the
+   same .aq-table / .aq-table-wrap styling as the rest of the page; only the
+   section rhythm and the perf-specific delta colours are added here. */
+.aq-performance .aq-section { margin-top: 40px; }
+.aq-performance .aq-section-title { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--aq-muted); padding-bottom: 10px; border-bottom: 1px solid var(--aq-border); margin-bottom: 0; }
+.aq-performance .aq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
+.aq-performance .aq-card { padding: 14px 16px; }
+.aq-performance .aq-card dt { color: var(--aq-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.aq-performance .aq-card dd { font-size: 22px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.aq-performance .aq-card dd small { font-size: 13px; color: var(--aq-muted); }
+.aq-performance .aq-table-wrap { margin-top: 12px; }
+.aq-performance .aq-banner { border: 1px solid var(--aq-border-strong); border-left: 3px solid var(--aq-amber); background: var(--aq-surface); border-radius: 8px; padding: 12px 16px; margin-top: 18px; }
+.aq-performance .aq-banner h3 { font-size: 15px; margin-bottom: 4px; }
+.aq-performance .aq-banner ul { margin: 6px 0 0 18px; }
+.aq-performance .aq-banner li { font-size: 13px; color: var(--aq-muted); }
+.aq-better { color: var(--aq-green); }
+.aq-worse { color: var(--aq-red); }
+.aq-flat { color: var(--aq-faint); }
+.aq-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; border: 1px solid var(--aq-border-strong); color: var(--aq-muted); }
 
 .aq-cards {
   display: grid;
@@ -327,7 +335,7 @@
           <div class="aq-nav-title">On this page</div>
           <a href="#summary">Summary</a>
           <a href="#benchmark">Benchmark</a>
-          <a href="#performance">Performance</a>
+          <a href="#performance" id="aq-nav-performance" hidden>Performance</a>
           <a href="#release">Release</a>
         </nav>
 
@@ -336,8 +344,6 @@
             <h2 class="aq-section-title">Summary</h2>
             <h3 class="aq-subtitle">Benchmark</h3>
             <div class="aq-cards" id="aq-summary-bench"></div>
-            <h3 class="aq-subtitle" id="aq-summary-perf-title">Performance</h3>
-            <div class="aq-cards" id="aq-summary-perf"></div>
             <h3 class="aq-subtitle">Top 3 challenges</h3>
             <div id="aq-summary-challenges"></div>
           </section>
@@ -356,14 +362,18 @@
             <p class="aq-note" id="aq-failures-note" hidden></p>
           </section>
 
-          <section id="performance" class="aq-section">
+          <section id="performance" class="aq-section" hidden>
             <h2 class="aq-section-title">Performance</h2>
-            <div class="aq-cards" id="aq-perf-cards"></div>
-            <h3 class="aq-subtitle">Test configuration</h3>
-            <div class="aq-table-wrap"><table class="aq-table" id="aq-perf-config"></table></div>
-            <h3 class="aq-subtitle">Environment</h3>
-            <div class="aq-env-grid" id="aq-perf-env"></div>
-            <p class="aq-note" id="aq-perf-note"></p>
+            <div class="aq-performance">
+              <div id="aq-perf-comparability"></div>
+              <section class="aq-section"><h3 class="aq-section-title">Before and after</h3><p class="aq-note">Both sides come from named runs in <span class="aq-mono">performance-metadata.json</span>. The baseline is chosen by label, never by file position.</p><div class="aq-grid" id="aq-perf-headline"></div><div class="aq-table-wrap"><table class="aq-table" id="aq-perf-delta"></table></div><p class="aq-note" id="aq-perf-delta-note"></p></section>
+              <section class="aq-section"><h3 class="aq-section-title">Client observed latency</h3><p class="aq-note">k6 is authoritative for everything in this section. Milliseconds, after run.</p><div class="aq-table-wrap"><table class="aq-table" id="aq-perf-latency"></table></div></section>
+              <section class="aq-section"><h3 class="aq-section-title">Cold start</h3><p class="aq-note">First request on a fresh process, measured separately so lazy cache loading never lands in warm percentiles.</p><div class="aq-table-wrap"><table class="aq-table" id="aq-perf-cold"></table></div></section>
+              <section class="aq-section"><h3 class="aq-section-title">Server-side stages</h3><p class="aq-note">Diagnostic only. Span-duration sums, not percentiles. Stages are ordered by after-run share of stage time.</p><div class="aq-table-wrap"><table class="aq-table" id="aq-perf-stages"></table></div><p class="aq-note" id="aq-perf-coverage"></p></section>
+              <section class="aq-section"><h3 class="aq-section-title">Runtime characteristics</h3><div class="aq-table-wrap"><table class="aq-table" id="aq-perf-runtime"></table></div></section>
+              <section class="aq-section"><h3 class="aq-section-title">Not measured</h3><p class="aq-note">Absent data is never zero. These are gaps with their reasons, carried through from the artifact.</p><div class="aq-table-wrap"><table class="aq-table" id="aq-perf-notmeasured"></table></div></section>
+              <section class="aq-section"><h3 class="aq-section-title">Limitations</h3><ul id="aq-perf-limitations" style="margin:12px 0 0 20px"></ul></section>
+            </div>
           </section>
 
           <section id="release" class="aq-section">
@@ -517,13 +527,6 @@
     card('Average confidence', avgConf === null ? '<span class="aq-na">N/A</span>' : pct(avgConf, 1),
       ('mean of ' + num(confs.length, 0) + ' scored records · ') + beforeSub('average_confidence', runPct, 'pp'));
 
-  /* ---------- summary: performance ---------- */
-  document.getElementById('aq-summary-perf').innerHTML =
-    card('RPS', na(reqs.rate, 1), 'throughput') +
-    card('P95 latency', ms(dur['p(95)']), 'of ' + num(reqs.count, 0) + ' requests') +
-    card('P99 latency', ms(dur['p(99)']), 'captured in load-test output') +
-    card('Error rate', pct(failed.rate, 2), 'http_req_failed');
-
   /* ---------- summary: top 3 challenges ---------- */
   function challengeRow(k, v) {
     return '<div class="aq-row"><div class="aq-k">' + esc(k) + '</div><div class="aq-v">' + (v === null || v === undefined || v === '' ? '<span class="aq-na">N/A</span>' : esc(v)) + '</div></div>';
@@ -624,77 +627,173 @@
     document.getElementById('aq-failures-note').hidden = false;
   }
 
-  /* ---------- performance ---------- */
-  var perfCards =
-    card('RPS', na(reqs.rate, 1), 'requests / second') +
-    card('Average latency', ms(dur.avg), '') +
-    card('P50 latency', ms(dur.med), '') +
-    card('P95 latency', ms(dur['p(95)']), '') +
-    card('P99 latency', ms(dur['p(99)']), '') +
-    card('Max latency', ms(dur.max), '') +
-    card('Error rate', pct(failed.rate, 2), 'http_req_failed') +
-    card('Total requests', na(reqs.count, 0), '') +
-    card('Test duration', secs(PERF.test_run_duration_ms), '') +
-    card('VUs (max)', na(vus.max, 0), '');
-  document.getElementById('aq-perf-cards').innerHTML = perfCards;
+  /* ---------- performance: rendered inline from D.performance_report ----------
+     The report is the same payload model performance.html renders; this builds
+     the section from that data directly (no iframe, no nested document). */
+  var P = D.performance_report || {};
+  var PA = P.entry && P.entry.after;
+  var PB = P.entry && P.entry.before;
+  var PM = PA && PA.metrics;
+  var PBM = PB && PB.metrics;
 
-  var opt = PERF.options || null;
-  var cfgRows = '<thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>';
-  if (opt && Array.isArray(opt.stages) && opt.stages.length) {
-    cfgRows += '<tr><td>Load profile (stages)</td><td>' + opt.stages.map(function (s) {
-      return esc(s.target) + ' VUs for ' + esc(s.duration);
-    }).join('<br>') + '</td></tr>';
-  } else {
-    cfgRows += '<tr><td>Load profile</td><td>' +
-      (vus.max !== undefined ? esc(num(vus.max, 0)) + ' VUs' : '<span class="aq-na">N/A</span>') +
-      (PERF.test_run_duration_ms ? ' over ' + secs(PERF.test_run_duration_ms) : '') +
-      ' <span class="aq-dim">(stages not captured in this artifact)</span></td></tr>';
+  function pval(M, from, key) { if (!M) return null; var src = from ? M[from] : M; return src ? src[key] : null; }
+  function pnum(v, digits) {
+    if (v === null || v === undefined || isNaN(Number(v))) return '<span class="aq-na">N/A</span>';
+    return Number(v).toLocaleString('en-US', { minimumFractionDigits: digits || 0, maximumFractionDigits: digits || 0 });
   }
-  if (opt && opt.summaryTrendStats) {
-    cfgRows += '<tr><td>Summary percentiles</td><td>' + esc(opt.summaryTrendStats.join(', ')) + '</td></tr>';
-  }
-  var thresholds = PERF.thresholds || {};
-  var tKeys = Object.keys(thresholds);
-  if (tKeys.length) {
-    cfgRows += tKeys.map(function (k) {
-      var t = thresholds[k];
-      var detail = Object.keys(t.thresholds || {}).map(function (ab) {
-        return esc(ab) + ' — ' + (t.thresholds[ab].ok ? badge('ok', 'pass') : badge('bad', 'fail'));
-      }).join(' &nbsp; ');
-      return '<tr><td>Threshold: ' + esc(k) + '</td><td>' + detail + '</td></tr>';
+  function pms(v) { return v === null || v === undefined || isNaN(Number(v)) ? '<span class="aq-na">N/A</span>' : pnum(v, v >= 100 ? 1 : 3) + ' ms'; }
+  function pcls(better, d) { return (d === 0 || better === 'neutral') ? 'aq-flat' : ((better === 'lower') === (d < 0) ? 'aq-better' : 'aq-worse'); }
+
+  if (PM) {
+    document.getElementById('performance').hidden = false;
+    document.getElementById('aq-nav-performance').hidden = false;
+
+    // Comparability guard: unlike runs must not be differenced silently.
+    var cmp = P.comparability || { comparable: true, reasons: [] };
+    if (!cmp.comparable) {
+      document.getElementById('aq-perf-comparability').innerHTML =
+        '<div class="aq-banner"><h3>Not a like-for-like comparison</h3>' +
+        '<p class="aq-dim">The two runs were measured under different conditions, so the deltas below mix code change with environment change.</p><ul>' +
+        cmp.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul></div>';
+    }
+
+    // Headline cards.
+    var cards = [
+      { label: 'Requests', k: 'requests', better: 'higher', digits: 0 },
+      { label: 'Throughput', k: 'throughput_rps', better: 'higher', digits: 2, unit: 'req/s' },
+      { label: 'p(95) latency', k: 'p(95)', from: 'http_req_duration_ms', better: 'lower', ms: true },
+      { label: 'p(99) latency', k: 'p(99)', from: 'http_req_duration_ms', better: 'lower', ms: true },
+      { label: 'HTTP errors', k: 'http_errors', better: 'lower', digits: 0 },
+      { label: 'Cold start', k: 'cold_start_ms', better: 'lower', ms: true },
+    ];
+    document.getElementById('aq-perf-headline').innerHTML = cards.map(function (c) {
+      var av = pval(PM, c.from, c.k), bv = pval(PBM, c.from, c.k);
+      var shown = c.ms ? pms(av) : pnum(av, c.digits) + (c.unit ? ' <small>' + esc(c.unit) + '</small>' : '');
+      var delta = '<small class="aq-flat">no baseline</small>';
+      if (bv !== null && bv !== undefined && av !== null && av !== undefined) {
+        var d = av - bv;
+        delta = '<small class="' + pcls(c.better, d) + '">' + (d > 0 ? '+' : '') +
+          pnum(d, c.ms ? 3 : (c.digits === undefined ? 2 : c.digits)) + (c.ms ? ' ms' : '') + '</small>';
+      }
+      return '<div class="aq-card"><dt>' + esc(c.label) + '</dt><dd>' + shown + '<br>' + delta + '</dd></div>';
     }).join('');
-  } else {
-    cfgRows += '<tr><td>Thresholds</td><td><span class="aq-na">N/A</span></td></tr>';
-  }
-  cfgRows += '</tbody>';
-  document.getElementById('aq-perf-config').innerHTML = cfgRows;
 
-  /* ---------- performance: environment ---------- */
-  var runner = M.runner || {};
-  var server = M.server || {};
-  function envCell(name, value) {
-    return '<div class="aq-row"><div class="aq-k">' + esc(name) + '</div><div class="aq-v">' +
-      (value === null || value === undefined || value === '' ? '<span class="aq-na">N/A</span>' : esc(value)) +
-      '</div></div>';
-  }
-  var envHtml =
-    '<div class="aq-env"><h3>Runner (k6)</h3>' +
-      envCell('CPU', runner.cpu) + envCell('Memory', runner.memory) +
-      envCell('OS', runner.os) + envCell('k6 version', runner.k6_version) +
-    '</div>' +
-    '<div class="aq-env"><h3>Server under test</h3>' +
-      envCell('CPU', server.cpu) + envCell('Memory', server.memory) +
-      envCell('OS', server.os) + envCell('API version', server.api_version) +
-      envCell('Git commit', server.git_commit) +
-    '</div>';
-  document.getElementById('aq-perf-env').innerHTML = envHtml;
+    // Full before/after table.
+    var rows = [
+      { label: 'Requests', k: 'requests', better: 'higher', digits: 0 },
+      { label: 'Throughput (req/s)', k: 'throughput_rps', better: 'higher', digits: 2 },
+      { label: 'HTTP errors', k: 'http_errors', better: 'lower', digits: 0 },
+      { label: 'HTTP error rate', k: 'http_error_rate', better: 'lower', digits: 4 },
+      { label: 'Cold start (ms)', k: 'cold_start_ms', better: 'lower', digits: 3 },
+      { label: 'Stage coverage of request time (%)', k: 'stage_time_coverage_pct', better: 'neutral', digits: 2 },
+    ];
+    var pctiles = ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'];
+    pctiles.forEach(function (p) { rows.push({ label: 'http_req_duration ' + p + ' (ms)', from: 'http_req_duration_ms', k: p, better: 'lower', digits: 3 }); });
 
-  var envMissing = !runner.cpu && !runner.memory && !runner.os && !runner.k6_version &&
-                   !server.cpu && !server.memory && !server.os;
-  document.getElementById('aq-perf-note').innerHTML =
-    'These numbers were measured with k6 on ' + (PERF.generated_at ? esc(PERF.generated_at.replace('T', ' ').slice(0, 19)) + ' UTC' : '<span class="aq-na">N/A</span>') +
-    ' against the runner and server above. They describe this specific environment and are not a guarantee of universal production performance.' +
-    (envMissing ? ' Environment details are not captured in the current artifacts — add them to <span class="aq-mono">tests/api/page/release.json</span> before publishing.' : '');
+    document.getElementById('aq-perf-delta').innerHTML =
+      '<thead><tr><th>Metric</th><th class="aq-num">Before</th><th class="aq-num">After</th><th class="aq-num">Delta</th><th>Direction</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var av = pval(PM, r.from, r.k), bv = pval(PBM, r.from, r.k);
+        var fmt = r.from ? pms : function (v) { return pnum(v, r.digits); };
+        var deltaCell = '<span class="aq-na">n/a</span>', dir = '<span class="aq-flat">no baseline</span>';
+        if (bv !== null && bv !== undefined && av !== null && av !== undefined) {
+          var d = av - bv;
+          deltaCell = '<span class="' + pcls(r.better, d) + '">' + (d > 0 ? '+' : '') + pnum(d, r.digits) + '</span>';
+          dir = r.better === 'neutral' ? '<span class="aq-flat">no direction</span>'
+            : (d === 0 ? '<span class="aq-flat">unchanged</span>'
+              : '<span class="' + pcls(r.better, d) + '">' + (((r.better === 'lower') === (d < 0)) ? 'improved' : 'regressed') + '</span>');
+        }
+        return '<tr><td>' + esc(r.label) + '</td>' +
+          '<td class="aq-num">' + fmt(bv) + '</td>' +
+          '<td class="aq-num">' + fmt(av) + '</td>' +
+          '<td class="aq-num">' + deltaCell + '</td><td>' + dir + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    document.getElementById('aq-perf-delta-note').innerHTML = PB
+      ? 'Before = <span class="aq-mono">' + esc(PB.performance_build) + '</span> ' +
+        '(<span class="aq-mono">' + esc(PB.artifact_source) + '</span>, commit ' +
+        '<span class="aq-mono">' + esc((PB.git_commit || '').slice(0, 7) || 'n/a') + '</span>). ' +
+        'After = <span class="aq-mono">' + esc(PA.performance_build) + '</span> ' +
+        '(<span class="aq-mono">' + esc(PA.artifact_source) + '</span>, commit ' +
+        '<span class="aq-mono">' + esc((PA.git_commit || '').slice(0, 7) || 'n/a') + '</span>). ' +
+        (PB.git_commit === PA.git_commit
+          ? '<strong>Same commit: these deltas are run-to-run variance, not code change.</strong>'
+          : 'Different commits: a delta smaller than the run-to-run spread is not evidence of a change.')
+      : 'This run is the baseline. There is no before side yet, so every delta is n/a rather than zero.';
+
+    // Latency percentiles.
+    document.getElementById('aq-perf-latency').innerHTML =
+      '<thead><tr><th>Metric</th><th class="aq-num">After run</th></tr></thead><tbody>' +
+      ['http_req_duration_ms', 'http_req_waiting_ms', 'iteration_duration_ms'].map(function (name) {
+        return PM[name] ? pctiles.map(function (p) {
+          return '<tr><td>' + esc(name) + ' ' + p + '</td><td class="aq-num">' + pms(PM[name][p]) + '</td></tr>';
+        }).join('') : '';
+      }).join('') + '</tbody>';
+
+    // Cold start.
+    var cs = PM.cold_stages || {};
+    var coldRows = ['<tr><td><strong>Total, client observed</strong></td><td class="aq-num">' + pms(PM.cold_start_ms) + '</td><td class="aq-num"></td></tr>'];
+    Object.keys(cs).sort(function (x, y) { return (cs[y].sum_ms || 0) - (cs[x].sum_ms || 0); }).forEach(function (s) {
+      coldRows.push('<tr><td class="aq-mono">' + esc(s) + '</td><td class="aq-num">' + pms(cs[s].sum_ms) +
+        '</td><td class="aq-num">' + pnum(cs[s].share_of_stage_time_pct, 2) + '%</td></tr>');
+    });
+    document.getElementById('aq-perf-cold').innerHTML =
+      '<thead><tr><th>Part</th><th class="aq-num">Sum</th><th class="aq-num">Share</th></tr></thead><tbody>' + coldRows.join('') + '</tbody>';
+
+    // Server-side stages, with before/after share.
+    var bIdx = {};
+    (PBM && PBM.stages ? PBM.stages : []).forEach(function (s) { bIdx[s.stage] = s; });
+    document.getElementById('aq-perf-stages').innerHTML =
+      '<thead><tr><th>Stage</th><th class="aq-num">After count</th><th class="aq-num">After sum</th>' +
+      '<th class="aq-num">After share</th><th class="aq-num">Before share</th><th class="aq-num">Calls/req</th></tr></thead><tbody>' +
+      (PM.stages || []).slice().sort(function (x, y) { return (y.sum_ms || 0) - (x.sum_ms || 0); }).map(function (s) {
+        var b = bIdx[s.stage];
+        return '<tr><td class="aq-mono">' + esc(s.stage) + '</td>' +
+          '<td class="aq-num">' + pnum(s.count, 0) + '</td>' +
+          '<td class="aq-num">' + pms(s.sum_ms) + '</td>' +
+          '<td class="aq-num">' + pnum(s.share_of_stage_time_pct, 2) + '%</td>' +
+          '<td class="aq-num">' + (b ? pnum(b.share_of_stage_time_pct, 2) + '%' : '<span class="aq-na">N/A</span>') + '</td>' +
+          '<td class="aq-num">' + pnum(s.calls_per_request, 3) + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    document.getElementById('aq-perf-coverage').innerHTML =
+      'Stages explain ' + pnum(P.stage_time_coverage_pct, 2) + '% of <span class="aq-mono">http.request</span> time. ' +
+      'The remainder is work no stage wraps (sanitizing, normalization, JSON encoding, HTTP server overhead).';
+
+    // Runtime characteristics: flatten nested dicts, drop notes and gaps.
+    var rt = PM.runtime_characteristics || {};
+    var flat = {};
+    Object.keys(rt).forEach(function (k) {
+      if (k === 'snapshot_note') return;
+      var v = rt[k];
+      if (v && typeof v === 'object') {
+        if (v.status === 'not_measured') return;
+        Object.keys(v).forEach(function (sk) { flat[k + '_' + sk] = v[sk]; });
+        return;
+      }
+      flat[k] = v;
+    });
+    document.getElementById('aq-perf-runtime').innerHTML =
+      '<thead><tr><th>Measurement</th><th class="aq-num">Value</th></tr></thead><tbody>' +
+      Object.keys(flat).map(function (k) {
+        return '<tr><td class="aq-mono">' + esc(k) + '</td><td class="aq-num">' + esc(String(flat[k])) + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    // Not measured.
+    var nm = P.not_measured || [];
+    document.getElementById('aq-perf-notmeasured').innerHTML = nm.length
+      ? '<thead><tr><th>Field</th><th>Reason</th></tr></thead><tbody>' +
+        nm.map(function (n) { return '<tr><td class="aq-mono">' + esc(n.path) + '</td><td class="aq-dim">' + esc(n.reason) + '</td></tr>'; }).join('') + '</tbody>'
+      : '<tbody><tr><td class="aq-na">nothing missing</td></tr></tbody>';
+
+    // Limitations.
+    var lim = (P.limitations || []).concat(PB ? [
+      'Two runs are recorded here and they bound the smallest credible delta: a change ' +
+      'smaller than the spread between them is not distinguishable from run-to-run noise.',
+    ] : []);
+    document.getElementById('aq-perf-limitations').innerHTML =
+      lim.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') || '<li class="aq-na">none recorded</li>';
+  }
 
   /* ---------- release ---------- */
   var relRows = '<thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>';
@@ -739,7 +838,7 @@
 
   /* ---------- footer ---------- */
   document.getElementById('aq-sources').textContent =
-    (B.source || 'benchmark.json') + ' · ' + (PERF.source || 'performance.json');
+    (B.source || 'benchmark.json') + ' · ' + ((D.performance_report && D.performance_report.entry && D.performance_report.entry.artifact_source) || PERF.source || 'performance.json');
 })();
 </script>
 </body>

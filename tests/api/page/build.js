@@ -36,8 +36,8 @@ const BENCH_VER = process.env.BENCH_VER || 'v1';
 const BENCH_DIR = path.join(PAGE_DIR, '..', BENCH_VER === 'v0' ? 'benchmark-v0' : 'benchmark');
 const RESULT_DIR = path.join(PAGE_DIR, '..', 'result');
 const TEMPLATE = path.join(PAGE_DIR, 'template.html');
-const OUTPUT = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'benchmark-v0.html' : 'benchmark.html');
-const FULL_OUTPUT = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'full-benchmark-v0.html' : 'full-benchmark.html');
+const OUTPUT = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'accuracy-v0.html' : 'accuracy.html');
+const FULL_OUTPUT = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'full-accuracy-v0.html' : 'full-accuracy.html');
 const META_FILE = path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'metadata-v0.json' : 'metadata.json');
 const RELEASE_FILE = path.join(PAGE_DIR, 'release.json');
 const BENCH_PATTERN = new RegExp(`_benchmark_${BENCH_VER}_\\d{4}\\.json$`);
@@ -360,13 +360,13 @@ function buildFullPayload(meta, before, benchmarkFile, perfFile, benchmarkRows) 
   return payload;
 }
 
-function renderTemplate(payload) {
+function renderTemplate(payload, templatePath = TEMPLATE) {
   const json = JSON.stringify(payload)
     .replace(/</g, '\\u003c')
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029');
 
-  let html = fs.readFileSync(TEMPLATE, 'utf-8');
+  let html = fs.readFileSync(templatePath, 'utf-8');
   if (!html.includes('__AQ_DATA__')) {
     console.error('template.html is missing the __AQ_DATA__ marker.');
     process.exit(1);
@@ -447,6 +447,8 @@ function main() {
   fs.mkdirSync(PAGE_DIR, { recursive: true });
   fs.writeFileSync(OUTPUT, html);
   fs.writeFileSync(FULL_OUTPUT, fullHtml);
+  fs.writeFileSync(path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'accuracy-v0-data.json' : 'accuracy-data.json'), JSON.stringify(payload));
+  fs.writeFileSync(path.join(PAGE_DIR, BENCH_VER === 'v0' ? 'full-accuracy-v0-data.json' : 'full-accuracy-data.json'), JSON.stringify(fullPayload));
   console.log(`Wrote ${OUTPUT}`);
   console.log(`Wrote ${FULL_OUTPUT} (${fullPayload.benchmark.failure_total} failures shown, raw addresses included)`);
   console.log(
@@ -464,4 +466,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { formatActualAddress, parseMetadataEntries };
+module.exports = { formatActualAddress, parseMetadataEntries, renderTemplate };
